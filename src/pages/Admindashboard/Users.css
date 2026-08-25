@@ -1,0 +1,13 @@
+.user-toolbar { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.search-input { padding: 10px 18px; border-radius: 40px; border: 1px solid #dce6ed; font-size: 14px; flex: 1; min-width: 200px; outline: none; }
+.search-input:focus { border-color: #1B5E20; box-shadow: 0 0 0 3px rgba(27,94,32,0.1); }
+.table-wrap { background: white; border-radius: 24px; padding: 20px; border: 1px solid #edf3f8; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; padding: 12px 8px; color: #5f7f90; font-weight: 600; border-bottom: 2px solid #f0f5fa; }
+td { padding: 14px 8px; border-bottom: 1px solid #f0f5fa; }
+tr:last-child td { border-bottom: none; }
+.badge { padding: 4px 12px; border-radius: 40px; font-size: 12px; font-weight: 600; }
+.badge.active { background: #e2f3e6; color: #1e6f4a; }
+.badge.verified { background: #d6eaff; color: #1a5a8a; }
+.badge.pending { background: #fff4d6; color: #9e7a2c; }
+.badge.suspended { background: #fde8e8; color: #b34141; }
