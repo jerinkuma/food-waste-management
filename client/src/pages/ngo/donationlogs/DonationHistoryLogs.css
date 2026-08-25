@@ -1,0 +1,297 @@
+/* DonationHistoryLogs.css */
+
+.dhl-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background-color: #f8fafc;
+  min-height: 100vh;
+  color: #1e293b;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  padding: 8px;
+}
+
+.dhl-header {
+  background-color: #ffffff;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  padding: 20px;
+  border-radius: 1rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.dhl-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dhl-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: #1e293b;
+  margin: 0;
+}
+
+.dhl-subtitle {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.dhl-export-btn {
+  background-color: #059669;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 10px 16px;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  border: none;
+  cursor: pointer;
+}
+
+.dhl-export-btn:hover {
+  background-color: #047857;
+}
+
+.dhl-filters-panel {
+  background-color: #ffffff;
+  padding: 16px;
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+@media (min-width: 640px) {
+  .dhl-filters-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .dhl-filters-panel {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+.dhl-filter-label {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.dhl-filter-select,
+.dhl-filter-input {
+  width: 100%;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 8px 12px;
+  color: #334155;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.dhl-filter-select:focus,
+.dhl-filter-input:focus {
+  border-color: #10b981;
+}
+
+.dhl-main-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+.dhl-table-col {
+  grid-column: span 12 / span 12;
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .dhl-table-col {
+    grid-column: span 9 / span 9;
+  }
+}
+
+.dhl-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 12px;
+}
+
+.dhl-table-title {
+  font-weight: 800;
+  color: #1e293b;
+  font-size: 0.875rem;
+  letter-spacing: 0.025em;
+  margin: 0;
+}
+
+.dhl-records-badge {
+  background-color: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  font-size: 0.75rem;
+  font-weight: 900;
+  padding: 4px 12px;
+  border-radius: 9999px;
+}
+
+.dhl-table-wrapper {
+  overflow-x: auto;
+}
+
+.dhl-custom-table {
+  width: 100%;
+  text-align: left;
+  font-size: 0.75rem;
+  border-collapse: collapse;
+}
+
+.dhl-custom-table th {
+  background-color: #f1f5f9;
+  color: #475569;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dhl-custom-table th:first-child {
+  border-top-left-radius: 0.75rem;
+  border-bottom-left-radius: 0.75rem;
+}
+
+.dhl-custom-table th:last-child {
+  border-top-right-radius: 0.75rem;
+  border-bottom-right-radius: 0.75rem;
+}
+
+.dhl-custom-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  font-weight: 500;
+}
+
+.dhl-custom-table tr:hover {
+  background-color: #f8fafc;
+  transition: background-color 0.2s;
+}
+
+.dhl-see-more-btn {
+  width: 100%;
+  margin-top: 12px;
+  background-color: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  font-weight: 800;
+  padding: 12px;
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+}
+
+.dhl-see-more-btn:hover {
+  background-color: #f8fafc;
+}
+
+.dhl-overview-col {
+  grid-column: span 12 / span 12;
+}
+
+@media (min-width: 1024px) {
+  .dhl-overview-col {
+    grid-column: span 3 / span 3;
+  }
+}
+
+.dhl-overview-card {
+  background-color: #ffffff;
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  padding: 20px;
+  position: relative;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dhl-overview-item {
+  background-color: rgba(248, 250, 252, 0.5);
+  padding: 14px;
+  border-radius: 0.75rem;
+  border: 1px solid #f1f5f9;
+  text-align: center;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+.dhl-overview-item:hover {
+  background-color: rgba(236, 253, 245, 0.4);
+}
+
+.dhl-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+
+.dhl-modal-box {
+  background-color: #ffffff;
+  border-radius: 1rem;
+  padding: 24px;
+  width: 100%;
+  max-width: 24rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid #e2e8f0;
+  position: relative;
+}

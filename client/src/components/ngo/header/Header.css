@@ -1,0 +1,337 @@
+/* Header.css */
+
+.ngo-header {
+  padding: 16px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+.ngo-header-dark {
+  background-color: #1e293b;
+  border-color: rgba(51, 65, 85, 0.6);
+  color: #f1f5f9;
+}
+
+.ngo-header-light {
+  background-color: #F8FAFC;
+  border-color: rgba(226, 232, 240, 0.6);
+  color: #0f172a;
+}
+
+.ngo-header-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.ngo-header-subtitle {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.ngo-header-subtitle-dark {
+  color: #94a3b8;
+}
+
+.ngo-header-subtitle-light {
+  color: #64748b;
+}
+
+.ngo-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+}
+
+.ngo-theme-badge {
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-weight: 600;
+  border: 1px solid;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.ngo-theme-badge-dark {
+  background-color: rgba(30, 41, 59, 0.8);
+  color: #34d399;
+  border-color: #334155;
+}
+
+.ngo-theme-badge-light {
+  background-color: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.ngo-search-container {
+  position: relative;
+  width: 16rem;
+}
+
+.ngo-search-icon {
+  width: 1rem;
+  height: 1rem;
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+}
+
+.ngo-search-input {
+  width: 100%;
+  padding-left: 36px;
+  padding-right: 16px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.ngo-search-input:focus {
+  ring: 2px;
+}
+
+.ngo-search-input-dark {
+  background-color: #0f172a;
+  border: 1px solid #334155;
+  color: #f1f5f9;
+}
+
+.ngo-search-input-dark::placeholder {
+  color: #64748b;
+}
+
+.ngo-search-input-light {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.ngo-search-input-light::placeholder {
+  color: #94a3b8;
+}
+
+.ngo-bell-btn {
+  padding: 8px;
+  border-radius: 9999px;
+  position: relative;
+  border: 1px solid;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.ngo-bell-btn-dark {
+  background-color: #0f172a;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+.ngo-bell-btn-dark:hover {
+  background-color: #1e293b;
+}
+
+.ngo-bell-btn-light {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.ngo-bell-btn-light:hover {
+  background-color: #f8fafc;
+}
+
+.ngo-bell-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #f43f5e;
+  border-radius: 9999px;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+.ngo-profile-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 8px;
+  padding-right: 16px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-radius: 9999px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ngo-profile-box-dark {
+  background-color: #0f172a;
+  border-color: #334155;
+}
+
+.ngo-profile-box-light {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+}
+
+.ngo-profile-box:hover {
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+}
+
+.ngo-profile-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  object-fit: cover;
+  border: 1px solid #10b981;
+}
+
+.ngo-profile-text {
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.ngo-profile-text-dark {
+  color: #e2e8f0;
+}
+
+.ngo-profile-text-light {
+  color: #1e293b;
+}
+
+.ngo-profile-modal {
+  position: absolute;
+  right: 0;
+  top: 56px;
+  width: 20rem;
+  border-radius: 1rem;
+  border: 1px solid;
+  padding: 20px;
+  z-index: 50;
+}
+
+@media (min-width: 640px) {
+  .ngo-profile-modal {
+    width: 24rem;
+  }
+}
+
+.ngo-profile-modal-dark {
+  background-color: #0f172a;
+  border-color: #334155;
+  color: #f1f5f9;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.ngo-profile-modal-light {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+  color: #1e293b;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.ngo-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+}
+
+.ngo-modal-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background-color: rgba(16, 185, 129, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #10b981;
+  font-weight: bold;
+  font-size: 1.125rem;
+}
+
+.ngo-modal-tag {
+  font-size: 11px;
+  color: #10b981;
+  font-weight: 500;
+}
+
+.ngo-modal-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 1.125rem;
+}
+
+.ngo-modal-close:hover {
+  color: #475569;
+}
+
+.ngo-modal-desc {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  font-size: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+}
+
+.ngo-modal-notice {
+  padding: 10px;
+  border-radius: 12px;
+  background-color: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  font-size: 11px;
+  color: #059669;
+  font-weight: 500;
+}
+
+.ngo-modal-stats {
+  padding-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  text-align: center;
+}
+
+.ngo-stat-card {
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid;
+}
+
+.ngo-stat-card-dark {
+  background-color: rgba(30, 41, 59, 0.5);
+  border-color: #1e293b;
+}
+
+.ngo-stat-card-light {
+  background-color: #f8fafc;
+  border-color: #f1f5f9;
+}
+
+.ngo-stat-number {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #10b981;
+}
+
+.ngo-stat-label {
+  font-size: 10px;
+  color: #94a3b8;
+}
