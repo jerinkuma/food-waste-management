@@ -9,6 +9,7 @@ import {
 import Home from "./pages/Home/Home";
 import Auth from "./pages/Auth/Auth";
 
+// Restaurant / Donor
 import Dashboard from "./pages/DonorDashboard/Dashboard";
 import AddDonation from "./pages/DonorDashboard/AddDonation";
 import DonationSuccess from "./pages/DonorDashboard/DonationSuccess";
@@ -16,6 +17,7 @@ import DonationHistory from "./pages/DonorDashboard/DonationHistory";
 import Analytics from "./pages/DonorDashboard/Analytics";
 import Profile from "./pages/DonorDashboard/Profile";
 
+// NGO
 import Sidebar from "./components/ngo/sideber/Sidebar";
 import Header from "./components/ngo/header/Header";
 
@@ -27,10 +29,25 @@ import Feedback from "./pages/ngo/feedback/Feedback";
 import Settings from "./pages/ngo/setting/Settings";
 import NGODashboard from "./pages/ngo/NGODashboard";
 
+// Admin
+import AdminNavbar from "./components/Admindashboard/Navbar";
+import AdminSidebar from "./components/Admindashboard/Sidebar";
+import AdminFooter from "./components/Admindashboard/Footer";
+
+import AdminDashboard from "./pages/Admindashboard/Dashboard";
+import AdminUsers from "./pages/Admindashboard/Users";
+import AdminDonations from "./pages/Admindashboard/Donations";
+import AdminOrphanages from "./pages/Admindashboard/Orphanages";
+import AdminFeedback from "./pages/Admindashboard/Feedback";
+import AdminReports from "./pages/Admindashboard/Reports";
+import AdminInventory from "./pages/Admindashboard/Inventory";
+import AdminSettings from "./pages/Admindashboard/Settings";
+
+
 const initialRequests = [
   {
     id: "req_1",
-    donor: "Café 1",
+    donor: "CafÃ© 1",
     timeAgo: "2h ago",
     trustScore: 4.5,
     logistics: "Food Panda Option",
@@ -70,6 +87,11 @@ const initialRequests = [
   },
 ];
 
+
+// =========================
+// NGO Layout
+// =========================
+
 function NGOLayout({
   requests,
   handleAccept,
@@ -92,6 +114,7 @@ function NGOLayout({
 
         <main className="px-8 py-6 flex-1">
           <Routes>
+
             <Route
               path="dashboard"
               element={
@@ -143,6 +166,12 @@ function NGOLayout({
                 />
               }
             />
+
+            <Route
+              index
+              element={<Navigate to="dashboard" replace />}
+            />
+
           </Routes>
         </main>
 
@@ -153,14 +182,96 @@ function NGOLayout({
               : "text-slate-400 border-slate-200/60"
           }`}
         >
-          FeedLink NGO Portal, Chattogram • FeedLink © 2026
+          FeedLink NGO Portal, Chattogram Â· FeedLink Â© 2026
         </footer>
       </div>
     </div>
   );
 }
 
+
+// =========================
+// Admin Layout
+// =========================
+
+function AdminLayout() {
+  return (
+    <div className="app">
+
+      <AdminNavbar />
+
+      <div className="main-wrapper">
+
+        <AdminSidebar />
+
+        <div className="content">
+
+          <Routes>
+
+            <Route
+              index
+              element={<Navigate to="dashboard" replace />}
+            />
+
+            <Route
+              path="dashboard"
+              element={<AdminDashboard />}
+            />
+
+            <Route
+              path="users"
+              element={<AdminUsers />}
+            />
+
+            <Route
+              path="donations"
+              element={<AdminDonations />}
+            />
+
+            <Route
+              path="orphanages"
+              element={<AdminOrphanages />}
+            />
+
+            <Route
+              path="feedback"
+              element={<AdminFeedback />}
+            />
+
+            <Route
+              path="reports"
+              element={<AdminReports />}
+            />
+
+            <Route
+              path="inventory"
+              element={<AdminInventory />}
+            />
+
+            <Route
+              path="settings"
+              element={<AdminSettings />}
+            />
+
+          </Routes>
+
+        </div>
+
+      </div>
+
+      <AdminFooter />
+
+    </div>
+  );
+}
+
+
+// =========================
+// Main App
+// =========================
+
 function App() {
+
   const [requests, setRequests] = useState(initialRequests);
 
   const [themeMode, setThemeMode] = useState(() => {
@@ -171,54 +282,82 @@ function App() {
     localStorage.setItem("theme", themeMode);
   }, [themeMode]);
 
+
   const handleAccept = (id) => {
+
     setRequests((prev) =>
       prev.filter((request) => request.id !== id)
     );
+
     alert("Request Accepted! Moved to Active Pickups.");
   };
 
+
   const handleDecline = (id) => {
+
     setRequests((prev) =>
       prev.filter((request) => request.id !== id)
     );
+
   };
 
+
   return (
+
     <BrowserRouter>
+
       <Routes>
 
-        {/* Main / Home */}
-        <Route path="/" element={<Home />} />
-        <Route path="/auth" element={<Auth />} />
+        {/* ================= HOME ================= */}
 
-        {/* Donor / Restaurant Dashboard */}
+        <Route
+          path="/"
+          element={<Home />}
+        />
+
+        {/* ================= AUTH ================= */}
+
+        <Route
+          path="/auth"
+          element={<Auth />}
+        />
+
+
+        {/* ================= RESTAURANT / DONOR ================= */}
+
         <Route
           path="/restaurant/dashboard"
           element={<Dashboard />}
         />
+
         <Route
           path="/restaurant/add-donation"
           element={<AddDonation />}
         />
+
         <Route
           path="/restaurant/donation-success"
           element={<DonationSuccess />}
         />
+
         <Route
           path="/restaurant/donation-history"
           element={<DonationHistory />}
         />
+
         <Route
           path="/restaurant/analytics"
           element={<Analytics />}
         />
+
         <Route
           path="/restaurant/profile"
           element={<Profile />}
         />
 
-        {/* NGO Dashboard */}
+
+        {/* ================= NGO ================= */}
+
         <Route
           path="/ngo/*"
           element={
@@ -232,15 +371,27 @@ function App() {
           }
         />
 
-        {/* Unknown route */}
+
+        {/* ================= ADMIN ================= */}
+
+        <Route
+          path="/admin/*"
+          element={<AdminLayout />}
+        />
+
+
+        {/* ================= UNKNOWN ROUTE ================= */}
+
         <Route
           path="*"
           element={<Navigate to="/" replace />}
         />
 
       </Routes>
+
     </BrowserRouter>
   );
 }
+
 
 export default App;
