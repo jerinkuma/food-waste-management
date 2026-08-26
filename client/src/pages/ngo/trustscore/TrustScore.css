@@ -1,0 +1,24 @@
+/* TrustScore Component Custom Styles */
+.trust-score-container {
+  /* Jodi kono special custom styling dorkar hoy */
+}
+
+/* Custom Scrollbar for review modals */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
