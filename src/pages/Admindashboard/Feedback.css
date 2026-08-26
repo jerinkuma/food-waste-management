@@ -1,0 +1,7 @@
+.feedback-list { background: white; border-radius: 24px; padding: 20px; border: 1px solid #edf3f8; }
+.feedback-item { padding: 16px; border-bottom: 1px solid #f0f5fa; }
+.feedback-item:last-child { border-bottom: none; }
+.feedback-header { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.feedback-header .rating { color: #f9b042; font-weight: 600; }
+.feedback-item p { font-size: 14px; color: #1a2a3a; }
+.feedback-item .time { color: #5f7f90; font-size: 12px; }

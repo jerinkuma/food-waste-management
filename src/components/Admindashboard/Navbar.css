@@ -1,0 +1,18 @@
+.navbar {
+  background: #ffffff;
+  padding: 16px 36px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 3px solid #1B5E20;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.navbar-brand { display: flex; align-items: center; gap: 12px; color: #1B5E20; font-weight: 700; font-size: 24px; }
+.brand-icon { font-size: 30px; }
+.navbar-right { display: flex; align-items: center; gap: 18px; }
+.admin-name { color: #1B5E20; font-weight: 600; }
+.avatar { width: 42px; height: 42px; border-radius: 50%; background: #1B5E20; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
+.logout-btn { background: transparent; border: 2px solid #1B5E20; color: #1B5E20; padding: 6px 18px; border-radius: 40px; font-weight: 600; cursor: pointer; }
+.logout-btn:hover { background: #1B5E20; color: white; }

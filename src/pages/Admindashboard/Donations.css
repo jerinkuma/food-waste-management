@@ -1,0 +1,12 @@
+.actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn-approve, .btn-reject, .btn-deliver { padding: 4px 12px; border: none; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.btn-approve { background: #e2f3e6; color: #1e6f4a; }
+.btn-approve:hover { background: #b8d9c2; }
+.btn-reject { background: #fde8e8; color: #b34141; }
+.btn-reject:hover { background: #f5c6c6; }
+.btn-deliver { background: #d6eaff; color: #1a5a8a; }
+.btn-deliver:hover { background: #b0d4f0; }
+.badge.accepted { background: #d6eaff; color: #1a5a8a; }
+.badge.delivered { background: #e2f3e6; color: #1e6f4a; }
+.badge.rejected { background: #fde8e8; color: #b34141; }
+.badge.pending { background: #fff4d6; color: #9e7a2c; }
