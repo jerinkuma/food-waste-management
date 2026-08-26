@@ -30,6 +30,7 @@ import Settings from "./pages/ngo/setting/Settings";
 import NGODashboard from "./pages/ngo/NGODashboard";
 
 // Admin
+// Admin
 import AdminNavbar from "./components/Admindashboard/Navbar";
 import AdminSidebar from "./components/Admindashboard/Sidebar";
 import AdminFooter from "./components/Admindashboard/Footer";
@@ -43,6 +44,7 @@ import AdminReports from "./pages/Admindashboard/Reports";
 import AdminInventory from "./pages/Admindashboard/Inventory";
 import AdminSettings from "./pages/Admindashboard/Settings";
 
+import "./App.css";
 
 const initialRequests = [
   {
