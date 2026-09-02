@@ -1,5 +1,4 @@
-import Sidebar from "../../components/DonorDashboard/Sidebar";
-import Topbar from "../../components/DonorDashboard/Topbar";
+import DashboardLayout from "../../components/DonorDashboard/DashboardLayout";
 
 import ProfileCard from "../../components/DonorDashboard/Profile/ProfileCard";
 import RestaurantInfo from "../../components/DonorDashboard/Profile/RestaurantInfo";
@@ -7,43 +6,31 @@ import AccountInfo from "../../components/DonorDashboard/Profile/AccountInfo";
 
 const Profile = () => {
   return (
-    <div className="min-h-screen bg-gray-100">
+    <DashboardLayout>
+      <div className="space-y-6 sm:space-y-8">
 
-      <Sidebar />
+        {/* Page Header */}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+            Restaurant Profile
+          </h1>
 
-      <div className="ml-72">
+          <p className="mt-2 text-sm text-gray-500 sm:text-base">
+            View and manage your restaurant information.
+          </p>
+        </div>
 
-        <Topbar />
+        {/* Profile Card */}
+        <ProfileCard />
 
-        <main className="space-y-8 p-8">
-
-          <div>
-
-            <h1 className="text-3xl font-bold text-gray-900">
-              Restaurant Profile
-            </h1>
-
-            <p className="mt-2 text-gray-500">
-              View and manage your restaurant information.
-            </p>
-
-          </div>
-
-          <ProfileCard />
-
-          <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
-
-            <RestaurantInfo />
-
-            <AccountInfo />
-
-          </div>
-
-        </main>
+        {/* Information Sections */}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <RestaurantInfo />
+          <AccountInfo />
+        </div>
 
       </div>
-
-    </div>
+    </DashboardLayout>
   );
 };
 

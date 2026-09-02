@@ -1,0 +1,318 @@
+
+/* =========================================
+   DONOR DASHBOARD LAYOUT
+========================================= */
+
+.donor-dashboard-layout {
+  min-height: 100vh;
+  background: #f3f4f6;
+  transition: background-color 0.3s ease;
+}
+
+.donor-dashboard-main {
+  min-height: 100vh;
+  margin-left: 72px;
+  background: #f3f4f6;
+  transition:
+    margin-left 0.3s ease,
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+
+.donor-dashboard-content {
+  min-height: 100vh;
+
+  /* Topbar fixed, so content must start below it */
+  padding: 104px 16px 24px;
+}
+
+
+/* =========================================
+   DARK MODE - MAIN LAYOUT
+========================================= */
+
+.dark.donor-dashboard-layout {
+  background: #111827;
+}
+
+.dark .donor-dashboard-main {
+  background: #111827;
+  color: #f9fafb;
+}
+
+.dark .donor-dashboard-content {
+  background: #111827;
+}
+
+
+/* =========================================
+   DARK MODE - MAIN CARDS
+========================================= */
+
+.dark .bg-white {
+  background-color: #1f2937 !important;
+}
+
+
+/* =========================================
+   DARK MODE - GRAY BACKGROUNDS
+========================================= */
+
+.dark .bg-gray-50 {
+  background-color: #1f2937 !important;
+}
+
+.dark .bg-gray-100 {
+  background-color: #1f2937 !important;
+}
+
+.dark .bg-gray-200 {
+  background-color: #374151 !important;
+}
+
+.dark .bg-gray-300 {
+  background-color: #4b5563 !important;
+}
+
+
+/* =========================================
+   DARK MODE - ENVIRONMENTAL IMPACT
+========================================= */
+
+.dark .bg-green-50 {
+  background-color: #173e32 !important;
+}
+
+.dark .bg-orange-50 {
+  background-color: #4e3522 !important;
+}
+
+.dark .bg-blue-50 {
+  background-color: #19344b !important;
+}
+
+.dark .bg-emerald-50 {
+  background-color: #1f4940 !important;
+}
+
+.dark .bg-cyan-50 {
+  background-color: #1e454d !important;
+}
+
+.dark .bg-purple-50 {
+  background-color: #332645 !important;
+}
+
+
+/* Green icon background */
+
+.dark .bg-green-100 {
+  background-color: #1d4a3a !important;
+}
+
+
+/* =========================================
+   DARK MODE - OTHER LIGHT COLORED BACKGROUNDS
+========================================= */
+
+.dark .bg-orange-100 {
+  background-color: #4a321d !important;
+}
+
+.dark .bg-blue-100 {
+  background-color: #1d3b52 !important;
+}
+
+.dark .bg-emerald-100 {
+  background-color: #164538 !important;
+}
+
+.dark .bg-cyan-100 {
+  background-color: #16454b !important;
+}
+
+.dark .bg-purple-100 {
+  background-color: #3a2a52 !important;
+}
+
+.dark .bg-red-50 {
+  background-color: #3b1f25 !important;
+}
+
+.dark .bg-yellow-50 {
+  background-color: #3b3218 !important;
+}
+
+
+/* =========================================
+   DARK MODE - TEXT COLORS
+========================================= */
+
+.dark .text-gray-900 {
+  color: #f9fafb !important;
+}
+
+.dark .text-gray-800 {
+  color: #f3f4f6 !important;
+}
+
+.dark .text-gray-700 {
+  color: #e5e7eb !important;
+}
+
+.dark .text-gray-600 {
+  color: #d1d5db !important;
+}
+
+.dark .text-gray-500 {
+  color: #9ca3af !important;
+}
+
+.dark .text-gray-400 {
+  color: #9ca3af !important;
+}
+
+.dark .text-black {
+  color: #f9fafb !important;
+}
+
+
+/* =========================================
+   DARK MODE - BORDERS
+========================================= */
+
+.dark .border-gray-50,
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300 {
+  border-color: #374151 !important;
+}
+
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #374151 !important;
+}
+
+
+/* =========================================
+   DARK MODE - INPUTS
+========================================= */
+
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #111827 !important;
+  color: #f9fafb !important;
+  border-color: #4b5563 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: #22c55e !important;
+}
+
+
+/* =========================================
+   DARK MODE - TABLES
+========================================= */
+
+.dark table {
+  color: #f3f4f6;
+}
+
+.dark thead {
+  background-color: #111827 !important;
+}
+
+.dark tbody {
+  background-color: #1f2937;
+}
+
+.dark tbody tr {
+  border-color: #374151 !important;
+}
+
+.dark tbody tr:hover {
+  background-color: #374151 !important;
+}
+
+
+/* =========================================
+   DARK MODE - HOVER BACKGROUNDS
+========================================= */
+
+.dark .hover\:bg-gray-50:hover {
+  background-color: #374151 !important;
+}
+
+.dark .hover\:bg-gray-100:hover {
+  background-color: #374151 !important;
+}
+
+.dark .hover\:bg-white:hover {
+  background-color: #374151 !important;
+}
+
+
+/* =========================================
+   DARK MODE - SHADOWS
+========================================= */
+
+.dark .shadow-sm,
+.dark .shadow,
+.dark .shadow-md,
+.dark .shadow-lg {
+  box-shadow:
+    0 4px 15px rgba(0, 0, 0, 0.2) !important;
+}
+
+
+/* =========================================
+   SCROLLBAR
+========================================= */
+
+.dark ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #111827;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 10px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+@media (min-width: 640px) and (max-width: 767px) {
+  .donor-dashboard-content {
+    padding: 104px 24px 24px;
+  }
+}
+
+
+@media (min-width: 768px) {
+  .donor-dashboard-main {
+    margin-left: 256px !important;
+  }
+
+  .donor-dashboard-content {
+    padding: 110px 32px 32px;
+  }
+}
+

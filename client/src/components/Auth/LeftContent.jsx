@@ -1,13 +1,12 @@
-const LeftPanel = ({ isSignup }) => {
+const LeftContent = ({ isSignup }) => {
   return (
-    <div className="hidden lg:flex flex-col justify-center bg-gradient-to-br from-green-900 to-green-700 px-12 text-white">
+    <div className="flex h-full flex-col justify-center bg-gradient-to-br from-green-900 to-green-700 px-12 text-white">
 
       <h1 className="text-5xl font-bold leading-tight">
         Feed<span className="text-green-300">Link</span>
       </h1>
 
       <div className="mt-10">
-
         {isSignup ? (
           <>
             <h2 className="text-3xl font-bold">
@@ -31,21 +30,16 @@ const LeftPanel = ({ isSignup }) => {
             </p>
           </>
         )}
-
       </div>
 
       <div className="mt-10 space-y-3 text-green-100">
-
         <p>✔ Reduce Food Waste</p>
-
         <p>✔ Connect Donors & NGOs</p>
-
         <p>✔ Help People in Need</p>
-
       </div>
 
     </div>
   );
 };
 
-export default LeftPanel;
+export default LeftContent;

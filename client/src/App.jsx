@@ -17,8 +17,14 @@ import DonationHistory from "./pages/DonorDashboard/DonationHistory";
 import Analytics from "./pages/DonorDashboard/Analytics";
 import Profile from "./pages/DonorDashboard/Profile";
 
+
+
+//delivery
+
+import SafetyVerification from "./pages/Delivery/SafetyVerification";
+
 // NGO
-import Sidebar from "./components/ngo/sideber/Sidebar";
+import NGOSidebar from "./components/ngo/sideber/Sidebar";
 import Header from "./components/ngo/header/Header";
 
 import DonationMap from "./pages/ngo/donationmap/DonationMap";
@@ -89,7 +95,6 @@ const initialRequests = [
   },
 ];
 
-
 // =========================
 // NGO Layout
 // =========================
@@ -109,7 +114,7 @@ function NGOLayout({
           : "bg-[#F8FAFC] text-slate-800"
       }`}
     >
-      <Sidebar />
+      <NGOSidebar />
 
       <div className="flex-1 flex flex-col overflow-y-auto">
         <Header themeMode={themeMode} />
@@ -191,7 +196,6 @@ function NGOLayout({
   );
 }
 
-
 // =========================
 // Admin Layout
 // =========================
@@ -267,7 +271,6 @@ function AdminLayout() {
   );
 }
 
-
 // =========================
 // Main App
 // =========================
@@ -284,7 +287,6 @@ function App() {
     localStorage.setItem("theme", themeMode);
   }, [themeMode]);
 
-
   const handleAccept = (id) => {
 
     setRequests((prev) =>
@@ -294,7 +296,6 @@ function App() {
     alert("Request Accepted! Moved to Active Pickups.");
   };
 
-
   const handleDecline = (id) => {
 
     setRequests((prev) =>
@@ -302,7 +303,6 @@ function App() {
     );
 
   };
-
 
   return (
 
@@ -323,7 +323,6 @@ function App() {
           path="/auth"
           element={<Auth />}
         />
-
 
         {/* ================= RESTAURANT / DONOR ================= */}
 
@@ -357,7 +356,6 @@ function App() {
           element={<Profile />}
         />
 
-
         {/* ================= NGO ================= */}
 
         <Route
@@ -373,14 +371,12 @@ function App() {
           }
         />
 
-
         {/* ================= ADMIN ================= */}
 
         <Route
           path="/admin/*"
           element={<AdminLayout />}
         />
-
 
         {/* ================= UNKNOWN ROUTE ================= */}
 
@@ -389,11 +385,13 @@ function App() {
           element={<Navigate to="/" replace />}
         />
 
+        <Route path="/delivery/safety/:donationId" element={<SafetyVerification />} />
+
       </Routes>
 
     </BrowserRouter>
   );
 }
 
-
 export default App;
+
