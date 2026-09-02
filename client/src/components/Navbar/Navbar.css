@@ -1,0 +1,252 @@
+/* =========================
+   DESKTOP MENU
+========================= */
+
+.desktop-menu {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+}
+
+.mobile-menu-button {
+  display: none;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+
+/* =========================
+   MOBILE MENU OVERLAY
+========================= */
+
+.mobile-menu-overlay {
+  position: fixed;
+  inset: 0;
+
+  z-index: 999;
+
+  opacity: 0;
+  visibility: hidden;
+
+  transition:
+    opacity 0.4s ease,
+    visibility 0.4s ease;
+}
+
+.mobile-menu-overlay.menu-active {
+  opacity: 1;
+  visibility: visible;
+}
+
+
+/* Background */
+
+.mobile-menu-backdrop {
+  position: absolute;
+  inset: 0;
+
+  background: rgba(0, 0, 0, 0.35);
+
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+
+/* =========================
+   CENTER CONTAINER
+========================= */
+
+.mobile-menu-container {
+  position: relative;
+
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+}
+
+
+/* =========================
+   CLOSE BUTTON
+========================= */
+
+.mobile-menu-close {
+  position: absolute;
+
+  top: 28px;
+  right: 30px;
+
+  z-index: 10;
+
+  border: none;
+  background: transparent;
+
+  color: white;
+
+  cursor: pointer;
+
+  transition: 0.3s;
+}
+
+.mobile-menu-close:hover {
+  transform: rotate(90deg);
+  color: #22c55e;
+}
+
+
+/* =========================
+   GLASS MENU BOX
+========================= */
+
+.mobile-menu-box {
+  width: min(420px, 90vw);
+
+  padding: 45px 35px;
+
+  border-radius: 24px;
+
+  background: rgba(255, 255, 255, 0.12);
+
+  border: 1px solid rgba(255, 255, 255, 0.3);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.45);
+
+  text-align: center;
+
+  transform: scale(0.9) translateY(20px);
+
+  transition: all 0.4s ease;
+}
+
+
+/* Animation */
+
+.menu-active .mobile-menu-box {
+  transform: scale(1) translateY(0);
+}
+
+
+/* =========================
+   MENU TITLE
+========================= */
+
+.mobile-menu-title {
+  color: white;
+
+  font-size: 2rem;
+  font-weight: 800;
+
+  margin-bottom: 18px;
+}
+
+.mobile-menu-title span {
+  color: #22c55e;
+}
+
+
+/* Divider */
+
+.mobile-menu-line {
+  width: 70px;
+  height: 3px;
+
+  margin: 0 auto 25px;
+
+  border-radius: 10px;
+
+  background: #22c55e;
+}
+
+
+/* =========================
+   MENU LINKS
+========================= */
+
+.mobile-menu-links {
+  list-style: none;
+
+  margin: 0;
+  padding: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+}
+
+.mobile-menu-links li a {
+  display: block;
+
+  padding: 13px 20px;
+
+  border-radius: 12px;
+
+  color: white;
+
+  font-size: 1.25rem;
+  font-weight: 600;
+
+  text-decoration: none;
+
+  transition: all 0.3s ease;
+}
+
+
+.mobile-menu-links li a:hover {
+  color: white;
+
+  background: rgba(34, 197, 94, 0.8);
+
+  transform: translateX(5px);
+}
+
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 1024px) {
+
+  .desktop-menu {
+    display: none;
+  }
+
+  .mobile-menu-button {
+    display: block;
+  }
+
+}
+
+
+/* Small Mobile */
+
+@media (max-width: 480px) {
+
+  .mobile-menu-box {
+    width: 90vw;
+
+    padding: 35px 25px;
+
+    border-radius: 20px;
+  }
+
+  .mobile-menu-title {
+    font-size: 1.8rem;
+  }
+
+  .mobile-menu-links li a {
+    font-size: 1.1rem;
+    padding: 11px 15px;
+  }
+
+}

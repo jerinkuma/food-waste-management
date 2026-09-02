@@ -1,5 +1,7 @@
-import Sidebar from "../../components/DonorDashboard/Sidebar";
-import Topbar from "../../components/DonorDashboard/Topbar";
+
+import { useState } from "react";
+
+import DashboardLayout from "../../components/DonorDashboard/DashboardLayout";
 
 import FoodInformation from "../../components/DonorDashboard/AddDonation/FoodInformation";
 import FoodCondition from "../../components/DonorDashboard/AddDonation/StorageCondition";
@@ -7,55 +9,69 @@ import PickupInformation from "../../components/DonorDashboard/AddDonation/Picku
 import SafetyDeclaration from "../../components/DonorDashboard/AddDonation/SafetyDeclaration";
 import DonationPreview from "../../components/DonorDashboard/AddDonation/DonationPreview";
 import ActionButtons from "../../components/DonorDashboard/AddDonation/ActionButtons";
-
 import DonationByCard from "../../components/DonorDashboard/AddDonation/DonationByCard";
 
 const AddDonation = () => {
-    return (
-        <div className="flex min-h-screen bg-gray-100">
+  const [donationData, setDonationData] = useState({
+    foodName: "",
+    foodType: "",
+    quantity: "",
+    estimatedMeals: 0,
+    cookingTime: "",
+    bestBefore: "",
 
-            <Sidebar />
+    condition: "",
+    foodCategory: "",
 
-            <div className="flex-1 ml-72">
+    pickupAddress: "",
+    pickupDate: "",
+    pickupTime: "",
+    contactNumber: "",
+    pickupDuration: "15 Minutes",
+    specialInstructions: "",
 
-                <Topbar />
+    safetyConfirmed: false,
+  });
 
-                <div className="p-8">
+  const updateDonationData = (field, value) => {
+    setDonationData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
-                    {/* Page Header */}
+  return (
+    <DashboardLayout>
+      <div className="space-y-5 sm:space-y-6 lg:space-y-8">
+        <DonationByCard />
 
-                    <div className="mb-8">
+        <FoodInformation
+          donationData={donationData}
+          updateDonationData={updateDonationData}
+        />
 
-                        <p className="mt-2 text-gray-500">
-                            Provide accurate food and pickup information before submitting.
-                        </p>
+        <FoodCondition
+          donationData={donationData}
+          updateDonationData={updateDonationData}
+        />
 
-                    </div>
+        <PickupInformation
+          donationData={donationData}
+          updateDonationData={updateDonationData}
+        />
 
-                    <div className="space-y-8">
+        <SafetyDeclaration
+          donationData={donationData}
+          updateDonationData={updateDonationData}
+        />
 
-                        <DonationByCard />
+        <DonationPreview donationData={donationData} />
 
-                        <FoodInformation />
-
-                        <FoodCondition />
-
-                        <PickupInformation />
-
-                        <SafetyDeclaration />
-
-                        <DonationPreview />
-
-                        <ActionButtons />
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-    );
+        <ActionButtons donationData={donationData} />
+      </div>
+    </DashboardLayout>
+  );
 };
 
 export default AddDonation;
+

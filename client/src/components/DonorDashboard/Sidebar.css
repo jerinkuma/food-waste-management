@@ -1,0 +1,276 @@
+/* =========================
+   DONOR SIDEBAR
+========================= */
+
+.donor-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 999;
+
+  width: 72px;
+  height: 100vh;
+
+  display: flex;
+  flex-direction: column;
+
+  background: #0f3d2e;
+  color: white;
+
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+
+  transition: width 0.3s ease;
+}
+
+
+/* =========================
+   LOGO
+========================= */
+
+.donor-sidebar-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 28px 10px;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+
+.donor-logo-small {
+  display: block;
+
+  font-size: 22px;
+  font-weight: 700;
+}
+
+
+.donor-logo-small span {
+  color: #4ade80;
+}
+
+
+/* Desktop logo initially hidden */
+
+.donor-logo-desktop {
+  display: none;
+}
+
+
+.donor-logo-desktop h1 {
+  margin: 0;
+
+  font-size: 30px;
+  font-weight: 700;
+
+  color: white;
+}
+
+
+.donor-logo-desktop h1 span {
+  color: #4ade80;
+}
+
+
+.donor-logo-desktop p {
+  margin: 4px 0 0;
+
+  font-size: 14px;
+
+  color: #bbf7d0;
+}
+
+
+/* =========================
+   NAVIGATION
+========================= */
+
+.donor-sidebar-nav {
+  flex: 1;
+
+  padding: 24px 8px;
+
+  overflow-y: auto;
+}
+
+
+.donor-sidebar-nav ul {
+  margin: 0;
+  padding: 0;
+
+  list-style: none;
+}
+
+
+.donor-sidebar-nav li {
+  margin-bottom: 12px;
+}
+
+
+.donor-nav-link {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 13px 0;
+
+  border-radius: 12px;
+
+  color: #d1fae5;
+
+  text-decoration: none;
+
+  transition: all 0.2s ease;
+}
+
+
+.donor-nav-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+
+  color: white;
+}
+
+
+.donor-nav-link.active {
+  background: #16a34a;
+
+  color: white;
+
+  box-shadow: 0 8px 20px rgba(22, 163, 74, 0.25);
+}
+
+
+.donor-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex-shrink: 0;
+}
+
+
+.donor-nav-text {
+  display: none;
+}
+
+
+/* =========================
+   LOGOUT
+========================= */
+
+.donor-sidebar-logout {
+  padding: 12px 8px;
+
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+
+.donor-sidebar-logout button {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 13px 0;
+
+  border: none;
+  border-radius: 12px;
+
+  background: transparent;
+
+  color: #fca5a5;
+
+  cursor: pointer;
+
+  transition: all 0.2s ease;
+}
+
+
+.donor-sidebar-logout button:hover {
+  background: #ef4444;
+
+  color: white;
+}
+
+
+.donor-logout-text {
+  display: none;
+}
+
+
+/* ===================================
+   DESKTOP
+=================================== */
+
+@media (min-width: 768px) {
+
+  .donor-sidebar {
+    width: 256px !important;
+  }
+
+
+  .donor-sidebar-logo {
+    justify-content: flex-start;
+
+    padding: 28px;
+  }
+
+
+  .donor-logo-small {
+    display: none;
+  }
+
+
+  .donor-logo-desktop {
+    display: block !important;
+  }
+
+
+  .donor-sidebar-nav {
+    padding: 24px 16px;
+  }
+
+
+  .donor-nav-link {
+    justify-content: flex-start;
+
+    gap: 16px;
+
+    padding: 13px 16px;
+  }
+
+
+  .donor-nav-text {
+    display: inline !important;
+
+    white-space: nowrap;
+
+    font-weight: 500;
+  }
+
+
+  .donor-sidebar-logout {
+    padding: 16px;
+  }
+
+
+  .donor-sidebar-logout button {
+    justify-content: flex-start;
+
+    gap: 16px;
+
+    padding: 13px 16px;
+  }
+
+
+  .donor-logout-text {
+    display: inline !important;
+
+    font-weight: 500;
+  }
+
+}

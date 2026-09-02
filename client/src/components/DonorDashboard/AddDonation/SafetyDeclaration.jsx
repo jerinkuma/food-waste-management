@@ -1,108 +1,60 @@
+
 import { ShieldCheck } from "lucide-react";
 
-const SafetyDeclaration = () => {
+const SafetyDeclaration = ({
+  donationData,
+  updateDonationData,
+}) => {
+  const handleSafetyChange = (e) => {
+    updateDonationData("safetyConfirmed", e.target.checked);
+  };
+
   return (
-    <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
-
-      {/* Header */}
-
-      <div className="flex items-center gap-3">
-
-        <div className="rounded-2xl bg-green-100 p-3">
-
+    <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
+      
+      <div className="flex items-start gap-4">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100">
           <ShieldCheck
-            size={28}
+            size={23}
             className="text-green-600"
           />
-
         </div>
 
         <div>
-
-          <h2 className="text-2xl font-bold text-gray-800">
+          <h2 className="text-xl font-bold text-gray-900">
             Safety Declaration
           </h2>
 
-          <p className="mt-1 text-gray-500">
-            Please confirm the following before publishing the donation.
+          <p className="mt-1 text-sm text-gray-500">
+            Please confirm the food is safe before publishing.
+          </p>
+        </div>
+      </div>
+
+      <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 transition hover:border-green-300 hover:bg-green-50">
+        <input
+          type="checkbox"
+          checked={donationData.safetyConfirmed}
+          onChange={handleSafetyChange}
+          className="mt-1 h-5 w-5 shrink-0 accent-green-600"
+        />
+
+        <div>
+          <p className="text-sm font-semibold text-gray-800">
+            I confirm that the donated food is safe for
+            consumption and all information provided is accurate.
           </p>
 
+          <p className="mt-1 text-xs leading-5 text-gray-500">
+            The food will be checked by an authorised NGO or
+            volunteer during pickup.
+          </p>
         </div>
-
-      </div>
-
-      {/* Checklist */}
-
-      <div className="mt-8 space-y-5">
-
-        <label className="flex items-start gap-3">
-
-          <input type="checkbox" className="mt-1 h-5 w-5 accent-green-600" />
-
-          <span className="text-gray-700">
-            The food was prepared in a hygienic environment.
-          </span>
-
-        </label>
-
-        <label className="flex items-start gap-3">
-
-          <input type="checkbox" className="mt-1 h-5 w-5 accent-green-600" />
-
-          <span className="text-gray-700">
-            The food has been stored at a safe temperature.
-          </span>
-
-        </label>
-
-        <label className="flex items-start gap-3">
-
-          <input type="checkbox" className="mt-1 h-5 w-5 accent-green-600" />
-
-          <span className="text-gray-700">
-            The food is within its safe consumption period.
-          </span>
-
-        </label>
-
-        <label className="flex items-start gap-3">
-
-          <input type="checkbox" className="mt-1 h-5 w-5 accent-green-600" />
-
-          <span className="text-gray-700">
-            The information provided is accurate.
-          </span>
-
-        </label>
-
-        <label className="flex items-start gap-3">
-
-          <input type="checkbox" className="mt-1 h-5 w-5 accent-green-600" />
-
-          <span className="text-gray-700">
-            I understand that the NGO/Volunteer will verify the food before pickup.
-          </span>
-
-        </label>
-
-      </div>
-
-      {/* Notice */}
-
-      <div className="mt-8 rounded-2xl border border-yellow-200 bg-yellow-50 p-5">
-
-        <p className="text-sm leading-7 text-yellow-800">
-
-          <strong>Note:</strong> Submitting this declaration does not automatically
-          approve the food. The donated food will be inspected by an authorised
-          NGO or volunteer during pickup using the FeedLink verification process.
-
-        </p>
-
-      </div>
+      </label>
 
     </div>
   );
 };
 
 export default SafetyDeclaration;
+

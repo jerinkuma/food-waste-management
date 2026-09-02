@@ -1,5 +1,4 @@
-import Sidebar from "../../components/DonorDashboard/Sidebar";
-import Topbar from "../../components/DonorDashboard/Topbar";
+import DashboardLayout from "../../components/DonorDashboard/DashboardLayout";
 
 import HistoryStats from "../../components/DonorDashboard/DonationHistory/HistoryStats";
 import SearchFilter from "../../components/DonorDashboard/DonationHistory/SearchFilter";
@@ -7,42 +6,22 @@ import DonationTable from "../../components/DonorDashboard/DonationHistory/Donat
 
 const DonationHistory = () => {
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <DashboardLayout>
+      
+      {/* Statistics */}
+      <HistoryStats />
 
-      {/* Sidebar */}
-      <Sidebar />
-
-      {/* Main Content */}
-      <div className="ml-72 flex-1">
-
-        {/* Topbar */}
-        <Topbar />
-
-        <main className="p-8">
-
-          {/* Page Heading */}
-          <div className="mb-8">
-
-          </div>
-
-          {/* Statistics */}
-          <HistoryStats />
-
-          {/* Search + Filter */}
-          <div className="mt-8">
-            <SearchFilter />
-          </div>
-
-          {/* Donation Table */}
-          <div className="mt-8">
-            <DonationTable />
-          </div>
-
-        </main>
-
+      {/* Search + Filter */}
+      <div className="mt-8">
+        <SearchFilter />
       </div>
 
-    </div>
+      {/* Donation Table */}
+      <div className="mt-8">
+        <DonationTable />
+      </div>
+
+    </DashboardLayout>
   );
 };
 

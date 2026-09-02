@@ -1,5 +1,4 @@
-import Sidebar from "../../components/DonorDashboard/Sidebar";
-import Topbar from "../../components/DonorDashboard/Topbar";
+import DashboardLayout from "../../components/DonorDashboard/DashboardLayout";
 
 import AnalyticsCards from "../../components/DonorDashboard/Analytics/AnalyticsCards";
 import MonthlyChart from "../../components/DonorDashboard/Analytics/MonthlyChart";
@@ -8,33 +7,23 @@ import FoodTypeChart from "../../components/DonorDashboard/Analytics/FoodTypeCha
 
 const Analytics = () => {
   return (
-    <div className="min-h-screen bg-gray-100">
+    <DashboardLayout>
+      <div className="space-y-6 sm:space-y-8">
 
-      <Sidebar />
+        {/* Analytics Cards */}
+        <AnalyticsCards />
 
-      <div className="ml-72">
+        {/* Charts */}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <MonthlyChart />
+          <StatusChart />
+        </div>
 
-        <Topbar />
-
-        <main className="space-y-8 p-8">
-
-          <AnalyticsCards />
-
-          <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
-
-            <MonthlyChart />
-
-            <StatusChart />
-
-          </div>
-
-          <FoodTypeChart />
-
-        </main>
+        {/* Food Type Chart */}
+        <FoodTypeChart />
 
       </div>
-
-    </div>
+    </DashboardLayout>
   );
 };
 
