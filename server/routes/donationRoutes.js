@@ -1,4 +1,3 @@
-
 const express = require("express");
 
 const {
@@ -7,40 +6,72 @@ const {
   getDonationByDonationId,
   verifyDonation,
   rejectDonation,
+  getDonorDonations,
+  getDonorDashboard,
 } = require("../controllers/donationController");
 
 const router = express.Router();
 
+// =====================================
+// CREATE DONATION
+// =====================================
 
-// Create / Publish Donation
 router.post("/", createDonation);
 
+// =====================================
+// DONOR DASHBOARD
+// IMPORTANT:
+// এই route /:id এর আগে রাখতে হবে
+// =====================================
 
-// Get donation by MongoDB _id
-router.get("/:id", getDonationById);
+router.get(
+  "/dashboard/:donorId",
+  getDonorDashboard
+);
 
+// =====================================
+// GET DONATION BY DONATION ID
+// =====================================
 
-// Get donation by Donation ID
 router.get(
   "/donation-id/:donationId",
   getDonationByDonationId
 );
 
+// =====================================
+// GET ALL DONATIONS OF A DONOR
+// =====================================
 
-// Safety verification
+router.get(
+  "/donor/:donorId",
+  getDonorDonations
+);
+
+// =====================================
+// GET DONATION BY MONGODB ID
+// =====================================
+
+router.get(
+  "/:id",
+  getDonationById
+);
+
+// =====================================
+// VERIFY DONATION
+// =====================================
+
 router.post(
   "/:id/verify",
   verifyDonation
 );
 
-// reject
+// =====================================
+// REJECT DONATION
+// =====================================
+
 router.post(
   "/:id/reject",
   rejectDonation
 );
-```
-
-
 
 module.exports = router;
-

@@ -5,7 +5,9 @@ import {
   BadgeCheck,
 } from "lucide-react";
 
-const RestaurantInfo = () => {
+const RestaurantInfo = ({
+  profile,
+}) => {
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
 
@@ -13,10 +15,10 @@ const RestaurantInfo = () => {
         Restaurant Information
       </h2>
 
+
       <div className="space-y-6">
 
         {/* Restaurant Name */}
-
         <div className="flex items-start gap-4">
 
           <div className="rounded-xl bg-green-100 p-3">
@@ -27,21 +29,19 @@ const RestaurantInfo = () => {
           </div>
 
           <div>
-
             <p className="text-sm text-gray-500">
               Restaurant Name
             </p>
 
             <h3 className="text-lg font-semibold text-gray-900">
-              Green Leaf Restaurant
+              {profile.name}
             </h3>
-
           </div>
 
         </div>
 
-        {/* Trade License */}
 
+        {/* Trade License */}
         <div className="flex items-start gap-4">
 
           <div className="rounded-xl bg-blue-100 p-3">
@@ -52,21 +52,19 @@ const RestaurantInfo = () => {
           </div>
 
           <div>
-
             <p className="text-sm text-gray-500">
               Trade License
             </p>
 
-            <h3 className="text-lg font-semibold text-gray-900">
-              TRD-45896321
+            <h3 className="break-all text-lg font-semibold text-gray-900">
+              {profile.tradeLicense}
             </h3>
-
           </div>
 
         </div>
 
-        {/* Phone */}
 
+        {/* Phone */}
         <div className="flex items-start gap-4">
 
           <div className="rounded-xl bg-yellow-100 p-3">
@@ -77,21 +75,19 @@ const RestaurantInfo = () => {
           </div>
 
           <div>
-
             <p className="text-sm text-gray-500">
               Phone Number
             </p>
 
             <h3 className="text-lg font-semibold text-gray-900">
-              +8801712345678
+              {profile.phone}
             </h3>
-
           </div>
 
         </div>
 
-        {/* Address */}
 
+        {/* Address */}
         <div className="flex items-start gap-4">
 
           <div className="rounded-xl bg-red-100 p-3">
@@ -101,22 +97,19 @@ const RestaurantInfo = () => {
             />
           </div>
 
-          <div>
-
+          <div className="min-w-0">
             <p className="text-sm text-gray-500">
               Address
             </p>
 
             <h3 className="text-lg font-semibold text-gray-900">
-              Banani, Dhaka, Bangladesh
+              {profile.address}
             </h3>
-
           </div>
 
         </div>
 
       </div>
-
     </div>
   );
 };

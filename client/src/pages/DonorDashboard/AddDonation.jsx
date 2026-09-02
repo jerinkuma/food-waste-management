@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 
 import DashboardLayout from "../../components/DonorDashboard/DashboardLayout";
@@ -11,27 +10,31 @@ import DonationPreview from "../../components/DonorDashboard/AddDonation/Donatio
 import ActionButtons from "../../components/DonorDashboard/AddDonation/ActionButtons";
 import DonationByCard from "../../components/DonorDashboard/AddDonation/DonationByCard";
 
+const initialDonationData = {
+  foodName: "",
+  foodType: "",
+  quantity: "",
+  estimatedMeals: 0,
+  cookingTime: "",
+  bestBefore: "",
+
+  condition: "",
+  foodCategory: "",
+
+  pickupAddress: "",
+  pickupDate: "",
+  pickupTime: "",
+  contactNumber: "",
+  pickupDuration: "15 Minutes",
+  specialInstructions: "",
+
+  safetyConfirmed: false,
+};
+
 const AddDonation = () => {
-  const [donationData, setDonationData] = useState({
-    foodName: "",
-    foodType: "",
-    quantity: "",
-    estimatedMeals: 0,
-    cookingTime: "",
-    bestBefore: "",
-
-    condition: "",
-    foodCategory: "",
-
-    pickupAddress: "",
-    pickupDate: "",
-    pickupTime: "",
-    contactNumber: "",
-    pickupDuration: "15 Minutes",
-    specialInstructions: "",
-
-    safetyConfirmed: false,
-  });
+  const [donationData, setDonationData] = useState(
+    initialDonationData
+  );
 
   const updateDonationData = (field, value) => {
     setDonationData((prev) => ({
@@ -40,9 +43,17 @@ const AddDonation = () => {
     }));
   };
 
+  // Cancel করলে সব form data reset হবে
+  const resetDonationForm = () => {
+    setDonationData({
+      ...initialDonationData,
+    });
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-5 sm:space-y-6 lg:space-y-8">
+
         <DonationByCard />
 
         <FoodInformation
@@ -65,13 +76,18 @@ const AddDonation = () => {
           updateDonationData={updateDonationData}
         />
 
-        <DonationPreview donationData={donationData} />
+        <DonationPreview
+          donationData={donationData}
+        />
 
-        <ActionButtons donationData={donationData} />
+        <ActionButtons
+          donationData={donationData}
+          resetDonationForm={resetDonationForm}
+        />
+
       </div>
     </DashboardLayout>
   );
 };
 
 export default AddDonation;
-

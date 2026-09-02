@@ -3,7 +3,10 @@ import { X, QrCode, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 
-const ActionButtons = ({ donationData }) => {
+const ActionButtons = ({
+  donationData,
+  resetDonationForm,
+}) => {
   const navigate = useNavigate();
 
   const [publishing, setPublishing] = useState(false);
@@ -11,8 +14,8 @@ const ActionButtons = ({ donationData }) => {
 
   // Cancel
   const handleCancel = () => {
-    navigate("/restaurant/dashboard");
-  };
+  resetDonationForm();
+};
 
   // Publish Donation
   const handlePublish = async () => {

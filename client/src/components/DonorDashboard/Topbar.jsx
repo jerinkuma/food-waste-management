@@ -12,7 +12,27 @@ import {
 } from "lucide-react";
 
 const Topbar = ({ isDark, setIsDark }) => {
-  const [showNotifications, setShowNotifications] = useState(false);
+  const [showNotifications, setShowNotifications] =
+    useState(false);
+
+  // =====================================
+  // USER / PROFILE IMAGE
+  // =====================================
+
+  const userData =
+    localStorage.getItem("user");
+
+  const user = userData
+    ? JSON.parse(userData)
+    : null;
+
+  const profileImage = user?.profileImage
+    ? `http://localhost:5000${user.profileImage}`
+    : "";
+
+  // =====================================
+  // GREETING
+  // =====================================
 
   const hour = new Date().getHours();
 
@@ -28,24 +48,37 @@ const Topbar = ({ isDark, setIsDark }) => {
     greeting = "Good Night";
   }
 
-  const today = new Date().toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  // =====================================
+  // TODAY
+  // =====================================
+
+  const today = new Date().toLocaleDateString(
+    "en-GB",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }
+  );
+
+  // =====================================
+  // NOTIFICATIONS
+  // =====================================
 
   const notifications = [
     {
       id: 1,
       title: "New Donation Update",
-      message: "Your recent donation has been received.",
+      message:
+        "Your recent donation has been received.",
       icon: Utensils,
     },
     {
       id: 2,
       title: "Pickup Completed",
-      message: "An NGO successfully collected your donation.",
+      message:
+        "An NGO successfully collected your donation.",
       icon: CheckCircle2,
     },
   ];
@@ -66,15 +99,19 @@ const Topbar = ({ isDark, setIsDark }) => {
 
           <h1
             className={`truncate text-base font-bold sm:text-xl md:text-2xl lg:text-3xl ${
-              isDark ? "text-white" : "text-gray-800"
+              isDark
+                ? "text-white"
+                : "text-gray-800"
             }`}
           >
-            {greeting}, Cafe One
+            {greeting}, {user?.name || "Restaurant"}
           </h1>
 
           <div
             className={`mt-1 flex min-w-0 items-center gap-1.5 sm:gap-2 ${
-              isDark ? "text-slate-400" : "text-gray-500"
+              isDark
+                ? "text-slate-400"
+                : "text-gray-500"
             }`}
           >
             <CalendarDays
@@ -121,7 +158,9 @@ const Topbar = ({ isDark, setIsDark }) => {
           {/* ================= DARK MODE ================= */}
 
           <button
-            onClick={() => setIsDark(!isDark)}
+            onClick={() =>
+              setIsDark(!isDark)
+            }
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition duration-300 sm:h-10 sm:w-10 md:h-11 md:w-11 md:rounded-xl ${
               isDark
                 ? "bg-slate-800 text-yellow-400 hover:bg-slate-700"
@@ -142,7 +181,9 @@ const Topbar = ({ isDark, setIsDark }) => {
 
             <button
               onClick={() =>
-                setShowNotifications(!showNotifications)
+                setShowNotifications(
+                  !showNotifications
+                )
               }
               className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition duration-300 sm:h-10 sm:w-10 md:h-11 md:w-11 md:rounded-xl ${
                 isDark
@@ -209,7 +250,9 @@ const Topbar = ({ isDark, setIsDark }) => {
 
                   <button
                     onClick={() =>
-                      setShowNotifications(false)
+                      setShowNotifications(
+                        false
+                      )
                     }
                     className={`rounded-lg p-1 transition ${
                       isDark
@@ -227,51 +270,54 @@ const Topbar = ({ isDark, setIsDark }) => {
 
                 <div>
 
-                  {notifications.map((notification) => {
+                  {notifications.map(
+                    (notification) => {
 
-                    const Icon = notification.icon;
+                      const Icon =
+                        notification.icon;
 
-                    return (
-                      <div
-                        key={notification.id}
-                        className={`flex gap-3 border-b px-4 py-3 sm:px-5 sm:py-4 ${
-                          isDark
-                            ? "border-slate-800 hover:bg-slate-800"
-                            : "border-gray-100 hover:bg-gray-50"
-                        }`}
-                      >
+                      return (
+                        <div
+                          key={notification.id}
+                          className={`flex gap-3 border-b px-4 py-3 sm:px-5 sm:py-4 ${
+                            isDark
+                              ? "border-slate-800 hover:bg-slate-800"
+                              : "border-gray-100 hover:bg-gray-50"
+                          }`}
+                        >
 
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-600 sm:h-10 sm:w-10">
-                          <Icon size={18} />
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-600 sm:h-10 sm:w-10">
+                            <Icon size={18} />
+                          </div>
+
+                          <div className="min-w-0">
+
+                            <h4
+                              className={`text-sm font-semibold ${
+                                isDark
+                                  ? "text-slate-100"
+                                  : "text-gray-800"
+                              }`}
+                            >
+                              {notification.title}
+                            </h4>
+
+                            <p
+                              className={`mt-1 text-xs leading-5 ${
+                                isDark
+                                  ? "text-slate-400"
+                                  : "text-gray-500"
+                              }`}
+                            >
+                              {notification.message}
+                            </p>
+
+                          </div>
+
                         </div>
-
-                        <div className="min-w-0">
-
-                          <h4
-                            className={`text-sm font-semibold ${
-                              isDark
-                                ? "text-slate-100"
-                                : "text-gray-800"
-                            }`}
-                          >
-                            {notification.title}
-                          </h4>
-
-                          <p
-                            className={`mt-1 text-xs leading-5 ${
-                              isDark
-                                ? "text-slate-400"
-                                : "text-gray-500"
-                            }`}
-                          >
-                            {notification.message}
-                          </p>
-
-                        </div>
-
-                      </div>
-                    );
-                  })}
+                      );
+                    }
+                  )}
 
                 </div>
 
@@ -302,11 +348,23 @@ const Topbar = ({ isDark, setIsDark }) => {
             }`}
             aria-label="Profile"
           >
-            <img
-              src="https://i.pravatar.cc/100"
-              alt="Restaurant"
-              className="h-8 w-8 rounded-full object-cover sm:h-10 sm:w-10 md:h-11 md:w-11"
-            />
+
+            {profileImage ? (
+              <img
+                src={profileImage}
+                alt={
+                  user?.name || "Restaurant"
+                }
+                className="h-8 w-8 rounded-full object-cover sm:h-10 sm:w-10 md:h-11 md:w-11"
+              />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-sm font-bold text-green-700 sm:h-10 sm:w-10 md:h-11 md:w-11">
+                {user?.name
+                  ?.charAt(0)
+                  ?.toUpperCase() || "R"}
+              </div>
+            )}
+
           </button>
 
         </div>
@@ -317,4 +375,3 @@ const Topbar = ({ isDark, setIsDark }) => {
 };
 
 export default Topbar;
-
