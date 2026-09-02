@@ -199,8 +199,106 @@ const login = async (req, res) => {
   }
 };
 
+// ===============================
+// CHANGE PASSWORD
+// ===============================
+
+const changePassword = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const {
+      currentPassword,
+      newPassword,
+    } = req.body;
+
+    // Validation
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Current password and new password are required",
+      });
+    }
+
+    // New password length
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "New password must be at least 6 characters",
+      });
+    }
+
+    // Find user
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check current password
+    const isPasswordCorrect =
+      await bcrypt.compare(
+        currentPassword,
+        user.password
+      );
+
+    if (!isPasswordCorrect) {
+      return res.status(400).json({
+        success: false,
+        message: "Current password is incorrect",
+      });
+    }
+
+    // Prevent same password
+    const isSamePassword =
+      await bcrypt.compare(
+        newPassword,
+        user.password
+      );
+
+    if (isSamePassword) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "New password must be different from current password",
+      });
+    }
+
+    // Hash new password
+    const hashedPassword =
+      await bcrypt.hash(newPassword, 10);
+
+    user.password = hashedPassword;
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Password changed successfully",
+    });
+
+  } catch (error) {
+    console.error(
+      "Change Password Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Server error while changing password",
+    });
+  }
+};
+
 
 module.exports = {
   signup,
   login,
+  changePassword,
 };

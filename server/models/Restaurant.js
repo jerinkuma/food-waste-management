@@ -26,6 +26,11 @@ const restaurantSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+
+    profileImage: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

@@ -5,66 +5,106 @@ import {
   Clock3,
 } from "lucide-react";
 
-const AnalyticsCards = () => {
+const AnalyticsCards = ({
+  donations = [],
+  loading,
+}) => {
+  const totalDonations = donations.length;
+
+  const totalMeals = donations.reduce(
+    (total, donation) =>
+      total + Number(donation.estimatedMeals || 0),
+    0
+  );
+
+  const accepted = donations.filter(
+    (donation) =>
+      donation.status === "NGO Accepted"
+  ).length;
+
+  const pending = donations.filter(
+    (donation) =>
+      donation.status ===
+      "Waiting for NGO Acceptance"
+  ).length;
+
   const cards = [
     {
       title: "Total Donations",
-      value: "25",
+      value: totalDonations,
       icon: ClipboardList,
       bg: "bg-blue-100",
       color: "text-blue-600",
     },
     {
       title: "Total Meals",
-      value: "1,850",
+      value: totalMeals.toLocaleString(),
       icon: UtensilsCrossed,
       bg: "bg-green-100",
       color: "text-green-600",
     },
     {
-      title: "Completed",
-      value: "18",
+      title: "Accepted",
+      value: accepted,
       icon: CheckCircle,
       bg: "bg-emerald-100",
       color: "text-emerald-600",
     },
     {
       title: "Pending",
-      value: "5",
+      value: pending,
       icon: Clock3,
       bg: "bg-yellow-100",
       color: "text-yellow-600",
     },
   ];
 
+  if (loading) {
+    return (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4">
+        {cards.map((card, index) => (
+          <div
+            key={index}
+            className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
+          >
+            <p className="text-sm text-gray-400">
+              Loading...
+            </p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4">
       {cards.map((card, index) => {
         const Icon = card.icon;
 
         return (
           <div
             key={index}
-            className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg"
+            className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg sm:p-6"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
 
-              <div>
-
-                <p className="text-sm font-medium text-gray-500">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-gray-600 sm:text-sm">
                   {card.title}
                 </p>
 
-                <h2 className="mt-2 text-3xl font-bold text-gray-900">
+                <h2 className="mt-1 text-2xl font-extrabold text-gray-900 sm:mt-2 sm:text-3xl">
                   {card.value}
                 </h2>
-
               </div>
 
               <div
-                className={`flex h-14 w-14 items-center justify-center rounded-2xl ${card.bg}`}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${card.bg} sm:h-14 sm:w-14`}
               >
-                <Icon className={card.color} size={28} />
+                <Icon
+                  className={card.color}
+                  size={18}
+                />
               </div>
 
             </div>
