@@ -11,6 +11,11 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+<<<<<<< Updated upstream
+=======
+    "axios": "^1.20.0",
+    "framer-motion": "^12.42.2",
+>>>>>>> Stashed changes
     "lucide-react": "^1.33.0",
     "pigeon-maps": "^0.22.1",
     "react": "^19.2.8",

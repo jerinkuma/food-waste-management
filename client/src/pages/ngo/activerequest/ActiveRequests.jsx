@@ -1,65 +1,93 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Phone, Archive, Eye, MapPin, Clock, Truck, ShieldCheck, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react';
 import { Map as PigeonMap, Marker } from 'pigeon-maps';
-import './ActiveRequests.css'; // আলাদা সিএসএস ফাইল ইমপোর্ট করা হলো
+import './ActiveRequests.css';
 
-export default function ActiveRequests({ requests }) {
+export default function ActiveRequests() {
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [selectedDriver, setSelectedDriver] = useState(null);
+
+  // ডাইনামিক ডেটার জন্য স্টেট
+  const [activePickups, setActivePickups] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // See More toggles for both sides
   const [showAllPickups, setShowAllPickups] = useState(false);
   const [showAllAlerts, setShowAllAlerts] = useState(false);
 
-  // Expanded Active Pickups Data matching the UI mockup
-  const activePickups = [
-    {
-      id: "AP1001",
-      donor: "Café 1",
-      trustScore: "4.5",
-      location: "Chattogram (Agrabad)",
-      logistics: "FoodPanda Tracking",
-      status: "In Transit",
-      driverName: "Rahim Uddin",
-      driverPhone: "+880 1812-345678",
-      foodType: "Rice, Chicken Curry (Prepared Meal, ~20 meals)",
-      eta: "~15 mins",
-      coords: [22.3303, 91.8122]
-    },
-    {
-      id: "AP1002",
-      donor: "Hotel Agrabad",
-      trustScore: "4.8",
-      location: "Chattogram (GEC)",
-      logistics: "By Self Option",
-      status: "Picked Up",
-      driverName: "Self Volunteers (Team B)",
-      driverPhone: "+880 1711-987654",
-      foodType: "Mixed Buffet Dishes, Bread, Soup (~35 meals)",
-      eta: "~8 mins",
-      coords: [22.3587, 91.8215]
-    },
-    {
-      id: "AP1003",
-      donor: "Restaurant Name 2",
-      trustScore: "4.2",
-      location: "Chattogram (WASA)",
-      logistics: "FoodPanda Tracking",
-      status: "Driver Assigned",
-      driverName: "Tanvir Hossain",
-      driverPhone: "+880 1912-001122",
-      foodType: "Chow Mein, Pastry, Fried Rice (~15 meals)",
-      eta: "~25 mins",
-      coords: [22.3683, 91.8252]
-    }
-  ];
+  // ব্যাকএন্ড থেকে ডেটা ফেচ করার জন্য useEffect
+  useEffect(() => {
+    fetchActiveRequests();
+  }, []);
 
-  const alerts = [
-    { time: "9:45 AM", text: "AP1001 vehicle near Agrabad Signal.", type: "info" },
-    { time: "9:30 AM", text: "AP1002 picked up successfully (By Self).", type: "success" },
-    { time: "8:55 AM", text: "AP1001 driver reassigned to Rahim Uddin.", type: "warning" },
-    { time: "8:30 AM", text: "New pickup AP1003 available from Restaurant Name 2.", type: "info" },
-  ];
+  const fetchActiveRequests = async () => {
+    try {
+      const token = localStorage.getItem("token"); // লগইন করা টোকেন
+      const response = await axios.get("http://localhost:5000/api/requests", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        // ব্যাকএন্ড থেকে আসা ডেটাকে ফ্রন্টএন্ডের ফরম্যাটে ম্যাপ করে নেওয়া
+        const formattedData = response.data.data.map(item => ({
+          id: item.requestId || item._id.slice(-6).toUpperCase(),
+          dbId: item._id,
+          donor: item.donor || "Unknown Donor",
+          trustScore: "4.8",
+          location: item.address || "Chattogram",
+          logistics: item.logistics || "By Self Option",
+          status: item.status || "In Transit",
+          driverName: "Assigned Driver",
+          driverPhone: "+880 1800-000000",
+          foodType: item.foodType || "Food Item",
+          eta: item.estimatedArrival || "15 mins",
+          coords: item.coords && item.coords.length === 2 ? item.coords : [22.3569, 91.7832]
+        }));
+        
+        setActivePickups(formattedData);
+      }
+    } catch (error) {
+      console.error("Error fetching active pickups:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAcceptRequest = async (requestId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.put(`http://localhost:5000/api/requests/${requestId}`, {
+        status: 'accepted' 
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        alert("Request Accepted Successfully!");
+        fetchActiveRequests(); // পেজের ডেটা পুনরায় রিফ্রেশ করা
+      }
+    } catch (error) {
+      console.error("Error updating request:", error);
+    }
+  };
+
+  // আর্কাইভ হ্যান্ডলার ফাংশন
+  const handleArchive = async (dbId) => {
+    try {
+      const token = localStorage.getItem("token");
+      await axios.put(`http://localhost:5000/api/requests/${dbId}`, {
+        status: "Archived"
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // সফলভাবে আর্কাইভ হলে লিস্ট রিফ্রেশ হবে
+      fetchActiveRequests();
+    } catch (error) {
+      console.error("Error archiving request:", error);
+    }
+  };
 
   // Filtered Pickups Array
   const filteredPickups = activePickups.filter(
@@ -70,6 +98,10 @@ export default function ActiveRequests({ requests }) {
   const displayedPickups = showAllPickups ? filteredPickups : filteredPickups.slice(0, 2);
   const displayedAlerts = showAllAlerts ? alerts : alerts.slice(0, 2);
 
+  if (loading) {
+    return <div className="ar-container flex justify-center items-center h-64"><p className="text-slate-500 font-medium">Loading active requests...</p></div>;
+  }
+
   return (
     <div className="ar-container">
       
@@ -79,7 +111,7 @@ export default function ActiveRequests({ requests }) {
           <h2 className="ar-banner-title">ACTIVE PICKUPS: Comprehensive Monitoring (In Progress)</h2>
          
           <div className="ar-filter-btns">
-            {['ALL', 'In Transit', 'Picked Up'].map((st) => (
+            {['ALL', 'In Transit', 'Picked Up', 'pending'].map((st) => (
               <button
                 key={st}
                 onClick={() => setFilterStatus(st)}
@@ -101,75 +133,84 @@ export default function ActiveRequests({ requests }) {
         
         {/* Left Column: Active Pickup Cards (8 Cols) */}
         <div className="ar-pickup-list-col">
-          {displayedPickups.map((pickup) => (
-            <div key={pickup.id} className="ar-pickup-card">
-              <div className="ar-card-grid">
-                
-                {/* Info Details */}
-                <div className="ar-card-info">
-                  <div className="ar-id-row">
-                    <span className="ar-id-text">PICKUP ID: {pickup.id}</span>
-                    <span className="ar-status-badge">
-                      <span className="ar-status-ping"></span>
-                      {pickup.status}
-                    </span>
-                  </div>
-
-                  <p className="text-slate-700">
-                    <span className="font-bold text-slate-900">DONOR:</span> {pickup.donor}{' '}
-                    <span className="text-amber-500 font-bold"> (★ {pickup.trustScore} Trust Score, {pickup.location})</span>
-                  </p>
-
-                  <p className="text-slate-700 flex items-center gap-1">
-                    <span className="font-bold text-slate-900">LOGISTICS:</span> {pickup.logistics}{' '}
-                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-                  </p>
-
-                  <div className="ar-food-box">
-                    <p className="font-bold text-slate-800 text-[11px]">FOOD TYPE:</p>
-                    <p className="text-slate-600 text-[11px] mt-0.5">{pickup.foodType}</p>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] pt-1">
-                    <span className="font-bold text-slate-900">ESTIMATED ARRIVAL:</span>
-                    <span className="text-emerald-600 font-extrabold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{pickup.eta}</span>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="ar-action-btns">
-                    <button className="ar-btn-view">
-                      <Eye className="w-3.5 h-3.5" /> VIEW DETAILS
-                    </button>
-                    <button 
-                      onClick={() => setSelectedDriver(pickup)} 
-                      className="ar-btn-contact"
-                    >
-                      <Phone className="w-3.5 h-3.5" /> CONTACT DRIVER
-                    </button>
-                    <button className="ar-btn-archive">
-                      ARCHIVE
-                    </button>
-                  </div>
-                </div>
-
-                {/* Live Mini Map Snippet */}
-                <div className="ar-card-map-col">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Live Map Snippet</span>
-                    <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                      <Truck className="w-3 h-3" /> Live Tracking
-                    </span>
-                  </div>
-                  <div className="ar-map-wrapper">
-                    <PigeonMap defaultCenter={pickup.coords} defaultZoom={13}>
-                      <Marker width={30} anchor={pickup.coords} color="#059669" />
-                    </PigeonMap>
-                  </div>
-                </div>
-
-              </div>
+          {displayedPickups.length === 0 ? (
+            <div className="bg-white p-8 rounded-2xl text-center border border-slate-200">
+              <p className="text-slate-500 text-sm">No active donation requests found.</p>
             </div>
-          ))}
+          ) : (
+            displayedPickups.map((pickup) => (
+              <div key={pickup.dbId} className="ar-pickup-card">
+                <div className="ar-card-grid">
+                  
+                  {/* Info Details */}
+                  <div className="ar-card-info">
+                    <div className="ar-id-row">
+                      <span className="ar-id-text">PICKUP ID: {pickup.id}</span>
+                      <span className="ar-status-badge">
+                        <span className="ar-status-ping"></span>
+                        {pickup.status}
+                      </span>
+                    </div>
+
+                    <p className="text-slate-700">
+                      <span className="font-bold text-slate-900">DONOR:</span> {pickup.donor}{' '}
+                      <span className="text-amber-500 font-bold"> (★ {pickup.trustScore} Trust Score, {pickup.location})</span>
+                    </p>
+
+                    <p className="text-slate-700 flex items-center gap-1">
+                      <span className="font-bold text-slate-900">LOGISTICS:</span> {pickup.logistics}{' '}
+                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                    </p>
+
+                    <div className="ar-food-box">
+                      <p className="font-bold text-slate-800 text-[11px]">FOOD TYPE:</p>
+                      <p className="text-slate-600 text-[11px] mt-0.5">{pickup.foodType}</p>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] pt-1">
+                      <span className="font-bold text-slate-900">ESTIMATED ARRIVAL:</span>
+                      <span className="text-emerald-600 font-extrabold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{pickup.eta}</span>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="ar-action-btns">
+                      <button className="ar-btn-view">
+                        <Eye className="w-3.5 h-3.5" /> VIEW DETAILS
+                      </button>
+                      <button 
+                        onClick={() => setSelectedDriver(pickup)} 
+                        className="ar-btn-contact"
+                      >
+                        <Phone className="w-3.5 h-3.5" /> CONTACT DRIVER
+                      </button>
+                      <button 
+                        onClick={() => handleArchive(pickup.dbId)}
+                        className="ar-btn-archive"
+                      >
+                        ARCHIVE
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Live Mini Map Snippet */}
+                  <div className="ar-card-map-col">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Live Map Snippet</span>
+                      <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                        <Truck className="w-3 h-3" /> Live Tracking
+                      </span>
+                    </div>
+                    <div className="ar-map-wrapper">
+                      <PigeonMap defaultCenter={pickup.coords} defaultZoom={13}>
+                        <Marker width={30} anchor={pickup.coords} color="#059669" />
+                      </PigeonMap>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            ))
+          )}
 
           {/* SEE MORE BUTTON FOR ACTIVE PICKUPS */}
           {filteredPickups.length > 2 && (
@@ -194,17 +235,21 @@ export default function ActiveRequests({ requests }) {
           </div>
 
           <div className="space-y-3">
-            {displayedAlerts.map((al, idx) => (
-              <div key={idx} className="ar-alert-card">
-                <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
-                  <span className="text-emerald-400 flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {al.time}
-                  </span>
-                  <span className="uppercase text-[9px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300">Live</span>
+            {displayedAlerts.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4">No recent alerts available.</p>
+            ) : (
+              displayedAlerts.map((al, idx) => (
+                <div key={idx} className="ar-alert-card">
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
+                    <span className="text-emerald-400 flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> {al.time}
+                    </span>
+                    <span className="uppercase text-[9px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300">Live</span>
+                  </div>
+                  <p className="text-xs text-slate-200 font-medium leading-relaxed">{al.text}</p>
                 </div>
-                <p className="text-xs text-slate-200 font-medium leading-relaxed">{al.text}</p>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* SEE MORE BUTTON FOR LOGISTICS ALERTS */}

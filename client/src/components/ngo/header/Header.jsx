@@ -1,13 +1,37 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Search, Bell } from "lucide-react";
 import { useLocation } from "react-router-dom";
-import "./Header.css"; // আলাদা সিএসএস ফাইল ইমপোর্ট করা হলো
+import "./Header.css";
 
 export default function Header({ themeMode }) {
   const isDark = themeMode === "dark";
   const location = useLocation();
   const [showProfileModal, setShowProfileModal] = useState(false);
   const modalRef = useRef(null);
+
+  // ডাইনামিক ইউজারের তথ্য রাখার জন্য স্টেট
+  const [ngoData, setNgoData] = useState({
+    name: "User",
+    email: "",
+    image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&q=80"
+  });
+
+  // লোকালস্টোরেজ থেকে লগইন করা ইউজারের ডাটা লোড করা
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setNgoData({
+          name: parsedUser.name || parsedUser.organizationName || parsedUser.ngoName || "User",
+          email: parsedUser.email || "",
+          image: parsedUser.image || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&q=80"
+        });
+      } catch (e) {
+        console.error("Error parsing user data", e);
+      }
+    }
+  }, []);
 
   // Close profile popup when clicking outside
   useEffect(() => {
@@ -26,7 +50,7 @@ export default function Header({ themeMode }) {
   const getPageTitle = () => {
     switch (location.pathname) {
       case "/ngo/dashboard":
-        return "Good Evening, Hope Foundation";
+        return `Good Evening, ${ngoData.name}`;
       case "/ngo/donation-map":
         return "Donation Map";
       case "/ngo/active-requests":
@@ -40,7 +64,7 @@ export default function Header({ themeMode }) {
       case "/ngo/settings":
         return "Settings";
       default:
-        return "Good Evening, Hope Foundation";
+        return `Good Evening, ${ngoData.name}`;
     }
   };
 
@@ -83,13 +107,13 @@ export default function Header({ themeMode }) {
           className={`ngo-profile-box ${isDark ? "ngo-profile-box-dark" : "ngo-profile-box-light"}`}
         >
           <img
-            src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&q=80"
-            alt="Hope Foundation"
+            src={ngoData.image}
+            alt={ngoData.name}
             className="ngo-profile-img"
           />
           <div className="text-left">
             <p className={`ngo-profile-text ${isDark ? "ngo-profile-text-dark" : "ngo-profile-text-light"}`}>
-              Welcome, Hope Foundation!
+              Welcome, {ngoData.name}!
             </p>
           </div>
         </div>
@@ -100,9 +124,9 @@ export default function Header({ themeMode }) {
             {/* Profile Header */}
             <div className="ngo-modal-header">
               <div className="flex items-center gap-3">
-                <div className="ngo-modal-avatar">HF</div>
+                <div className="ngo-modal-avatar">{ngoData.name ? ngoData.name.charAt(0).toUpperCase() : "U"}</div>
                 <div>
-                  <h3 className="font-bold text-sm">Hope Foundation</h3>
+                  <h3 className="font-bold text-sm">{ngoData.name}</h3>
                   <p className="ngo-modal-tag">Verified Partner NGO • Chattogram</p>
                 </div>
               </div>
@@ -114,7 +138,7 @@ export default function Header({ themeMode }) {
             {/* Description */}
             <div className="ngo-modal-desc">
               <p className={isDark ? "text-slate-300" : "text-slate-600"}>
-                <strong className="text-emerald-500">Hope Foundation</strong> is a well-known non-profit social organization dedicated to collecting surplus food and distributing nutritious meals to underprivileged people.
+                <strong className="text-emerald-500">{ngoData.name}</strong> is a well-known non-profit social organization dedicated to collecting surplus food and distributing nutritious meals to underprivileged people.
               </p>
               <div className="ngo-modal-notice">
                 ✨ NGO Details: Doing an exceptional job in food waste reduction and public welfare.

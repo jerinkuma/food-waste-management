@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
-import './Feedback.css'; // সিএসএস ফাইলটি এখানে ইমপোর্ট করা হয়েছে
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import './Feedback.css'; // সিএসএস ফাইলটি এখানে ইমপোর্ট করা হয়েছে
+
+const API_BASE = 'http://localhost:5000/api';
 
 export default function Feedback() {
   // Form States
@@ -15,13 +18,22 @@ export default function Feedback() {
     packagingIssue: false,
   });
 
-  // Dummy Previous Tickets/Feedback Data (Without Ratings)
-  const [previousFeedback, setPreviousFeedback] = useState([
-    { id: "DH1004", donor: "Restaurant 2", category: "Late Arrival", date: "9/14", status: "Resolved", priority: "Normal" },
-    { id: "DH1003", donor: "Restaurant 2", category: "Food Quality Issue", date: "9/14", status: "Closed", priority: "High" },
-    { id: "DH1002", donor: "Café 1", category: "General Feedback", date: "9/13", status: "Closed", priority: "Low" },
-    { id: "DH1009", donor: "Café 1", category: "Packaging Issue", date: "9/13", status: "Resolved", priority: "Normal" },
-  ]);
+  // Previous Feedback List State
+  const [previousFeedback, setPreviousFeedback] = useState([]);
+
+  // Load Feedbacks from DB
+  useEffect(() => {
+    fetchFeedbacks();
+  }, []);
+
+  const fetchFeedbacks = async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/feedback`);
+      setPreviousFeedback(res.data);
+    } catch (err) {
+      console.error("Error fetching feedbacks:", err);
+    }
+  };
 
   // Handle Checkbox Change
   const handleCheckboxChange = (e) => {
@@ -31,26 +43,46 @@ export default function Feedback() {
     });
   };
 
-  // Submit Feedback Form
-  const handleSubmit = (e) => {
+  // Submit Feedback Form to Express Backend
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!detailsText.trim()) {
       alert("Please describe your feedback before submitting.");
       return;
     }
 
-    const newFeedback = {
-      id: selectedDonationId || "GENERAL",
-      donor: selectedDonationId === 'DH1005' ? 'Café 1' : 'Selected Donor',
+    // Selected Tags Array Extraction
+    const tags = Object.keys(selectedCheckboxes).filter(
+      (key) => selectedCheckboxes[key]
+    );
+
+    const payload = {
+      donationId: selectedDonationId || "GENERAL",
+      donorName: selectedDonationId === 'DH1005' ? 'Café 1' : 'Selected Donor',
       category: feedbackCategory,
-      date: "Today",
-      status: "Under Review",
-      priority: priorityLevel
+      priority: priorityLevel,
+      tags: tags,
+      message: detailsText
     };
 
-    setPreviousFeedback([newFeedback, ...previousFeedback]);
-    setDetailsText('');
-    alert("Thank you! Your feedback ticket has been submitted successfully to the FeedLink Support Team.");
+    try {
+      await axios.post(`${API_BASE}/feedback`, payload);
+      alert("Thank you! Your feedback ticket has been submitted successfully to the FeedLink Support Team.");
+      
+      // Reset Form & Refetch List
+      setDetailsText('');
+      setSelectedCheckboxes({
+        lateArrival: false,
+        foodQualityIssue: false,
+        communicationIssue: false,
+        quantityMismatch: false,
+        packagingIssue: false,
+      });
+      fetchFeedbacks();
+    } catch (err) {
+      console.error("Error submitting feedback:", err);
+      alert("Failed to submit feedback. Please try again.");
+    }
   };
 
   // Email Reporting System Trigger
@@ -59,7 +91,7 @@ export default function Feedback() {
     const body = encodeURIComponent(
       `Hello FeedLink Audit & Support Team,\n\nI want to report an issue regarding Donation ID: ${selectedDonationId}.\n\nCategory: ${feedbackCategory}\nPriority: ${priorityLevel}\n\nDetails / Incidents:\n${detailsText || '[Write details here]'}\n\nPlease look into this matter.\n\nThank you,\nNGO Representative`
     );
-    window.location.href = `mailto:support@feedlink.org?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:admin@feedlink.org?subject=${subject}&body=${body}`;
   };
 
   return (
@@ -116,11 +148,11 @@ export default function Feedback() {
                   onChange={(e) => setFeedbackCategory(e.target.value)}
                   className="feedlink-select"
                 >
-                  <option value="General Feedback">General App Feedback</option>
+                  <option value="General App Feedback">General App Feedback</option>
                   <option value="Food Quality Issue">Food Quality / Spoilage</option>
                   <option value="Late Arrival">Late Logistics Delivery</option>
                   <option value="Quantity Mismatch">Quantity Mismatch</option>
-                  <option value="Donor Misbehavior">Donor Misbehavior Report</option>
+                  <option value="Donor Misbehavior Report">Donor Misbehavior Report</option>
                 </select>
               </div>
             </div>
@@ -237,25 +269,33 @@ export default function Feedback() {
                   </tr>
                 </thead>
                 <tbody>
-                  {previousFeedback.map((item, idx) => (
-                    <tr key={idx} className="feedlink-tr">
-                      <td className="td-date">{item.date}</td>
-                      <td className="td-id">{item.id}</td>
-                      <td className="td-donor">{item.donor}</td>
-                      <td className="td-category">{item.category}</td>
-                      <td>
-                        <span className={`feedlink-status-badge ${
-                          item.status === 'Resolved' 
-                            ? 'status-resolved' 
-                            : item.status === 'Under Review'
-                            ? 'status-review'
-                            : 'status-closed'
-                        }`}>
-                          {item.status}
-                        </span>
+                  {previousFeedback.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '16px', color: '#64748b' }}>
+                        No feedback submitted yet.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    previousFeedback.map((item, idx) => (
+                      <tr key={item._id || idx} className="feedlink-tr">
+                        <td className="td-date">{item.date || "Today"}</td>
+                        <td className="td-id">{item.donationId || item.id}</td>
+                        <td className="td-donor">{item.donorName || item.donor}</td>
+                        <td className="td-category">{item.category}</td>
+                        <td>
+                          <span className={`feedlink-status-badge ${
+                            (item.status || 'Under Review') === 'Resolved' 
+                              ? 'status-resolved' 
+                              : (item.status || 'Under Review') === 'Under Review'
+                              ? 'status-review'
+                              : 'status-closed'
+                          }`}>
+                            {item.status || 'Under Review'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -269,7 +309,7 @@ export default function Feedback() {
                 For urgent complaints regarding food safety or severe donor issues, directly contact our admin department via email:
               </p>
               <a 
-                href="mailto:audit@feedlink.org" 
+                href="mailto:admin@feedlink.org" 
                 className="feedlink-support-link"
               >
                 ✉️ admin@feedlink.org
