@@ -1,9 +1,9 @@
-const DonationRequest = require('../models/DonationRequest');
+const Donation = require('../models/Donation');
 
 // ১. ম্যাপ এবং অ্যাক্টিভ রিকোয়েস্ট উভয়ের জন্য ডেটা ফেচ করার ফাংশন
 const getDonationRequests = async (req, res) => {
   try {
-    const requests = await DonationRequest.find({ 
+    const requests = await Donation.find({ 
       status: { $ne: 'Archived' } 
     }).sort({ createdAt: -1 });
 
@@ -20,9 +20,7 @@ const getDonationRequests = async (req, res) => {
 // ২. শুধু অ্যাক্টিভ রিকোয়েস্টগুলো আনার ফাংশন
 const getActiveRequests = async (req, res) => {
   try {
-    const requests = await DonationRequest.find({ 
-      status: { $ne: "Archived" } 
-    }).sort({ createdAt: -1 });
+    const requests = await Donation.find({}).sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
@@ -39,7 +37,7 @@ const archiveRequest = async (req, res) => {
   try {
     const newStatus = req.body.status || "Archived";
     
-    await DonationRequest.findByIdAndUpdate(
+    await Donation.findByIdAndUpdate(
       req.params.id, 
       { status: newStatus }
     );

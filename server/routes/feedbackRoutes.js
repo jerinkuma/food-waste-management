@@ -1,40 +1,33 @@
 const express = require("express");
 const router = express.Router();
-const Feedback = require("../models/Feedback");
+const {
+  submitFeedback,
+  getAdminFeedback,
+  getRestaurantFeedback,
+  getNgoFeedbacks,
+  respondToFeedback,
+  markFeedbackRead,
+} = require("../controllers/feedbackController");
 
-// GET all feedback logs
-router.get("/", async (req, res) => {
-  try {
-    const list = await Feedback.find().sort({ createdAt: -1 });
-    res.json(list);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// Submit feedback -> dual-routed to Admin + Restaurant
+router.post("/", submitFeedback);
 
-// POST submit feedback
-router.post("/", async (req, res) => {
-  try {
-    const { donationId, donorName, category, tags, priority, message } = req.body;
-    
-    const today = new Date();
-    const formattedDate = `${today.getMonth() + 1}/${today.getDate()}`;
+// Admin inbox
+router.get("/admin", getAdminFeedback);
 
-    const newFeedback = new Feedback({
-      donationId,
-      donorName,
-      category,
-      tags,
-      priority,
-      message,
-      date: formattedDate
-    });
+// Restaurant inbox
+router.get("/restaurant/:restaurantId", getRestaurantFeedback);
 
-    await newFeedback.save();
-    res.status(201).json(newFeedback);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// NGO's own submitted feedback
+router.get("/ngo/:ngoId", getNgoFeedbacks);
+
+// Restaurant responds to a piece of feedback
+router.put("/:id/respond", respondToFeedback);
+
+// Mark read by a given viewer
+router.patch("/:id/read", markFeedbackRead);
+
+// Backwards-compatible generic list (kept for anything still calling GET /api/feedback)
+router.get("/", getAdminFeedback);
 
 module.exports = router;

@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   UtensilsCrossed,
+  Handshake,
 } from "lucide-react";
 
 // -------------------------------------------------------------
@@ -28,6 +29,7 @@ export function Sidebar({ handleLogout }) {
     { path: "/ngo/dashboard", name: "HOME", icon: Home },
     { path: "/ngo/donation-map", name: "DONATION MAP", icon: MapPin },
     { path: "/ngo/active-requests", name: "ACTIVE REQUESTS", icon: Clock },
+    { path: "/ngo/partners", name: "PARTNERS", icon: Handshake },
     { path: "/ngo/history", name: "HISTORY & LOGS", icon: History },
     { path: "/ngo/trust-score", name: "TRUST SCORE", icon: ShieldCheck },
     { path: "/ngo/feedback", name: "FEEDBACK", icon: MessageSquare },
@@ -129,8 +131,8 @@ export default function NgoLayout({ children }) {
     localStorage.removeItem("user");
     sessionStorage.clear();
 
-    // 2. ইউজারকে লগইন পেজে রিডাইরেক্ট করা
-    navigate("/login");
+    // 2. ইউজারকে লগইন পেজে রিডাইরেক্ট করা (fixed: route is /auth, not /login)
+    navigate("/auth");
   };
 
   return (

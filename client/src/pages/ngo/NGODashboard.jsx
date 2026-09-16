@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 
 import {
   Utensils,
@@ -15,90 +14,98 @@ import {
 } from "lucide-react";
 
 import { Map as PigeonMap, Marker } from "pigeon-maps";
+import { getSocket } from "../../services/socket";
+import { getCurrentUser } from "../../services/auth";
+import {
+  fetchNgoStats,
+  fetchNgoProfile,
+  fetchAvailableDonations,
+  acceptDonation,
+  updateDonationStatus,
+} from "../../services/api";
 
 export default function NGODashboard() {
   const navigate = useNavigate();
+  const user = getCurrentUser();
 
-  // ১. ডাইনামিক ডেটা এবং স্ট্যাটাসের জন্য স্টেট
   const [stats, setStats] = useState({
     totalClaimed: 0,
     mealsDistributed: 0,
     trustScore: 0,
-    foodWasteSaved: "0 Kg"
+    foodWasteSaved: "0 Kg",
   });
   const [requests, setRequests] = useState([]);
+  const [ngoId, setNgoId] = useState(null);
+  const [busyId, setBusyId] = useState(null);
 
-  // ২. ব্যাকএন্ড থেকে ডেটা ফেচ করার জন্য useEffect
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const config = { headers: { Authorization: `Bearer ${token}` } };
+  const loadDashboard = useCallback(async () => {
+    try {
+      const [statsData, profile] = await Promise.all([
+        fetchNgoStats().catch(() => null),
+        fetchNgoProfile().catch(() => null),
+      ]);
+      if (statsData) setStats(statsData);
+      setNgoId(profile?._id || null);
 
-        // ড্যাশবোর্ড স্ট্যাটস এপিআই কল
-        const statsRes = await axios.get("http://localhost:5000/api/ngo/stats", config);
-        if (statsRes.data?.success) {
-          setStats(statsRes.data.stats);
-        }
-
-        // অ্যাক্টিভ রিকোয়েস্ট এপিআই কল (সঠিক রাউট /api/requests ব্যবহার করা হয়েছে)
-        const reqRes = await axios.get("http://localhost:5000/api/requests", config);
-        if (reqRes.data) {
-          // রেসপন্স অবজেক্ট বা অ্যারে যাই হোক না কেন তা হ্যান্ডেল করার জন্য
-          const reqData = reqRes.data.success ? reqRes.data.data : reqRes.data;
-          setRequests(Array.isArray(reqData) ? reqData : []);
-        }
-      } catch (err) {
-        console.error("Error fetching dashboard data:", err);
-      }
-    };
-
-    fetchDashboardData();
+      navigator.geolocation?.getCurrentPosition(
+        async (pos) => setRequests(await fetchAvailableDonations(pos.coords.latitude, pos.coords.longitude)),
+        async () => setRequests(await fetchAvailableDonations()),
+        { timeout: 4000 }
+      );
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+    }
   }, []);
 
-  // ৩. রিকোয়েস্ট Accept করার ফাংশন
-  const handleAccept = async (requestId) => {
+  useEffect(() => {
+    loadDashboard();
+
+    // Real-time: new donations & status changes refresh this view instantly
+    const socket = getSocket();
+    socket.on("donation:new", loadDashboard);
+    socket.on("donation:updated", loadDashboard);
+    return () => {
+      socket.off("donation:new", loadDashboard);
+      socket.off("donation:updated", loadDashboard);
+    };
+  }, [loadDashboard]);
+
+  const handleAccept = async (donationId) => {
+    if (!ngoId) {
+      alert("Your NGO profile could not be verified. Please log in again.");
+      return;
+    }
+    setBusyId(donationId);
     try {
-      const token = localStorage.getItem("token");
-      await axios.put(`http://localhost:5000/api/requests/${requestId}/accept`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setRequests(requests.filter(req => (req._id || req.id) !== requestId));
-      alert("Request accepted successfully!");
+      await acceptDonation(donationId, ngoId);
+      alert("Request accepted successfully! Moved to Active Pickups.");
+      await loadDashboard();
     } catch (err) {
-      console.error("Failed to accept request", err);
+      alert(err?.response?.data?.message || "Failed to accept request");
+    } finally {
+      setBusyId(null);
     }
   };
 
-  // ৪. রিকোয়েস্ট Decline করার ফাংশন
-  const handleDecline = async (requestId) => {
+  const handleDecline = async (donationId) => {
+    setBusyId(donationId);
     try {
-      const token = localStorage.getItem("token");
-      await axios.put(`http://localhost:5000/api/requests/${requestId}/reject`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setRequests(requests.filter(req => (req._id || req.id) !== requestId));
-      alert("Request declined.");
+      await updateDonationStatus(donationId, "Rejected", "Declined from dashboard", user?.id);
+      await loadDashboard();
     } catch (err) {
       console.error("Failed to reject request", err);
+    } finally {
+      setBusyId(null);
     }
   };
 
-  // Show only the first two requests safely
-  const displayedRequests = Array.isArray(requests) ? requests.slice(0, 2) : [];
-
-  // Navigate to donation map
-  const goToMap = () => {
-    navigate("/ngo/donation-map");
-  };
+  const displayedRequests = requests.slice(0, 2);
+  const goToMap = () => navigate("/ngo/donation-map");
 
   return (
     <div className="space-y-6">
-
       {/* ================= STAT CARDS ================= */}
       <div className="grid grid-cols-4 gap-5">
-
-        {/* Total Claimed */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-36">
           <div className="flex justify-between items-start">
             <div>
@@ -113,11 +120,10 @@ export default function NGODashboard() {
             <span className="text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md">
               +{stats.todayClaimed || 0} Today
             </span>
-            <span className="text-slate-400">Updated just now</span>
+            <span className="text-slate-400">Live</span>
           </div>
         </div>
 
-        {/* Meals Distributed */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-36">
           <div className="flex justify-between items-start">
             <div>
@@ -132,11 +138,10 @@ export default function NGODashboard() {
             <span className="text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-md">
               +{stats.todayMeals || 0} Meals
             </span>
-            <span className="text-slate-400">Updated just now</span>
+            <span className="text-slate-400">Live</span>
           </div>
         </div>
 
-        {/* Trust Score */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-36">
           <div className="flex justify-between items-start">
             <div>
@@ -153,11 +158,10 @@ export default function NGODashboard() {
             <span className="text-slate-600 font-semibold bg-slate-100 px-2 py-0.5 rounded-md">
               {stats.reviewCount || 0} Reviews
             </span>
-            <span className="text-slate-400">Updated just now</span>
+            <span className="text-slate-400">Live</span>
           </div>
         </div>
 
-        {/* Food Waste Saved */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-36">
           <div className="flex justify-between items-start">
             <div>
@@ -170,56 +174,35 @@ export default function NGODashboard() {
           </div>
           <div className="flex justify-between items-center text-[11px]">
             <span className="text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md">
-              Saved from claims
+              Saved from completed pickups
             </span>
-            <span className="text-slate-400">Updated just now</span>
+            <span className="text-slate-400">Live</span>
           </div>
         </div>
-
       </div>
 
       {/* ================= MAP + ACTIVE REQUESTS ================= */}
       <div className="grid grid-cols-12 gap-6">
-
-        {/* MAP */}
         <div className="col-span-7 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-center mb-3">
             <div className="flex items-center gap-2">
               <MapIcon className="w-5 h-5 text-emerald-600" />
               <h3 className="font-bold text-slate-900 text-sm">
-                NEARBY FOOD{" "}
-                <span className="text-slate-500 font-normal">
-                  (Chattogram Area)
-                </span>
+                NEARBY FOOD <span className="text-slate-500 font-normal">(Live Locations)</span>
               </h3>
             </div>
-            <button
-              onClick={goToMap}
-              className="text-slate-400 hover:text-emerald-600 p-1 cursor-pointer"
-              title="Open Full Map View"
-            >
+            <button onClick={goToMap} className="text-slate-400 hover:text-emerald-600 p-1 cursor-pointer" title="Open Full Map View">
               <Maximize2 className="w-4 h-4" />
             </button>
           </div>
 
-          <div
-            onClick={goToMap}
-            className="relative w-full h-80 rounded-xl overflow-hidden border border-slate-200 cursor-pointer group"
-          >
-            <PigeonMap
-              defaultCenter={[22.3569, 91.7832]}
-              defaultZoom={12}
-            >
-              <Marker
-                width={40}
-                anchor={[22.3587, 91.8215]}
-                color="#059669"
-              />
-              <Marker
-                width={40}
-                anchor={[22.3303, 91.8122]}
-                color="#f59e0b"
-              />
+          <div onClick={goToMap} className="relative w-full h-80 rounded-xl overflow-hidden border border-slate-200 cursor-pointer group">
+            <PigeonMap defaultCenter={[22.3569, 91.7832]} defaultZoom={12}>
+              {requests
+                .filter((r) => r.resolvedLocation)
+                .map((r) => (
+                  <Marker key={r._id} width={36} anchor={[r.resolvedLocation.lat, r.resolvedLocation.lng]} color="#059669" />
+                ))}
             </PigeonMap>
 
             <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-slate-900/20 transition-all flex items-center justify-center">
@@ -230,95 +213,71 @@ export default function NGODashboard() {
           </div>
         </div>
 
-        {/* ACTIVE REQUESTS */}
         <div className="col-span-5 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center mb-3">
-              <div>
-                <h3 className="font-bold text-slate-900 text-sm">
-                  ACTIVE REQUESTS
-                </h3>
-              </div>
-
+              <h3 className="font-bold text-slate-900 text-sm">ACTIVE REQUESTS</h3>
               <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
                 {requests.length} Total
               </span>
             </div>
 
             <div className="space-y-3">
-              {displayedRequests.map((req) => {
-                const reqId = req._id || req.id;
-                return (
-                  <div
-                    key={reqId}
-                    className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-xs">
-                          {req.restaurant?.organizationName || req.restaurant?.name || req.donor || "Restaurant"}
-                        </h4>
-                        <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
-                          <Truck className="w-3 h-3 text-rose-500" />
-                          {req.foodPost?.title || req.foodType || "Food Post Item"}
-                        </p>
-                      </div>
-
-                      <span className="text-[10px] text-slate-400 font-medium">
-                        {req.createdAt ? new Date(req.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
-                      </span>
+              {displayedRequests.map((req) => (
+                <div key={req._id} className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-xs">{req.donor?.name || "Restaurant"}</h4>
+                      <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                        <Truck className="w-3 h-3 text-rose-500" />
+                        {req.foodName}
+                      </p>
                     </div>
-
-                    <p className="text-[11px] text-slate-600 bg-white p-1.5 rounded border border-slate-100">
-                      {req.message || req.address || "No message provided"}
-                    </p>
-
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        onClick={() => handleAccept(reqId)}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        ACCEPT
-                      </button>
-
-                      <button
-                        onClick={() => handleDecline(reqId)}
-                        className="flex-1 bg-rose-700 hover:bg-rose-800 text-white font-bold py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        DECLINE
-                      </button>
-                    </div>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      {req.distanceKm != null ? `${req.distanceKm} km` : ""}
+                    </span>
                   </div>
-                );
-              })}
 
-              {/* No Requests */}
+                  <p className="text-[11px] text-slate-600 bg-white p-1.5 rounded border border-slate-100">
+                    {req.pickupAddress || "No address provided"}
+                  </p>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      disabled={busyId === req._id}
+                      onClick={() => handleAccept(req._id)}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Check className="w-3.5 h-3.5" /> ACCEPT
+                    </button>
+                    <button
+                      disabled={busyId === req._id}
+                      onClick={() => handleDecline(req._id)}
+                      className="flex-1 bg-rose-700 hover:bg-rose-800 text-white font-bold py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" /> DECLINE
+                    </button>
+                  </div>
+                </div>
+              ))}
+
               {displayedRequests.length === 0 && (
                 <div className="text-center py-10">
-                  <p className="text-sm text-slate-400">
-                    No active donation requests.
-                  </p>
+                  <p className="text-sm text-slate-400">No active donation requests.</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* See All */}
           <button
             onClick={goToMap}
             className="w-full mt-4 bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>
-              SEE ALL ACTIVE REQUESTS ({requests.length})
-            </span>
+            <span>SEE ALL ACTIVE REQUESTS ({requests.length})</span>
             <ArrowRight className="w-4 h-4 text-emerald-400" />
           </button>
         </div>
-
       </div>
-
     </div>
   );
 }

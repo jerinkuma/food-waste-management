@@ -15,6 +15,13 @@ const feedbackSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Ngo",
     },
+    // The restaurant (User with role "donor") this feedback is about -
+    // this is what makes dual-routing to the Restaurant dashboard possible.
+    restaurant: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     donor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -22,6 +29,22 @@ const feedbackSchema = new mongoose.Schema(
     donorName: { 
       type: String, 
       required: true 
+    },
+
+    // =====================================
+    // DUAL-DESTINATION ROUTING
+    // Every feedback submission is routed to the Admin panel AND
+    // (when a restaurant is linked) to that Restaurant's own dashboard.
+    // =====================================
+    routedTo: {
+      admin: { type: Boolean, default: true },
+      restaurant: { type: Boolean, default: false },
+    },
+    adminRead: { type: Boolean, default: false },
+    restaurantRead: { type: Boolean, default: false },
+    restaurantResponse: {
+      message: { type: String, default: "" },
+      respondedAt: { type: Date, default: null },
     },
 
     // Feedback Content & Categorization
