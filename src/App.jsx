@@ -5,7 +5,7 @@ import Footer from './components/Admindashboard/Footer';
 import Dashboard from './pages/Admindashboard/Dashboard';
 import Users from './pages/Admindashboard/Users';
 import Donations from './pages/Admindashboard/Donations';
-import Orphanages from './pages/Admindashboard/Orphanages';
+import NGO from './pages/Admindashboard/NGO';
 import Feedback from './pages/Admindashboard/Feedback';
 import Reports from './pages/Admindashboard/Reports';
 import Inventory from './pages/Admindashboard/Inventory';
@@ -24,7 +24,7 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/users" element={<Users />} />
               <Route path="/donations" element={<Donations />} />
-              <Route path="/orphanages" element={<Orphanages />} />
+              <Route path="/NGO" element={<NGO />} />
               <Route path="/feedback" element={<Feedback />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/inventory" element={<Inventory />} />

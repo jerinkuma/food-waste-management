@@ -8,7 +8,7 @@ export const fetchDashboardStats = () => ({
   recentActivities: [
     { id: 1, text: '🍽️ Mezban Restaurant donated 30 kg Chicken Dum Biriyani', time: '2 min ago' },
     { id: 2, text: '🚚 Agrabad Food Bank picked up 20 kg Mutton Teheri', time: '15 min ago' },
-    { id: 3, text: '🏠 New orphanage request from Halishahar', time: '42 min ago' },
+    { id: 3, text: '🏠 New NGO request from Halishahar', time: '42 min ago' },
     { id: 4, text: '✅ 12 donations approved by admin', time: '1 hour ago' },
     { id: 5, text: '📦 Inventory updated: Chicken Fried Rice & Pasta stock increased', time: '2 hours ago' },
     { id: 6, text: '⭐ Suzana gave 5-star feedback to Mezban', time: '3 hours ago' },
@@ -32,7 +32,7 @@ export const fetchUsers = () => [
   { id: 14, name: 'Taj Restaurant', email: 'taj@rest.com', role: 'Restaurant', location: 'Bahaddarhat, Ctg', status: 'Active' },
   { id: 15, name: 'Ruchi Restaurant', email: 'ruchi@rest.com', role: 'Restaurant', location: 'Khulshi, Ctg', status: 'Pending' },
   { id: 16, name: 'Sultan\'s Dine', email: 'sultan@rest.com', role: 'Restaurant', location: 'Oxygen, Ctg', status: 'Active' },
-  { id: 17, name: 'Chittagong Orphanage Trust', email: 'cot@ngo.org', role: 'NGO', location: 'Halishahar, Ctg', status: 'Verified' },
+  { id: 17, name: 'Chittagong NGO Trust', email: 'cot@ngo.org', role: 'NGO', location: 'Halishahar, Ctg', status: 'Verified' },
   { id: 18, name: 'Agrabad Women\'s Forum', email: 'awf@ngo.org', role: 'NGO', location: 'Agrabad, Ctg', status: 'Active' },
   { id: 19, name: 'Bayazid Food Bank', email: 'bayazid@ngo.org', role: 'NGO', location: 'Bayazid, Ctg', status: 'Verified' },
   { id: 20, name: 'Shah Amanat Foundation', email: 'saf@ngo.org', role: 'NGO', location: 'Shah Amanat, Ctg', status: 'Active' },
@@ -66,22 +66,22 @@ export const fetchDonations = () => [
   { id: 25, food: 'Chicken Jhal Fry', qty: '10 kg', donor: 'Spice Garden', date: '2026-07-24', status: 'Accepted' },
 ];
 
-export const fetchOrphanages = () => [
+export const fetchNGO = () => [
   { id: 1, name: 'Halishahar Children Home', food: 'Chicken Rice', qty: '25 kg', status: 'Pending' },
-  { id: 2, name: 'Agrabad Orphanage', food: 'Mutton Korma', qty: '18 kg', status: 'Accepted' },
-  { id: 3, name: 'Bakalia Orphanage', food: 'Pasta', qty: '15 kg', status: 'Pending' },
+  { id: 2, name: 'Agrabad NGO', food: 'Mutton Korma', qty: '18 kg', status: 'Accepted' },
+  { id: 3, name: 'Bakalia NGO', food: 'Pasta', qty: '15 kg', status: 'Pending' },
   { id: 4, name: 'Chandgaon Mission', food: 'Fish Rice', qty: '30 kg', status: 'Pending' },
   { id: 5, name: 'Pathantoly Children Home', food: 'Chicken Soup', qty: '12 kg', status: 'Accepted' },
   { id: 6, name: 'Nasirabad Boarding', food: 'Chicken Biriyani', qty: '22 kg', status: 'Pending' },
-  { id: 7, name: 'Pahartali Orphanage', food: 'Mutton Teheri', qty: '16 kg', status: 'Accepted' },
+  { id: 7, name: 'Pahartali NGO', food: 'Mutton Teheri', qty: '16 kg', status: 'Accepted' },
   { id: 8, name: 'Khulshi Children Shelter', food: 'Pasta Sauce', qty: '14 kg', status: 'Pending' },
-  { id: 9, name: 'GEC Orphanage', food: 'Chicken Roast', qty: '20 kg', status: 'Accepted' },
-  { id: 10, name: 'Oxygen Orphanage', food: 'Chicken Curry', qty: '18 kg', status: 'Pending' },
+  { id: 9, name: 'GEC NGO', food: 'Chicken Roast', qty: '20 kg', status: 'Accepted' },
+  { id: 10, name: 'Oxygen NGO', food: 'Chicken Curry', qty: '18 kg', status: 'Pending' },
   { id: 11, name: 'Bayazid Children Home', food: 'Mutton Korma', qty: '28 kg', status: 'Pending' },
-  { id: 12, name: 'Shah Amanat Orphanage', food: 'Chicken Fry', qty: '15 kg', status: 'Accepted' },
+  { id: 12, name: 'Shah Amanat NGO', food: 'Chicken Fry', qty: '15 kg', status: 'Accepted' },
   { id: 13, name: 'Ctg Club Foundation', food: 'Mutton Biriyani', qty: '20 kg', status: 'Pending' },
   { id: 14, name: 'Agrabad Women Shelter', food: 'Vegetable Rice', qty: '22 kg', status: 'Accepted' },
-  { id: 15, name: 'Panchlaish Orphanage', food: 'Chicken Bhuna', qty: '25 kg', status: 'Pending' },
+  { id: 15, name: 'Panchlaish NGO', food: 'Chicken Bhuna', qty: '25 kg', status: 'Pending' },
 ];
 
 export const fetchFeedback = () => [
@@ -97,7 +97,7 @@ export const fetchFeedback = () => [
   { id: 10, from: 'The Peninsula', rating: 4.3, message: 'Nice interface, easy to donate.', time: '10h ago' },
   { id: 11, from: 'Spice Garden', rating: 4.6, message: 'Great teamwork. Food reached orphans on time.', time: '11h ago' },
   { id: 12, from: 'Taj Restaurant', rating: 4.4, message: 'Very useful for surplus food management.', time: '12h ago' },
-  { id: 13, from: 'Chittagong Orphanage Trust', rating: 5, message: 'We received fresh food daily. Thank you!', time: '1d ago' },
+  { id: 13, from: 'Chittagong NGO Trust', rating: 5, message: 'We received fresh food daily. Thank you!', time: '1d ago' },
   { id: 14, from: 'Agrabad Women\'s Forum', rating: 4.8, message: 'Empowering community. Keep it up.', time: '1d ago' },
   { id: 15, from: 'Bayazid Food Bank', rating: 5, message: 'Smooth logistics, great communication.', time: '1d ago' },
   { id: 16, from: 'Sultan\'s Dine', rating: 4.2, message: 'Good app, but need more NGO participation.', time: '2d ago' },

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { fetchOrphanages } from '../../services/api';
-import './Orphanages.css';
+import { fetchNGO } from '../../services/api';
+import './NGO.css';
 
-const Orphanages = () => {
+const NGO = () => {
   const [requests, setRequests] = useState([]);
 
   useEffect(() => {
-    setRequests(fetchOrphanages());
+    setRequests(fetchNGO());
   }, []);
 
   const updateStatus = (id, status) => {
@@ -15,10 +15,18 @@ const Orphanages = () => {
 
   return (
     <div className="page">
-      <h1><span className="page-icon">🏠</span> Orphanage Requests</h1>
+      <h1><span className="page-icon">🏠</span> NGO Requests</h1>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Orphanage</th><th>Requested Food</th><th>Quantity</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead>
+            <tr>
+              <th>NGO</th>
+              <th>Requested Food</th>
+              <th>Quantity</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
           <tbody>
             {requests.map(r => (
               <tr key={r.id}>
@@ -43,4 +51,4 @@ const Orphanages = () => {
   );
 };
 
-export default Orphanages;
+export default NGO;
