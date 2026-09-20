@@ -1,74 +1,13 @@
-import React, { useState } from 'react';
-import './TrustScore.css'; // Jodi custom CSS file use korte chan
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import './TrustScore.css'; // Optional custom styling
+
+const API_BASE = 'http://localhost:5000/api'; // Express Port
 
 export default function TrustScore({ themeMode = 'light' }) {
-  // 1. Initial Donor Data
-  const [donors, setDonors] = useState([
-    {
-      id: "d1",
-      name: "Café 1",
-      location: "Agrabad, Chattogram",
-      trustScore: 4.8,
-      totalDonations: 42,
-      isFollowed: true,
-      tags: ["Fresh Food", "Super Fast", "Top Rated"],
-      recentImages: [
-        "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200",
-        "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200"
-      ],
-      reviews: [
-        { id: "r1", user: "Volunteer A", rating: 5, comment: "Food was warm and well packed.", type: "positive" },
-        { id: "r2", user: "NGO Rep", rating: 2, comment: "Pickup was delayed by 30 minutes.", type: "negative" }
-      ]
-    },
-    {
-      id: "d2",
-      name: "Hotel Agrabad",
-      location: "Agrabad, Chattogram",
-      trustScore: 4.7,
-      totalDonations: 35,
-      isFollowed: false,
-      tags: ["Large Meals", "Very Hygienic"],
-      recentImages: [
-        "https://images.unsplash.com/photo-1544025162-d76694265947?w=200"
-      ],
-      reviews: [
-        { id: "r3", user: "Shelter Coordinator", rating: 5, comment: "Excellent quantity and highly hygienic.", type: "positive" }
-      ]
-    },
-    {
-      id: "d3",
-      name: "Royal Dine",
-      location: "GEC Circle, Chattogram",
-      trustScore: 3.5,
-      totalDonations: 28,
-      isFollowed: false,
-      tags: ["Quality Packaging", "Inconsistent Quantity"],
-      recentImages: [],
-      reviews: [
-        { id: "r4", user: "Distributor B", rating: 2, comment: "Packaging was torn during pickup.", type: "negative" }
-      ]
-    },
-    {
-      id: "d4",
-      name: "Restaurant Name 2",
-      location: "WASA, Chattogram",
-      trustScore: 2.8,
-      totalDonations: 19,
-      isFollowed: false,
-      tags: ["Late Delivery", "Cold Food"],
-      recentImages: [],
-      reviews: [
-        { id: "r5", user: "Volunteer C", rating: 1, comment: "Food quality was below average and cold.", type: "negative" }
-      ]
-    }
-  ]);
-
-  const [pendingRatings, setPendingRatings] = useState([
-    { id: "DH1005", donor: "Café 1", food: "Rice & Chicken Curry (~30 meals)", deliveredTime: "2 hours ago" },
-    { id: "DH1004", donor: "Restaurant Name 2", food: "Chow Mein & Sauce (~15 meals)", deliveredTime: "Yesterday" }
-  ]);
-
+  // State definitions
+  const [donors, setDonors] = useState([]);
+  const [pendingRatings, setPendingRatings] = useState([]);
   const [selectedDonorDetail, setSelectedDonorDetail] = useState(null);
   const [selectedRatingItem, setSelectedRatingItem] = useState(null);
   const [userStars, setUserStars] = useState(4);
@@ -77,63 +16,68 @@ export default function TrustScore({ themeMode = 'light' }) {
   const [reviewComment, setReviewComment] = useState('');
   const [ratingTypeFilter, setRatingTypeFilter] = useState('all');
 
-  const toggleFollow = (id) => {
-    setDonors(prev =>
-      prev.map(item => item.id === id ? { ...item, isFollowed: !item.isFollowed } : item)
-    );
+  // Fetch Donors Dynamically on search or filter change
+  useEffect(() => {
+    fetchDonors();
+  }, [searchQuery, ratingTypeFilter]);
+
+  // Fetch Pending Feedbacks on Mount
+  useEffect(() => {
+    fetchPending();
+  }, []);
+
+  const fetchDonors = async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/donors?search=${searchQuery}&filter=${ratingTypeFilter}`);
+      setDonors(res.data);
+    } catch (err) {
+      console.error('Error fetching donors:', err);
+    }
   };
 
-  const handleRatingSubmit = () => {
+  const fetchPending = async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/pending-feedback`);
+      setPendingRatings(res.data);
+    } catch (err) {
+      console.error('Error fetching pending feedback:', err);
+    }
+  };
+
+  const toggleFollow = async (id) => {
+    try {
+      const res = await axios.patch(`${API_BASE}/donors/${id}/follow`);
+      setDonors(prev =>
+        prev.map(d => d._id === id ? { ...d, isFollowed: res.data.isFollowed } : d)
+      );
+      if (selectedDonorDetail && selectedDonorDetail._id === id) {
+        setSelectedDonorDetail(prev => ({ ...prev, isFollowed: res.data.isFollowed }));
+      }
+    } catch (err) {
+      console.error('Error toggling follow:', err);
+    }
+  };
+
+  const handleRatingSubmit = async () => {
     if (!selectedRatingItem) return;
 
-    setDonors(prev =>
-      prev.map(donor => {
-        if (donor.name === selectedRatingItem.donor) {
-          const newTotalDonations = donor.totalDonations + 1;
-          const updatedScore = parseFloat(
-            (((donor.trustScore * donor.totalDonations) + userStars) / newTotalDonations).toFixed(1)
-          );
-          
-          const newTags = donor.tags.includes(selectedTag) 
-            ? donor.tags 
-            : [...donor.tags, selectedTag];
+    try {
+      await axios.post(`${API_BASE}/rate-donor`, {
+        pendingId: selectedRatingItem._id,
+        donorName: selectedRatingItem.donorName || selectedRatingItem.donor,
+        userStars,
+        selectedTag,
+        reviewComment
+      });
 
-          const newReview = {
-            id: `r_${Date.now()}`,
-            user: "Verified Recipient",
-            rating: userStars,
-            comment: reviewComment || "No written review provided.",
-            type: userStars >= 3 ? "positive" : "negative"
-          };
-
-          return {
-            ...donor,
-            trustScore: updatedScore,
-            totalDonations: newTotalDonations,
-            tags: newTags,
-            reviews: [newReview, ...donor.reviews]
-          };
-        }
-        return donor;
-      })
-    );
-
-    setPendingRatings(prev => prev.filter(r => r.id !== selectedRatingItem.id));
-    setSelectedRatingItem(null);
-    setReviewComment('');
-  };
-
-  const filteredDonors = donors.filter(donor => {
-    const matchesSearch = donor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          donor.location.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    if (ratingTypeFilter === 'positive') {
-      return matchesSearch && donor.trustScore >= 4.0;
-    } else if (ratingTypeFilter === 'negative') {
-      return matchesSearch && donor.trustScore < 4.0;
+      fetchDonors();
+      fetchPending();
+      setSelectedRatingItem(null);
+      setReviewComment('');
+    } catch (err) {
+      console.error('Error submitting rating:', err);
     }
-    return matchesSearch;
-  });
+  };
 
   const isDark = themeMode === 'dark';
 
@@ -238,14 +182,14 @@ export default function TrustScore({ themeMode = 'light' }) {
 
             {/* Donor List */}
             <div className="space-y-3">
-              {filteredDonors.length === 0 ? (
+              {donors.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
                   No donors match the current criteria.
                 </div>
               ) : (
-                filteredDonors.map((donor, index) => (
+                donors.map((donor, index) => (
                   <div 
-                    key={donor.id} 
+                    key={donor._id} 
                     className="p-4 rounded-xl border border-slate-200 hover:border-emerald-400 hover:shadow-sm transition-all bg-white flex flex-wrap sm:flex-nowrap items-center justify-between gap-4"
                   >
                     <div className="flex items-start gap-3">
@@ -292,7 +236,7 @@ export default function TrustScore({ themeMode = 'light' }) {
                       </div>
 
                       <button
-                        onClick={() => toggleFollow(donor.id)}
+                        onClick={() => toggleFollow(donor._id)}
                         className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
                           donor.isFollowed
                             ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300'
@@ -326,16 +270,16 @@ export default function TrustScore({ themeMode = 'light' }) {
             ) : (
               <div className="space-y-3">
                 {pendingRatings.map((item) => (
-                  <div key={item.id} className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                  <div key={item._id} className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
                     <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-bold text-slate-500">{item.id}</span>
+                      <span className="text-[10px] font-bold text-slate-500">{item.orderId}</span>
                       <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
                         Delivered
                       </span>
                     </div>
 
                     <div>
-                      <h5 className="font-extrabold text-slate-900 text-xs">{item.donor}</h5>
+                      <h5 className="font-extrabold text-slate-900 text-xs">{item.donorName || item.donor}</h5>
                       <p className="text-[11px] text-slate-600 font-medium">{item.food}</p>
                     </div>
 
@@ -374,7 +318,7 @@ export default function TrustScore({ themeMode = 'light' }) {
                 <p><strong className="text-slate-600">Status:</strong> {selectedDonorDetail.isFollowed ? 'Following' : 'Not Followed'}</p>
               </div>
               
-              {selectedDonorDetail.recentImages.length > 0 && (
+              {selectedDonorDetail.recentImages && selectedDonorDetail.recentImages.length > 0 && (
                 <div>
                   <strong className="text-slate-700 block mb-1">Recent Food Donation Proofs:</strong>
                   <div className="flex gap-2">
@@ -388,9 +332,9 @@ export default function TrustScore({ themeMode = 'light' }) {
               <div>
                 <strong className="text-slate-700 block mb-2">Community Feedback & Reviews:</strong>
                 <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                  {selectedDonorDetail.reviews.map((rev) => (
+                  {selectedDonorDetail.reviews.map((rev, index) => (
                     <div 
-                      key={rev.id} 
+                      key={rev._id || index} 
                       className={`p-2.5 rounded-xl border text-[11px] space-y-1 ${
                         rev.type === 'positive'
                           ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
@@ -423,7 +367,7 @@ export default function TrustScore({ themeMode = 'light' }) {
             <div className="flex justify-between items-start border-b pb-3 border-slate-200">
               <div>
                 <h3 className="font-extrabold text-base text-slate-900">Rate Donor Experience</h3>
-                <p className="text-xs text-slate-500 font-medium">Order #{selectedRatingItem.id} - {selectedRatingItem.donor}</p>
+                <p className="text-xs text-slate-500 font-medium">Order #{selectedRatingItem.orderId} - {selectedRatingItem.donorName || selectedRatingItem.donor}</p>
               </div>
               <button onClick={() => setSelectedRatingItem(null)} className="text-slate-400 hover:text-slate-800 font-bold text-base">✕</button>
             </div>
@@ -433,7 +377,7 @@ export default function TrustScore({ themeMode = 'light' }) {
               <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">SELECT SCORE RATING</label>
               
               <div className="flex justify-center items-center gap-2">
-                {[1, 2, 3, 4, 5].anim?.map ? null : [1, 2, 3, 4, 5].map((star) => (
+                {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
                     type="button"

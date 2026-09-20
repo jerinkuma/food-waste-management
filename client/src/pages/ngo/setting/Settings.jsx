@@ -1,22 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import './Settings.css';
+
+const API_BASE = 'http://localhost:5000/api/ngo';
+
 export default function Settings({ 
   userProfile = {}, 
   setUserProfile = () => {}, 
   themeMode: externalThemeMode, 
-   setThemeMode: externalSetThemeMode
+  setThemeMode: externalSetThemeMode
 }) {
   const DEFAULT_AVATAR = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&auto=format&fit=crop&q=80";
 
   // Form State
   const [formData, setFormData] = useState({
-    fullName: userProfile?.fullName || 'NGO Representative 1',
-    ngoName: userProfile?.ngoName || 'FeedLink Partner NGO',
-    email: userProfile?.email || 'ngo1@feedlink.org',
-    phone: userProfile?.phone || '+880 1812-345678',
-    licenseNo: userProfile?.licenseNo || 'LIC-2026-9901',
-    address: userProfile?.address || 'Chittagong, Bangladesh',
-    avatar: userProfile?.avatar || DEFAULT_AVATAR
+    fullName: 'NGO Representative 1',
+    ngoName: 'FeedLink Partner NGO',
+    email: 'ngo1@feedlink.org',
+    phone: '+880 1812-345678',
+    licenseNo: 'LIC-2026-9901',
+    address: 'Chittagong, Bangladesh',
+    avatar: DEFAULT_AVATAR
   });
 
   const [passwordData, setPasswordData] = useState({ 
@@ -24,6 +28,35 @@ export default function Settings({
     newPass: '', 
     confirm: '' 
   });
+
+  // Fetch current NGO settings on component mount
+  useEffect(() => {
+    fetchUserSettings();
+  }, []);
+
+  const fetchUserSettings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_BASE}/settings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.data) {
+        setFormData({
+          fullName: res.data.fullName || userProfile?.fullName || '',
+          ngoName: res.data.ngoName || userProfile?.ngoName || '',
+          email: res.data.email || userProfile?.email || '',
+          phone: res.data.phone || userProfile?.phone || '',
+          licenseNo: res.data.licenseNo || userProfile?.licenseNo || '',
+          address: res.data.address || userProfile?.address || '',
+          avatar: res.data.avatar || userProfile?.avatar || DEFAULT_AVATAR
+        });
+      }
+    } catch (err) {
+      console.warn("Backend connection failed or unauthorized. Using local defaults.");
+    }
+  };
 
   // Direct Theme State
   const [localTheme, setLocalTheme] = useState('dark');
@@ -54,14 +87,31 @@ export default function Settings({
     setFormData((prev) => ({ ...prev, avatar: null }));
   };
 
-  const handleProfileUpdate = (e) => {
+  // -------------------------------------------------------------
+  // ১. Profile Update Request (এখানে নতুন কোড যুক্ত করা হয়েছে)
+  // -------------------------------------------------------------
+  const handleProfileUpdate = async (e) => {
     e.preventDefault();
-    setUserProfile(formData);
-    alert('Profile updated successfully!');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.put(`${API_BASE}/settings/profile`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setUserProfile(res.data.data || formData);
+      alert('Profile updated successfully!');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update profile');
+    }
   };
 
-  const handlePasswordUpdate = (e) => {
+  // -------------------------------------------------------------
+  // ২. Password Update Request (এখানে নতুন কোড যুক্ত করা হয়েছে)
+  // -------------------------------------------------------------
+  const handlePasswordUpdate = async (e) => {
     e.preventDefault();
+
     if (!passwordData.current) {
       alert('Please enter your current password.');
       return;
@@ -70,8 +120,22 @@ export default function Settings({
       alert('New passwords do not match!');
       return;
     }
-    alert('Password updated securely!');
-    setPasswordData({ current: '', newPass: '', confirm: '' });
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(`${API_BASE}/settings/password`, {
+        currentPassword: passwordData.current,
+        newPassword: passwordData.newPass
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      alert('Password updated securely!');
+      setPasswordData({ current: '', newPass: '', confirm: '' });
+    } catch (err) {
+      alert(err.response?.data?.message || 'Password update failed');
+    }
   };
 
   return (

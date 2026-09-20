@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import "./Sidebar.css"; // আলাদা সিএসএস ফাইল ইমপোর্ট করা হলো
+import "./Sidebar.css";
 
 import {
   Home,
@@ -14,57 +14,29 @@ import {
   ChevronLeft,
   ChevronRight,
   UtensilsCrossed,
+  Handshake,
 } from "lucide-react";
 
-export default function Sidebar({ handleLogout }) {
+// -------------------------------------------------------------
+// 1. SIDEBAR COMPONENT
+// -------------------------------------------------------------
+export function Sidebar({ handleLogout }) {
   const [isExpanded, setIsExpanded] = useState(true);
-
   const navigate = useNavigate();
   const location = useLocation();
 
-  // NGO Navigation Items
   const menuItems = [
-    {
-      path: "/ngo/dashboard",
-      name: "HOME",
-      icon: Home,
-    },
-    {
-      path: "/ngo/donation-map",
-      name: "DONATION MAP",
-      icon: MapPin,
-    },
-    {
-      path: "/ngo/active-requests",
-      name: "ACTIVE REQUESTS",
-      icon: Clock,
-    },
-    {
-      path: "/ngo/history",
-      name: "HISTORY & LOGS",
-      icon: History,
-    },
-    {
-      path: "/ngo/trust-score",
-      name: "TRUST SCORE",
-      icon: ShieldCheck,
-    },
-    {
-      path: "/ngo/feedback",
-      name: "FEEDBACK",
-      icon: MessageSquare,
-    },
-    {
-      path: "/ngo/settings",
-      name: "SETTINGS",
-      icon: Settings,
-    },
+    { path: "/ngo/dashboard", name: "HOME", icon: Home },
+    { path: "/ngo/donation-map", name: "DONATION MAP", icon: MapPin },
+    { path: "/ngo/active-requests", name: "ACTIVE REQUESTS", icon: Clock },
+    { path: "/ngo/partners", name: "PARTNERS", icon: Handshake },
+    { path: "/ngo/history", name: "HISTORY & LOGS", icon: History },
+    { path: "/ngo/trust-score", name: "TRUST SCORE", icon: ShieldCheck },
+    { path: "/ngo/feedback", name: "FEEDBACK", icon: MessageSquare },
+    { path: "/ngo/settings", name: "SETTINGS", icon: Settings },
   ];
 
-  // Check Active Route
-  const isActiveRoute = (path) => {
-    return location.pathname === path;
-  };
+  const isActiveRoute = (path) => location.pathname === path;
 
   return (
     <aside
@@ -123,7 +95,6 @@ export default function Sidebar({ handleLogout }) {
                     isActive ? "ngo-nav-icon-active" : "ngo-nav-icon-inactive"
                   }`}
                 />
-
                 {isExpanded && <span className="truncate">{item.name}</span>}
               </button>
             );
@@ -145,5 +116,34 @@ export default function Sidebar({ handleLogout }) {
         </button>
       </div>
     </aside>
+  );
+}
+
+// -------------------------------------------------------------
+// 2. MAIN LAYOUT COMPONENT (DEFAULT EXPORT)
+// -------------------------------------------------------------
+export default function NgoLayout({ children }) {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // 1. LocalStorage & SessionStorage ক্লিয়ার করা
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    sessionStorage.clear();
+
+    // 2. ইউজারকে লগইন পেজে রিডাইরেক্ট করা (fixed: route is /auth, not /login)
+    navigate("/auth");
+  };
+
+  return (
+    <div className="flex">
+      {/* Integrated Sidebar */}
+      <Sidebar handleLogout={handleLogout} />
+
+      {/* Main Dynamic Content Area */}
+      <main className="flex-1">
+        {children}
+      </main>
+    </div>
   );
 }

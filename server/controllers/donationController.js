@@ -1,6 +1,10 @@
 const Donation = require("../models/Donation");
 const User = require("../models/User");
+const Restaurant = require("../models/Restaurant");
+const Ngo = require("../models/Ngo");
 const QRCode = require("qrcode");
+const { getIO, rooms } = require("../utils/socket");
+const { haversineKm, resolveDonationLocation } = require("../utils/geo");
 
 
 // =====================================
@@ -211,7 +215,24 @@ const createDonation = async (req, res) => {
 
       // Initial status
       status: "Waiting for NGO Acceptance",
+      pipelineStatus: "Pending",
+      statusHistory: [
+        { status: "Pending", changedAt: new Date(), changedBy: donor, note: "Donation posted by restaurant" },
+      ],
     });
+
+
+    // =====================================
+    // REAL-TIME BROADCAST
+    // Notify every NGO's live feed + the Admin panel instantly.
+    // =====================================
+    const populatedDonation = await Donation.findById(donation._id).populate(
+      "donor",
+      "name email role"
+    );
+
+    getIO().to(rooms.ngos()).emit("donation:new", populatedDonation);
+    getIO().to(rooms.admins()).emit("donation:new", populatedDonation);
 
 
     // =====================================
@@ -971,6 +992,213 @@ const getDonorDashboard = async (
 
 
 // =====================================
+// LIST AVAILABLE DONATIONS (NGO BROWSE POOL)
+// Every donation still waiting to be claimed, optionally sorted by
+// distance from the requesting NGO (?lat=&lng=).
+// =====================================
+const listAvailableDonations = async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+
+    const donations = await Donation.find({
+      pipelineStatus: "Pending",
+    })
+      .populate("donor", "name email role")
+      .sort({ createdAt: -1 });
+
+    // Attach restaurant business profile (address/phone/location) + distance
+    const enriched = await Promise.all(
+      donations.map(async (donation) => {
+        const restaurant = await Restaurant.findOne({ user: donation.donor?._id });
+
+        const resolvedLocation = await resolveDonationLocation(donation, restaurant);
+
+        const distanceKm =
+          lat && lng && resolvedLocation
+            ? haversineKm(Number(lat), Number(lng), resolvedLocation.lat, resolvedLocation.lng)
+            : null;
+
+        return {
+          ...donation.toObject(),
+          restaurantProfile: restaurant
+            ? {
+                phone: restaurant.phone,
+                address: restaurant.address,
+                profileImage: restaurant.profileImage,
+              }
+            : null,
+          resolvedLocation,
+          distanceKm,
+        };
+      })
+    );
+
+    if (lat && lng) {
+      enriched.sort((a, b) => {
+        if (a.distanceKm == null) return 1;
+        if (b.distanceKm == null) return -1;
+        return a.distanceKm - b.distanceKm;
+      });
+    }
+
+    return res.status(200).json({ success: true, count: enriched.length, donations: enriched });
+  } catch (error) {
+    console.error("List available donations error:", error);
+    return res.status(500).json({ success: false, message: "Failed to load available donations.", error: error.message });
+  }
+};
+
+// =====================================
+// NGO ACCEPTS A DONATION
+// Pending -> Accepted
+// =====================================
+const acceptDonation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { ngoId } = req.body; // Ngo profile _id (not the User id)
+
+    if (!ngoId) {
+      return res.status(400).json({ success: false, message: "ngoId is required." });
+    }
+
+    const donation = await Donation.findById(id).populate("donor", "name email role");
+
+    if (!donation) {
+      return res.status(404).json({ success: false, message: "Donation not found." });
+    }
+
+    if (donation.pipelineStatus !== "Pending") {
+      return res.status(409).json({
+        success: false,
+        message: `This donation is already ${donation.pipelineStatus.toLowerCase()} and can no longer be accepted.`,
+      });
+    }
+
+    const ngo = await Ngo.findById(ngoId);
+    if (!ngo) {
+      return res.status(404).json({ success: false, message: "NGO not found." });
+    }
+
+    donation.pipelineStatus = "Accepted";
+    donation.status = "NGO Requested";
+    donation.ngoRequest = {
+      requested: true,
+      requestedBy: ngo._id,
+      requestedAt: new Date(),
+      acceptedAt: new Date(),
+    };
+    donation.statusHistory.push({
+      status: "Accepted",
+      changedAt: new Date(),
+      changedBy: ngo.user,
+      note: `Accepted by ${ngo.organizationId}`,
+    });
+
+    await donation.save();
+
+    const updated = await Donation.findById(id)
+      .populate("donor", "name email role")
+      .populate("ngoRequest.requestedBy", "organizationId phone address");
+
+    // Real-time sync: restaurant sees it accepted instantly, other NGOs
+    // see it disappear from their pool, admin sees the status change.
+    getIO().to(rooms.restaurant(donation.donor._id.toString())).emit("donation:updated", updated);
+    getIO().to(rooms.ngos()).emit("donation:updated", updated);
+    getIO().to(rooms.ngo(ngo.user.toString())).emit("donation:updated", updated);
+    getIO().to(rooms.admins()).emit("donation:updated", updated);
+
+    return res.status(200).json({ success: true, message: "Donation accepted.", donation: updated });
+  } catch (error) {
+    console.error("Accept donation error:", error);
+    return res.status(500).json({ success: false, message: "Failed to accept donation.", error: error.message });
+  }
+};
+
+// =====================================
+// UPDATE PIPELINE STATUS
+// Accepted -> Out for Delivery -> Completed  (or -> Rejected at any point)
+// =====================================
+const PIPELINE_ORDER = ["Pending", "Accepted", "Out for Delivery", "Completed"];
+
+const updateDonationStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, note, updatedBy } = req.body;
+
+    if (!PIPELINE_ORDER.includes(status) && status !== "Rejected") {
+      return res.status(400).json({ success: false, message: "Invalid status value." });
+    }
+
+    const donation = await Donation.findById(id).populate("donor", "name email role");
+    if (!donation) {
+      return res.status(404).json({ success: false, message: "Donation not found." });
+    }
+
+    // Enforce forward-only progression (no skipping / going backwards),
+    // except Rejected which can happen from Pending or Accepted.
+    if (status !== "Rejected") {
+      const currentIndex = PIPELINE_ORDER.indexOf(donation.pipelineStatus);
+      const nextIndex = PIPELINE_ORDER.indexOf(status);
+      if (nextIndex !== currentIndex + 1) {
+        return res.status(409).json({
+          success: false,
+          message: `Cannot move from "${donation.pipelineStatus}" directly to "${status}".`,
+        });
+      }
+    }
+
+    donation.pipelineStatus = status;
+    donation.status =
+      status === "Out for Delivery" ? "Food Picked Up" : status === "Completed" ? "Completed" : status === "Rejected" ? "Rejected" : donation.status;
+
+    donation.statusHistory.push({
+      status,
+      changedAt: new Date(),
+      changedBy: updatedBy || null,
+      note: note || "",
+    });
+
+    await donation.save();
+
+    const updated = await Donation.findById(id)
+      .populate("donor", "name email role")
+      .populate("ngoRequest.requestedBy", "organizationId phone address user");
+
+    const ngoUserId = updated.ngoRequest?.requestedBy?.user?.toString();
+
+    getIO().to(rooms.restaurant(updated.donor._id.toString())).emit("donation:updated", updated);
+    if (ngoUserId) getIO().to(rooms.ngo(ngoUserId)).emit("donation:updated", updated);
+    getIO().to(rooms.admins()).emit("donation:updated", updated);
+
+    return res.status(200).json({ success: true, message: `Status updated to ${status}.`, donation: updated });
+  } catch (error) {
+    console.error("Update donation status error:", error);
+    return res.status(500).json({ success: false, message: "Failed to update status.", error: error.message });
+  }
+};
+
+// =====================================
+// GET AN NGO'S DONATIONS (active + archived history)
+// =====================================
+const getNgoDonations = async (req, res) => {
+  try {
+    const { ngoId } = req.params; // Ngo profile _id
+
+    const donations = await Donation.find({ "ngoRequest.requestedBy": ngoId })
+      .populate("donor", "name email role")
+      .sort({ createdAt: -1 });
+
+    const active = donations.filter((d) => !["Completed", "Rejected"].includes(d.pipelineStatus));
+    const archived = donations.filter((d) => ["Completed", "Rejected"].includes(d.pipelineStatus));
+
+    return res.status(200).json({ success: true, active, archived, count: donations.length });
+  } catch (error) {
+    console.error("Get NGO donations error:", error);
+    return res.status(500).json({ success: false, message: "Failed to load NGO donations.", error: error.message });
+  }
+};
+
+// =====================================
 // EXPORT
 // =====================================
 
@@ -982,4 +1210,8 @@ module.exports = {
   rejectDonation,
   getDonorDonations,
   getDonorDashboard,
+  listAvailableDonations,
+  acceptDonation,
+  updateDonationStatus,
+  getNgoDonations,
 };

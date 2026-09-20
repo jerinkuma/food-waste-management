@@ -17,10 +17,7 @@ import DonationHistory from "./pages/DonorDashboard/DonationHistory";
 import Analytics from "./pages/DonorDashboard/Analytics";
 import Profile from "./pages/DonorDashboard/Profile";
 
-
-
-//delivery
-
+// Delivery
 import SafetyVerification from "./pages/Delivery/SafetyVerification";
 
 // NGO
@@ -32,10 +29,10 @@ import ActiveRequests from "./pages/ngo/activerequest/ActiveRequests";
 import DonationHistoryLogs from "./pages/ngo/donationlogs/DonationHistoryLogs";
 import TrustScore from "./pages/ngo/trustscore/TrustScore";
 import Feedback from "./pages/ngo/feedback/Feedback";
+import Partners from "./pages/ngo/partners/Partners";
 import Settings from "./pages/ngo/setting/Settings";
 import NGODashboard from "./pages/ngo/NGODashboard";
 
-// Admin
 // Admin
 import AdminNavbar from "./components/Admindashboard/Navbar";
 import AdminSidebar from "./components/Admindashboard/Sidebar";
@@ -121,7 +118,6 @@ function NGOLayout({
 
         <main className="px-8 py-6 flex-1">
           <Routes>
-
             <Route
               path="dashboard"
               element={
@@ -147,6 +143,11 @@ function NGOLayout({
             <Route
               path="active-requests"
               element={<ActiveRequests requests={requests} />}
+            />
+
+            <Route
+              path="partners"
+              element={<Partners />}
             />
 
             <Route
@@ -178,7 +179,6 @@ function NGOLayout({
               index
               element={<Navigate to="dashboard" replace />}
             />
-
           </Routes>
         </main>
 
@@ -203,17 +203,13 @@ function NGOLayout({
 function AdminLayout() {
   return (
     <div className="app">
-
       <AdminNavbar />
 
       <div className="main-wrapper">
-
         <AdminSidebar />
 
         <div className="content">
-
           <Routes>
-
             <Route
               index
               element={<Navigate to="dashboard" replace />}
@@ -258,15 +254,11 @@ function AdminLayout() {
               path="settings"
               element={<AdminSettings />}
             />
-
           </Routes>
-
         </div>
-
       </div>
 
       <AdminFooter />
-
     </div>
   );
 }
@@ -276,7 +268,6 @@ function AdminLayout() {
 // =========================
 
 function App() {
-
   const [requests, setRequests] = useState(initialRequests);
 
   const [themeMode, setThemeMode] = useState(() => {
@@ -288,7 +279,6 @@ function App() {
   }, [themeMode]);
 
   const handleAccept = (id) => {
-
     setRequests((prev) =>
       prev.filter((request) => request.id !== id)
     );
@@ -297,35 +287,27 @@ function App() {
   };
 
   const handleDecline = (id) => {
-
     setRequests((prev) =>
       prev.filter((request) => request.id !== id)
     );
-
   };
 
   return (
-
     <BrowserRouter>
-
       <Routes>
-
         {/* ================= HOME ================= */}
-
         <Route
           path="/"
           element={<Home />}
         />
 
         {/* ================= AUTH ================= */}
-
         <Route
           path="/auth"
           element={<Auth />}
         />
 
         {/* ================= RESTAURANT / DONOR ================= */}
-
         <Route
           path="/restaurant/dashboard"
           element={<Dashboard />}
@@ -357,7 +339,6 @@ function App() {
         />
 
         {/* ================= NGO ================= */}
-
         <Route
           path="/ngo/*"
           element={
@@ -372,26 +353,25 @@ function App() {
         />
 
         {/* ================= ADMIN ================= */}
-
         <Route
           path="/admin/*"
           element={<AdminLayout />}
         />
 
-        {/* ================= UNKNOWN ROUTE ================= */}
+        {/* ================= DELIVERY ================= */}
+        <Route
+          path="/delivery/safety/:donationId"
+          element={<SafetyVerification />}
+        />
 
+        {/* ================= UNKNOWN ROUTE ================= */}
         <Route
           path="*"
           element={<Navigate to="/" replace />}
         />
-
-        <Route path="/delivery/safety/:donationId" element={<SafetyVerification />} />
-
       </Routes>
-
     </BrowserRouter>
   );
 }
 
 export default App;
-

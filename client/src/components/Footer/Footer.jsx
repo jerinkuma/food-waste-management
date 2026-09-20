@@ -1,10 +1,7 @@
 import { Mail, Phone, MapPin } from "lucide-react";
-import {
-  FaFacebookF,
-  FaInstagram,
-  FaLinkedinIn,
-  FaGithub,
-} from "react-icons/fa";
+
+
+import { FaFacebookF,FaInstagram, FaLinkedinIn, FaGithub } from "react-icons/fa";
 
 const Footer = () => {
   return (

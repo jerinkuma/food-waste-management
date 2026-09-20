@@ -98,6 +98,20 @@ const donationSchema = new mongoose.Schema(
     },
 
     // =====================================
+    // PICKUP GEOLOCATION (lat/lng & coords)
+    // =====================================
+    pickupLocation: {
+      lat: { type: Number, default: null },
+      lng: { type: Number, default: null },
+    },
+
+    coords: { 
+      type: [Number], // [latitude, longitude]
+      required: false, 
+      default: [22.3569, 91.7832] // চট্টগ্রামের ডিফল্ট পিন
+    },
+
+    // =====================================
     // SAFETY
     // =====================================
 
@@ -117,9 +131,41 @@ const donationSchema = new mongoose.Schema(
       required: true,
     },
 
+    requestId: { 
+      type: String, 
+      unique: true,
+      sparse: true,
+      default: () => "REQ-" + Math.floor(1000 + Math.random() * 9000)
+    },
+
     qrCode: {
       type: String,
       default: "",
+    },
+
+    // =====================================
+    // LOGISTICS & EXTRA FIELDS (NGO NEEDED)
+    // =====================================
+
+    logistics: { 
+      type: String, 
+      enum: ["FoodPanda Tracking", "By Self Option", "Third-party Delivery"],
+      default: "By Self Option" 
+    },
+
+    estimatedArrival: { 
+      type: String, 
+      default: "15 mins" 
+    },
+
+    message: { 
+      type: String, 
+      trim: true 
+    },
+
+    timeAgo: { 
+      type: String, 
+      default: 'Recent' 
     },
 
     // =====================================
@@ -139,9 +185,35 @@ const donationSchema = new mongoose.Schema(
         "Delivered",
         "Completed",
         "Rejected",
+        "pending",
+        "accepted",
+        "rejected",
+        "completed",
+        "In Transit",
+        "Picked Up",
+        "Driver Assigned",
+        "Archived"
       ],
       default: "Waiting for NGO Acceptance",
     },
+
+    // =====================================
+    // SIMPLIFIED NGO-FACING PIPELINE STATUS
+    // =====================================
+    pipelineStatus: {
+      type: String,
+      enum: ["Pending", "Accepted", "Out for Delivery", "Completed", "Rejected"],
+      default: "Pending",
+    },
+
+    statusHistory: [
+      {
+        status: { type: String },
+        changedAt: { type: Date, default: Date.now },
+        changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        note: { type: String, default: "" },
+      },
+    ],
 
     // =====================================
     // NGO REQUEST
@@ -258,7 +330,5 @@ const donationSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model(
-  "Donation",
-  donationSchema
-);
+
+module.exports = mongoose.model("Donation", donationSchema, "donations");
