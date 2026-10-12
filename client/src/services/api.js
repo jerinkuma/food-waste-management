@@ -31,6 +31,25 @@ export const acceptDonation = async (donationId, ngoId) => {
   return data;
 };
 
+
+export const assignDeliveryDriver = async (
+  donationId,
+  name,
+  phone,
+  vehicleNumber
+) => {
+  const { data } = await client.put(
+    `/donations/${donationId}/assign-driver`,
+    {
+      name,
+      phone,
+      vehicleNumber,
+    }
+  );
+
+  return data;
+};
+
 // Advance the pipeline: Accepted -> Out for Delivery -> Completed (or Rejected)
 export const updateDonationStatus = async (donationId, status, note, updatedBy) => {
   const { data } = await client.put(`/donations/${donationId}/status`, { status, note, updatedBy });

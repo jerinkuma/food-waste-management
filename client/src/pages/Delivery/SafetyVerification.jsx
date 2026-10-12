@@ -1,461 +1,563 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
-  ShieldCheck,
-  Utensils,
-  Scale,
-  Clock,
-  Calendar,
-  MapPin,
+  ArrowLeft,
+  CalendarCheck,
   CheckCircle2,
-  XCircle,
   Loader2,
-  Package,
+  PackageCheck,
+  ShieldCheck,
+  Thermometer,
+  UserRound,
+  Phone,
+  Car,
+  MapPin,
+  Utensils,
 } from "lucide-react";
 
-
 const SafetyVerification = () => {
-  const { donationId } = useParams();
+  const params = useParams();
   const navigate = useNavigate();
 
-  const [donation, setDonation] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // ==================================================
+  // SUPPORT BOTH:
+  // /delivery/safety/:id
+  // /delivery/safety/:donationId
+  // ==================================================
 
-  const [checks, setChecks] = useState([
-    false,
-    false,
-    false,
-    false,
-  ]);
+  const donationId =
+    params.donationId ||
+    params.id ||
+    "";
 
-  const [verifying, setVerifying] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  // ==================================================
+  // STATES
+  // ==================================================
 
+  const [donation, setDonation] =
+    useState(null);
 
-  // Load donation
+  const [loadingDonation, setLoadingDonation] =
+    useState(true);
+
+  const [checks, setChecks] = useState({
+    foodCondition: false,
+    packaging: false,
+    temperature: false,
+    expiry: false,
+  });
+
+  const [verifying, setVerifying] =
+    useState(false);
+
+  const [rejecting, setRejecting] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const [successMessage, setSuccessMessage] =
+    useState("");
+
+  // ==================================================
+  // TOKEN
+  // ==================================================
+
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("authToken");
+
+  // ==================================================
+  // LOAD DONATION
+  // IMPORTANT:
+  // Custom FL-xxxx ID uses /donation-id/:donationId
+  // ==================================================
+
   useEffect(() => {
     const loadDonation = async () => {
-      try {
-        setLoading(true);
-
-        const response = await fetch(
-          `http://localhost:5000/api/donations/donation-id/${donationId}`
+      if (!donationId) {
+        setError(
+          "Donation ID is missing."
         );
 
-        const data = await response.json();
+        setLoadingDonation(false);
+        return;
+      }
 
-        if (!response.ok) {
+      try {
+        setLoadingDonation(true);
+        setError("");
+
+        const response = await fetch(
+          `http://localhost:5000/api/donations/donation-id/${encodeURIComponent(
+            donationId
+          )}`,
+          {
+            method: "GET",
+
+            headers: {
+              ...(token
+                ? {
+                    Authorization: `Bearer ${token}`,
+                  }
+                : {}),
+            },
+          }
+        );
+
+        const data =
+          await response.json();
+
+        console.log(
+          "DONATION DETAILS RESPONSE:",
+          data
+        );
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
           throw new Error(
-            data.message || "Donation not found."
+            data.message ||
+              "Failed to load donation."
           );
         }
 
-        setDonation(data.donation);
-      } catch (error) {
+        setDonation(
+          data.donation ||
+            data.data
+        );
+      } catch (err) {
         console.error(
           "Load donation error:",
-          error
+          err
         );
 
         setError(
-          error.message ||
-            "Failed to load donation."
+          err.message ||
+            "Failed to load donation details."
         );
       } finally {
-        setLoading(false);
+        setLoadingDonation(false);
       }
     };
 
     loadDonation();
-  }, [donationId]);
+  }, [donationId, token]);
 
+  // ==================================================
+  // CHECK CHANGE
+  // ==================================================
 
-  const handleCheck = (index) => {
-    const updatedChecks = [...checks];
+  const handleCheckChange = (
+    key
+  ) => {
+    if (
+      verifying ||
+      rejecting
+    ) {
+      return;
+    }
 
-    updatedChecks[index] =
-      !updatedChecks[index];
+    setChecks((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
 
-    setChecks(updatedChecks);
     setError("");
+    setSuccessMessage("");
   };
 
+  // ==================================================
+  // ALL CHECKS
+  // ==================================================
 
-  const allChecked = checks.every(Boolean);
+  const allChecked =
+    checks.foodCondition === true &&
+    checks.packaging === true &&
+    checks.temperature === true &&
+    checks.expiry === true;
 
+  // ==================================================
+  // VERIFY
+  // ==================================================
 
-  // Accept donation
-  const handleAccept = async () => {
-    setError("");
-    setSuccess("");
+  const handleVerify = async () => {
+    if (!donationId) {
+      setError(
+        "Donation ID is missing."
+      );
+      return;
+    }
 
     if (!allChecked) {
       setError(
-        "Please complete all safety checks before accepting."
+        "Please complete all four safety checks before verification."
       );
-
       return;
     }
 
-    if (!donation?._id) {
-      setError("Donation information is missing.");
+    // Prevent double click
+    if (
+      verifying ||
+      rejecting
+    ) {
       return;
     }
 
     try {
       setVerifying(true);
 
-      const response = await fetch(
-        `http://localhost:5000/api/donations/${donation._id}/verify`,
-        {
-          method: "POST",
+      setError("");
+      setSuccessMessage("");
 
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify({
-            approved: true,
-            checks,
-          }),
-        }
+      console.log(
+        "================================="
       );
 
-      const data = await response.json();
+      console.log(
+        "VERIFY DONATION:"
+      );
 
-      if (!response.ok) {
+      console.log(
+        "Donation ID:",
+        donationId
+      );
+
+      console.log(
+        "Checks:",
+        checks
+      );
+
+      console.log(
+        "================================="
+      );
+
+      const response =
+        await fetch(
+          `http://localhost:5000/api/donations/${encodeURIComponent(
+            donationId
+          )}/verify`,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              ...(token
+                ? {
+                    Authorization: `Bearer ${token}`,
+                  }
+                : {}),
+            },
+
+            body: JSON.stringify({
+              approved: true,
+
+              checks: {
+                foodCondition:
+                  true,
+
+                packaging:
+                  true,
+
+                temperature:
+                  true,
+
+                expiry:
+                  true,
+              },
+            }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      console.log(
+        "VERIFY RESPONSE:",
+        data
+      );
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
         throw new Error(
           data.message ||
-            "Failed to verify donation."
+            "Donation verification failed."
         );
       }
 
-      setDonation(data.donation);
-
-      setSuccess(
-        "Donation has been successfully verified."
+      setSuccessMessage(
+        "Donation verified successfully and marked as Completed."
       );
-    } catch (error) {
+
+      // Go back after success
+      setTimeout(() => {
+        navigate(-1);
+      }, 1200);
+    } catch (err) {
       console.error(
         "Verification error:",
-        error
+        err
       );
 
       setError(
-        error.message ||
-          "Failed to verify donation."
+        err.message ||
+          "Something went wrong during verification."
       );
     } finally {
       setVerifying(false);
     }
   };
 
+  // ==================================================
+  // REJECT
+  //
+  // IMPORTANT:
+  // Reject MUST use /reject
+  // NOT /verify
+  // ==================================================
 
-  // Reject donation
   const handleReject = async () => {
-    setError("");
-    setSuccess("");
-
-    if (!donation?._id) {
-      setError("Donation information is missing.");
+    if (!donationId) {
+      setError(
+        "Donation ID is missing."
+      );
       return;
     }
 
-    const confirmed = window.confirm(
-      "Are you sure you want to reject this donation?"
-    );
-
-    if (!confirmed) {
+    // Prevent double click
+    if (
+      verifying ||
+      rejecting
+    ) {
       return;
     }
 
     try {
-      setVerifying(true);
+      setRejecting(true);
 
-      const response = await fetch(
-        `http://localhost:5000/api/donations/${donation._id}/reject`,
-        {
-          method: "POST",
+      setError("");
+      setSuccessMessage("");
 
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+      console.log(
+        "================================="
       );
 
-      const data = await response.json();
+      console.log(
+        "REJECT DONATION:"
+      );
 
-      if (!response.ok) {
+      console.log(
+        "Donation ID:",
+        donationId
+      );
+
+      console.log(
+        "================================="
+      );
+
+      const response =
+        await fetch(
+          `http://localhost:5000/api/donations/${encodeURIComponent(
+            donationId
+          )}/reject`,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              ...(token
+                ? {
+                    Authorization: `Bearer ${token}`,
+                  }
+                : {}),
+            },
+
+            body: JSON.stringify({
+              reason:
+                "Food failed the safety verification.",
+            }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      console.log(
+        "REJECT RESPONSE:",
+        data
+      );
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
         throw new Error(
           data.message ||
-            "Failed to reject donation."
+            "Donation rejection failed."
         );
       }
 
-      setDonation(data.donation);
-
-      setSuccess(
-        "Donation has been rejected."
+      setSuccessMessage(
+        "Donation rejected successfully."
       );
-    } catch (error) {
+
+      setTimeout(() => {
+        navigate(-1);
+      }, 1200);
+    } catch (err) {
       console.error(
-        "Reject donation error:",
-        error
+        "Rejection error:",
+        err
       );
 
       setError(
-        error.message ||
-          "Failed to reject donation."
+        err.message ||
+          "Something went wrong while rejecting donation."
       );
     } finally {
-      setVerifying(false);
+      setRejecting(false);
     }
   };
 
+  // ==================================================
+  // CHECK ITEMS
+  // ==================================================
 
-  if (loading) {
+  const checkItems = [
+    {
+      key: "foodCondition",
+
+      title: "Food Condition",
+
+      description:
+        "Food is fresh, safe and suitable for consumption.",
+
+      icon: ShieldCheck,
+    },
+
+    {
+      key: "packaging",
+
+      title: "Packaging",
+
+      description:
+        "Food is properly packed and protected.",
+
+      icon: PackageCheck,
+    },
+
+    {
+      key: "temperature",
+
+      title: "Temperature",
+
+      description:
+        "Food has been stored at a safe temperature.",
+
+      icon: Thermometer,
+    },
+
+    {
+      key: "expiry",
+
+      title: "Expiry / Freshness",
+
+      description:
+        "Food is within its safe consumption period.",
+
+      icon: CalendarCheck,
+    },
+  ];
+
+  // ==================================================
+  // LOADING
+  // ==================================================
+
+  if (loadingDonation) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6">
-
-        <div className="text-center">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="flex items-center gap-3 text-slate-600">
 
           <Loader2
-            size={36}
-            className="mx-auto animate-spin text-green-600"
+            size={22}
+            className="animate-spin"
           />
 
-          <p className="mt-4 text-sm text-gray-500">
-            Loading donation information...
-          </p>
+          <span className="font-medium">
+            Loading donation details...
+          </span>
 
         </div>
-
       </div>
     );
   }
 
-
-  if (!donation) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6">
-
-        <div className="w-full max-w-md rounded-3xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
-            <XCircle
-              size={34}
-              className="text-red-500"
-            />
-          </div>
-
-          <h2 className="mt-5 text-xl font-bold text-gray-900">
-            Donation Not Found
-          </h2>
-
-          <p className="mt-2 text-sm leading-6 text-gray-500">
-            This QR code does not belong to a valid
-            donation.
-          </p>
-
-        </div>
-
-      </div>
-    );
-  }
-
+  // ==================================================
+  // PAGE
+  // ==================================================
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
 
-      <div className="mx-auto w-full max-w-4xl">
+      <div className="mx-auto max-w-4xl">
 
-        {/* HEADER */}
-        <div className="rounded-3xl border border-gray-200 bg-white p-6 text-center shadow-sm sm:p-8">
+        {/* ==================================================
+            BACK
+        ================================================== */}
 
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-green-100">
-            <ShieldCheck
-              size={34}
-              className="text-green-600"
-            />
-          </div>
+        <button
+          type="button"
+          onClick={() =>
+            navigate(-1)
+          }
+          disabled={
+            verifying ||
+            rejecting
+          }
+          className="mb-4 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <ArrowLeft size={18} />
+          Back
+        </button>
 
-          <h1 className="mt-5 text-2xl font-bold text-gray-900 sm:text-3xl">
-            Food Safety Verification
-          </h1>
+        {/* ==================================================
+            HEADER
+        ================================================== */}
 
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-gray-500">
-            Verify the donated food before accepting
-            it for pickup.
-          </p>
+        <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 
-          <div className="mt-5 inline-flex rounded-full bg-green-50 px-4 py-2 text-sm font-bold text-green-700">
-            {donation.donationId}
-          </div>
+          <div className="flex items-start gap-4">
 
-        </div>
-
-
-        {/* DONATION DETAILS */}
-        <div className="mt-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-
-          <div className="mb-6 flex items-center gap-3">
-
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-100">
-              <Utensils
-                size={22}
-                className="text-green-600"
-              />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+              <ShieldCheck size={25} />
             </div>
 
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">
-                Donation Details
-              </h2>
+            <div className="min-w-0">
 
-              <p className="text-sm text-gray-500">
-                Check the information against the actual food.
+              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
+                Safety Verification
+              </h1>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Verify the donation before completing
+                the delivery process.
               </p>
-            </div>
 
-          </div>
+              <p className="mt-2 text-xs font-medium text-slate-400">
+                Donation ID:{" "}
 
-
-          <div className="rounded-2xl bg-gray-50 p-5">
-
-            <h3 className="text-xl font-bold text-gray-900">
-              {donation.foodName}
-            </h3>
-
-            <p className="mt-1 text-sm text-gray-500">
-              {donation.foodType}
-            </p>
-
-
-            <div className="mt-6 grid grid-cols-2 gap-5 sm:grid-cols-4">
-
-              <div>
-                <p className="text-xs text-gray-400">
-                  Quantity
-                </p>
-
-                <div className="mt-1 flex items-center gap-2">
-                  <Scale
-                    size={17}
-                    className="text-green-600"
-                  />
-
-                  <span className="text-sm font-semibold text-gray-800">
-                    {donation.quantity} KG
-                  </span>
-                </div>
-              </div>
-
-
-              <div>
-                <p className="text-xs text-gray-400">
-                  Condition
-                </p>
-
-                <div className="mt-1 flex items-center gap-2">
-                  <Package
-                    size={17}
-                    className="text-orange-500"
-                  />
-
-                  <span className="text-sm font-semibold text-gray-800">
-                    {donation.condition}
-                  </span>
-                </div>
-              </div>
-
-
-              <div>
-                <p className="text-xs text-gray-400">
-                  Best Before
-                </p>
-
-                <div className="mt-1 flex items-center gap-2">
-                  <Calendar
-                    size={17}
-                    className="text-blue-500"
-                  />
-
-                  <span className="text-sm font-semibold text-gray-800">
-                    {new Date(
-                      donation.bestBefore
-                    ).toLocaleDateString("en-GB")}
-                  </span>
-                </div>
-              </div>
-
-
-              <div>
-                <p className="text-xs text-gray-400">
-                  Cooking Time
-                </p>
-
-                <div className="mt-1 flex items-center gap-2">
-                  <Clock
-                    size={17}
-                    className="text-purple-500"
-                  />
-
-                  <span className="text-sm font-semibold text-gray-800">
-                    {donation.cookingTime}
-                  </span>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-
-
-          {/* PICKUP */}
-          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
-
-            <div className="flex items-start gap-3 rounded-2xl border border-gray-100 p-4">
-
-              <MapPin
-                size={19}
-                className="mt-0.5 shrink-0 text-red-500"
-              />
-
-              <div>
-                <p className="text-xs text-gray-400">
-                  Pickup Address
-                </p>
-
-                <p className="mt-1 text-sm font-semibold leading-5 text-gray-800">
-                  {donation.pickupAddress}
-                </p>
-              </div>
-
-            </div>
-
-
-            <div className="flex items-start gap-3 rounded-2xl border border-gray-100 p-4">
-
-              <Calendar
-                size={19}
-                className="mt-0.5 shrink-0 text-green-600"
-              />
-
-              <div>
-                <p className="text-xs text-gray-400">
-                  Pickup Schedule
-                </p>
-
-                <p className="mt-1 text-sm font-semibold text-gray-800">
-                  {new Date(
-                    donation.pickupDate
-                  ).toLocaleDateString("en-GB")}{" "}
-                  at {donation.pickupTime}
-                </p>
-              </div>
+                <span className="text-slate-600">
+                  {donationId}
+                </span>
+              </p>
 
             </div>
 
@@ -463,141 +565,405 @@ const SafetyVerification = () => {
 
         </div>
 
+        {/* ==================================================
+            DONATION + DRIVER INFORMATION
+        ================================================== */}
 
-        {/* SAFETY CHECKLIST */}
-        <div className="mt-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
+        {donation && (
+          <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
 
-          <div className="mb-6">
+            {/* DONATION */}
 
-            <h2 className="text-xl font-bold text-gray-900">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
+              <div className="mb-4 flex items-center gap-3">
+
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                  <Utensils size={20} />
+                </div>
+
+                <div>
+
+                  <h2 className="font-bold text-slate-900">
+                    Donation Details
+                  </h2>
+
+                  <p className="text-xs text-slate-500">
+                    Food information
+                  </p>
+
+                </div>
+
+              </div>
+
+              <div className="space-y-3 text-sm">
+
+                <div className="flex justify-between gap-4">
+
+                  <span className="text-slate-500">
+                    Food
+                  </span>
+
+                  <span className="text-right font-semibold text-slate-900">
+                    {donation.foodName ||
+                      "N/A"}
+                  </span>
+
+                </div>
+
+                <div className="flex justify-between gap-4">
+
+                  <span className="text-slate-500">
+                    Food Type
+                  </span>
+
+                  <span className="text-right font-semibold text-slate-900">
+                    {donation.foodType ||
+                      "N/A"}
+                  </span>
+
+                </div>
+
+                <div className="flex justify-between gap-4">
+
+                  <span className="text-slate-500">
+                    Quantity
+                  </span>
+
+                  <span className="text-right font-semibold text-slate-900">
+                    {donation.quantity ??
+                      "N/A"}{" "}
+                    KG
+                  </span>
+
+                </div>
+
+                <div className="flex justify-between gap-4">
+
+                  <span className="text-slate-500">
+                    Estimated Meals
+                  </span>
+
+                  <span className="text-right font-semibold text-slate-900">
+                    {donation.estimatedMeals ??
+                      "N/A"}
+                  </span>
+
+                </div>
+
+                <div className="flex justify-between gap-4">
+
+                  <span className="text-slate-500">
+                    Pickup Address
+                  </span>
+
+                  <span className="max-w-[220px] text-right font-semibold text-slate-900">
+                    {donation.pickupAddress ||
+                      donation.address ||
+                      "N/A"}
+                  </span>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* DRIVER */}
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
+              <div className="mb-4 flex items-center gap-3">
+
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                  <UserRound size={20} />
+                </div>
+
+                <div>
+
+                  <h2 className="font-bold text-slate-900">
+                    Delivery Driver
+                  </h2>
+
+                  <p className="text-xs text-slate-500">
+                    Assigned driver information
+                  </p>
+
+                </div>
+
+              </div>
+
+              <div className="space-y-3 text-sm">
+
+                <div className="flex items-center justify-between gap-4">
+
+                  <span className="flex items-center gap-2 text-slate-500">
+                    <UserRound size={15} />
+                    Name
+                  </span>
+
+                  <span className="font-semibold text-slate-900">
+                    {donation.deliveryMan
+                      ?.name ||
+                      "N/A"}
+                  </span>
+
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+
+                  <span className="flex items-center gap-2 text-slate-500">
+                    <Phone size={15} />
+                    Phone
+                  </span>
+
+                  <span className="font-semibold text-slate-900">
+                    {donation.deliveryMan
+                      ?.phone ||
+                      "N/A"}
+                  </span>
+
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+
+                  <span className="flex items-center gap-2 text-slate-500">
+                    <Car size={15} />
+                    Vehicle
+                  </span>
+
+                  <span className="font-semibold text-slate-900">
+                    {donation.deliveryMan
+                      ?.vehicleNumber ||
+                      "N/A"}
+                  </span>
+
+                </div>
+
+                <div className="flex items-start justify-between gap-4">
+
+                  <span className="flex items-center gap-2 text-slate-500">
+                    <MapPin size={15} />
+                    Status
+                  </span>
+
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    {donation.status ||
+                      donation.pipelineStatus ||
+                      "N/A"}
+                  </span>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+        {/* ==================================================
+            ERROR
+        ================================================== */}
+
+        {error && (
+          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* ==================================================
+            SUCCESS
+        ================================================== */}
+
+        {successMessage && (
+          <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+            {successMessage}
+          </div>
+        )}
+
+        {/* ==================================================
+            SAFETY CHECKS
+        ================================================== */}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+
+          <div className="mb-5">
+
+            <h2 className="text-lg font-bold text-slate-900">
               Safety Checklist
             </h2>
 
-            <p className="mt-1 text-sm text-gray-500">
-              Confirm each item before accepting the donation.
+            <p className="mt-1 text-sm text-slate-500">
+              Confirm every condition before verifying
+              this donation.
             </p>
 
           </div>
 
-
           <div className="space-y-3">
 
-            {[
-              "Food condition matches the information provided.",
-              "Food appears safe for consumption.",
-              "Packaging and storage condition are acceptable.",
-              "Food is within the safe consumption period.",
-            ].map((text, index) => (
+            {checkItems.map(
+              (item) => {
+                const Icon =
+                  item.icon;
 
-              <label
-                key={index}
-                className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${
-                  checks[index]
-                    ? "border-green-200 bg-green-50"
-                    : "border-gray-200 bg-gray-50 hover:border-green-300"
-                }`}
-              >
+                const checked =
+                  checks[item.key];
 
-                <input
-                  type="checkbox"
-                  checked={checks[index]}
-                  onChange={() =>
-                    handleCheck(index)
-                  }
-                  className="mt-1 h-5 w-5 shrink-0 accent-green-600"
-                />
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() =>
+                      handleCheckChange(
+                        item.key
+                      )
+                    }
+                    disabled={
+                      verifying ||
+                      rejecting
+                    }
+                    className={`flex w-full items-center gap-4 rounded-xl border p-4 text-left transition ${
+                      checked
+                        ? "border-emerald-300 bg-emerald-50"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
 
-                <span className="text-sm font-medium leading-6 text-gray-700">
-                  {text}
-                </span>
+                    <div
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                        checked
+                          ? "bg-emerald-600 text-white"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      <Icon size={21} />
+                    </div>
 
-              </label>
+                    <div className="min-w-0 flex-1">
 
-            ))}
+                      <h3 className="font-semibold text-slate-900">
+                        {item.title}
+                      </h3>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        {item.description}
+                      </p>
+
+                    </div>
+
+                    <div
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
+                        checked
+                          ? "border-emerald-600 bg-emerald-600 text-white"
+                          : "border-slate-300 bg-white"
+                      }`}
+                    >
+                      {checked && (
+                        <CheckCircle2
+                          size={17}
+                        />
+                      )}
+                    </div>
+
+                  </button>
+                );
+              }
+            )}
 
           </div>
 
+          {/* ==================================================
+              CHECK STATUS
+          ================================================== */}
 
-          {/* MESSAGE */}
-          {error && (
-            <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-              {error}
-            </div>
-          )}
+          <div
+            className={`mt-5 rounded-xl border px-4 py-3 text-sm font-medium ${
+              allChecked
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-amber-200 bg-amber-50 text-amber-700"
+            }`}
+          >
+            {allChecked
+              ? "All safety checks passed. The donation is ready for verification."
+              : "Please complete all four safety checks."}
+          </div>
 
+          {/* ==================================================
+              ACTION BUTTONS
+          ================================================== */}
 
-          {success && (
-            <div className="mt-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
-              {success}
-            </div>
-          )}
+          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
 
+            {/* ================================================
+                REJECT
+            ================================================= */}
 
-          {/* ACTIONS */}
-          {donation.status ===
-          "Waiting for NGO Acceptance" ? (
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={handleReject}
+              disabled={
+                verifying ||
+                rejecting
+              }
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {rejecting ? (
+                <>
+                  <Loader2
+                    size={19}
+                    className="animate-spin"
+                  />
 
-              <button
-                type="button"
-                onClick={handleReject}
-                disabled={verifying}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-6 py-3 font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <XCircle size={19} />
-                Reject Food
-              </button>
+                  Rejecting...
+                </>
+              ) : (
+                "Reject Donation"
+              )}
+            </button>
 
+            {/* ================================================
+                VERIFY
+            ================================================= */}
 
-              <button
-                type="button"
-                onClick={handleAccept}
-                disabled={
-                  verifying || !allChecked
-                }
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-600 px-6 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
+            <button
+              type="button"
+              onClick={handleVerify}
+              disabled={
+                verifying ||
+                rejecting ||
+                !allChecked
+              }
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {verifying ? (
+                <>
+                  <Loader2
+                    size={19}
+                    className="animate-spin"
+                  />
 
-                {verifying ? (
-                  <>
-                    <Loader2
-                      size={19}
-                      className="animate-spin"
-                    />
-                    Verifying...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 size={19} />
-                    Accept & Verify
-                  </>
-                )}
+                  Verifying...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2
+                    size={19}
+                  />
 
-              </button>
+                  Verify Donation
+                </>
+              )}
+            </button>
 
-            </div>
-          ) : (
-            <div className="mt-7 rounded-2xl bg-green-50 p-5 text-center">
-
-              <CheckCircle2
-                size={30}
-                className="mx-auto text-green-600"
-              />
-
-              <p className="mt-2 font-bold text-green-800">
-                Donation Status: {donation.status}
-              </p>
-
-            </div>
-          )}
+          </div>
 
         </div>
 
       </div>
-
     </div>
   );
 };
 
 export default SafetyVerification;
-

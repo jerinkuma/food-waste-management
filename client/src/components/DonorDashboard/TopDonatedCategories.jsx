@@ -7,45 +7,37 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-const categories = [
-  {
-    icon: Pizza,
-    name: "Rice & Biryani",
-    meals: 1240,
-    percent: 92,
-    color: "bg-orange-500",
-  },
-  {
-    icon: Soup,
-    name: "Curries",
-    meals: 860,
-    percent: 78,
-    color: "bg-red-500",
-  },
-  {
-    icon: Sandwich,
-    name: "Fast Food",
-    meals: 620,
-    percent: 61,
-    color: "bg-blue-500",
-  },
-  {
-    icon: Salad,
-    name: "Vegetables",
-    meals: 510,
-    percent: 48,
-    color: "bg-green-500",
-  },
-  {
-    icon: Cake,
-    name: "Desserts",
-    meals: 290,
-    percent: 29,
-    color: "bg-pink-500",
-  },
-];
+const TopDonatedCategories = ({
+  categories = [],
+}) => {
+  // Different icons/colors for different food categories
+  const categoryStyles = [
+    {
+      icon: Pizza,
+      color: "bg-orange-500",
+    },
+    {
+      icon: Soup,
+      color: "bg-red-500",
+    },
+    {
+      icon: Sandwich,
+      color: "bg-blue-500",
+    },
+    {
+      icon: Salad,
+      color: "bg-green-500",
+    },
+    {
+      icon: Cake,
+      color: "bg-pink-500",
+    },
+  ];
 
-const TopDonatedCategories = () => {
+  const categoryList = Array.isArray(categories)
+    ? categories
+    : [];
+
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
 
@@ -80,63 +72,100 @@ const TopDonatedCategories = () => {
 
       <div className="mt-8 space-y-6">
 
-        {categories.map((item, index) => {
+        {categoryList.length === 0 ? (
 
-          const Icon = item.icon;
+          <div className="rounded-2xl border border-dashed border-gray-300 p-8 text-center">
 
-          return (
+            <p className="text-gray-500">
+              No food category data available yet.
+            </p>
 
-            <div key={index}>
+            <p className="mt-1 text-sm text-gray-400">
+              Categories will appear here after you make donations.
+            </p>
 
-              <div className="mb-2 flex items-center justify-between">
+          </div>
 
-                <div className="flex items-center gap-3">
+        ) : (
 
-                  <div
-                    className={`rounded-xl p-3 ${item.color}`}
-                  >
-                    <Icon
-                      className="text-white"
-                      size={20}
-                    />
+          categoryList.map((item, index) => {
+
+            const style =
+              categoryStyles[
+                index %
+                  categoryStyles.length
+              ];
+
+            const Icon = style.icon;
+
+            const meals =
+              Number(item.meals) || 0;
+
+            const percent = Math.min(
+              Math.max(
+                Number(item.percent) || 0,
+                0
+              ),
+              100
+            );
+
+            return (
+
+              <div
+                key={`${item.name}-${index}`}
+              >
+
+                <div className="mb-2 flex items-center justify-between">
+
+                  <div className="flex items-center gap-3">
+
+                    <div
+                      className={`rounded-xl p-3 ${style.color}`}
+                    >
+                      <Icon
+                        className="text-white"
+                        size={20}
+                      />
+                    </div>
+
+                    <div>
+
+                      <h3 className="font-semibold text-gray-800">
+                        {item.name || "Other"}
+                      </h3>
+
+                      <p className="text-sm text-gray-500">
+                        {meals.toLocaleString()} Meals Donated
+                      </p>
+
+                    </div>
+
                   </div>
 
-                  <div>
-
-                    <h3 className="font-semibold text-gray-800">
-                      {item.name}
-                    </h3>
-
-                    <p className="text-sm text-gray-500">
-                      {item.meals} Meals Donated
-                    </p>
-
-                  </div>
+                  <span className="font-bold text-gray-700">
+                    {percent}%
+                  </span>
 
                 </div>
 
-                <span className="font-bold text-gray-700">
-                  {item.percent}%
-                </span>
+                <div className="h-3 overflow-hidden rounded-full bg-gray-200">
+
+                  <div
+                    className={`${style.color} h-full rounded-full transition-all duration-500`}
+                    style={{
+                      width: `${percent}%`,
+                    }}
+                  />
+
+                </div>
 
               </div>
 
-              <div className="h-3 overflow-hidden rounded-full bg-gray-200">
+            );
 
-                <div
-                  className={`${item.color} h-full rounded-full`}
-                  style={{
-                    width: `${item.percent}%`,
-                  }}
-                />
+          })
 
-              </div>
-
-            </div>
-
-          );
-
-        })}
+        )}
 
       </div>
 

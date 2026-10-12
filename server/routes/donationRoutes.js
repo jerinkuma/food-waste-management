@@ -1,52 +1,142 @@
+
 const express = require("express");
+
 const router = express.Router();
 
-// কন্ট্রোলার ইমপোর্ট (নিরাপদ ফলব্যাক সহ)
-let donationController = {};
-try {
-  donationController = require("../controllers/donationController");
-} catch (err) {
-  console.error("Donation controller load warning:", err.message);
-}
+const {
+  createDonation,
+  getDonationById,
+  getDonationByDonationId,
+
+  verifyDonation,
+  rejectDonation,
+
+  getDonorDonations,
+  getDonorDashboard,
+
+  listAvailableDonations,
+  acceptDonation,
+
+  updateDonationStatus,
+
+  getNgoDonations,
+  assignDeliveryDriver,
+} = require("../controllers/donationController");
 
 const {
-  createDonation = (req, res) => res.status(501).json({ message: "Not Implemented" }),
-  listAvailableDonations = (req, res) => res.json({ success: true, data: [] }), // নামটি এখানে ঠিক করা হলো
-  getDonationById = (req, res) => res.status(501).json({ message: "Not Implemented" }),
-  getDonationByDonationId = (req, res) => res.status(501).json({ message: "Not Implemented" }),
-  verifyDonation = (req, res) => res.status(501).json({ message: "Not Implemented" }),
-  rejectDonation = (req, res) => res.status(501).json({ message: "Not Implemented" }),
-  getDonorDonations = (req, res) => res.json({ success: true, data: [] }),
-  getDonorDashboard = (req, res) => res.json({ success: true, data: {} }),
-  getNgoDonations = (req, res) => res.json({ success: true, data: [] }),
-  acceptDonation = (req, res) => res.status(501).json({ message: "Not Implemented" }),
-  updateDonationStatus = (req, res) => res.status(501).json({ message: "Not Implemented" }),
-} = donationController;
+  protect,
+  restrictTo,
+} = require("../middleware/authMiddleware");
 
-const { protect, restrictTo } = require("../middleware/authMiddleware") || {
-  protect: (req, res, next) => next(),
-  restrictTo: () => (req, res, next) => next()
-};
-
-// =====================================
-// ROUTES DEFINITION
-// =====================================
-
+// ======================================================
+// CREATE DONATION
+// ======================================================
 router.post("/", createDonation);
 
-// স্পেসিফিক রুটগুলো ডায়নামিক রাউটের উপরে থাকতে হবে
-router.get("/available", listAvailableDonations); // এখানে ফাংশনটি যুক্ত করা হলো
-router.get("/ngo/:ngoId", getNgoDonations);
-router.put("/:id/accept", protect, restrictTo("ngo"), acceptDonation);
-router.put("/:id/status", protect, restrictTo("ngo", "donor", "admin"), updateDonationStatus);
-router.get("/dashboard/:donorId", getDonorDashboard);
-router.get("/donation-id/:donationId", getDonationByDonationId);
-router.get("/donor/:donorId", getDonorDonations);
+// ======================================================
+// AVAILABLE DONATIONS
+// Public because NGOs can browse available donations.
+// ======================================================
+router.get(
+  "/available",
+  listAvailableDonations
+);
 
-// ডায়নামিক আইডি রুট
-router.get("/:id", getDonationById);
+// ======================================================
+// NGO DONATIONS
+// ======================================================
+router.get(
+  "/ngo/:ngoId",
+  getNgoDonations
+);
 
-router.post("/:id/verify", verifyDonation);
-router.post("/:id/reject", rejectDonation);
+// ======================================================
+// ACCEPT DONATION
+// NGO ONLY
+// ======================================================
+router.put(
+  "/:id/accept",
+  protect,
+  restrictTo("ngo"),
+  acceptDonation
+);
+
+// ======================================================
+// ASSIGN DELIVERY DRIVER
+// NGO ONLY
+// ======================================================
+router.put(
+  "/:id/assign-driver",
+  protect,
+  restrictTo("ngo"),
+  assignDeliveryDriver
+);
+
+// ======================================================
+// UPDATE DONATION STATUS
+// NGO / DONOR / ADMIN
+// ======================================================
+router.put(
+  "/:id/status",
+  protect,
+  restrictTo("ngo", "donor", "admin"),
+  updateDonationStatus
+);
+
+// ======================================================
+// DONOR DASHBOARD
+// ======================================================
+router.get(
+  "/dashboard/:donorId",
+  getDonorDashboard
+);
+
+// ======================================================
+// GET BY CUSTOM DONATION ID
+// ======================================================
+router.get(
+  "/donation-id/:donationId",
+  getDonationByDonationId
+);
+
+// ======================================================
+// DONOR DONATIONS
+// ======================================================
+router.get(
+  "/donor/:donorId",
+  getDonorDonations
+);
+
+// ======================================================
+// SAFETY VERIFICATION
+// NGO ONLY
+// ======================================================
+router.post(
+  "/:id/verify",
+  protect,
+  restrictTo("ngo"),
+  verifyDonation
+);
+
+// ======================================================
+// REJECT DONATION
+// NGO ONLY
+// ======================================================
+router.post(
+  "/:id/reject",
+  protect,
+  restrictTo("ngo"),
+  rejectDonation
+);
+
+// ======================================================
+// GET SINGLE DONATION
+// Keep this LAST because it uses /:id
+// ======================================================
+router.get(
+  "/:id",
+  getDonationById
+);
 
 module.exports = router;
+

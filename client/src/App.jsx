@@ -16,6 +16,7 @@ import DonationSuccess from "./pages/DonorDashboard/DonationSuccess";
 import DonationHistory from "./pages/DonorDashboard/DonationHistory";
 import Analytics from "./pages/DonorDashboard/Analytics";
 import Profile from "./pages/DonorDashboard/Profile";
+import Notifications from "./pages/DonorDashboard/Notifications";
 
 // Delivery
 import SafetyVerification from "./pages/Delivery/SafetyVerification";
@@ -105,11 +106,10 @@ function NGOLayout({
 }) {
   return (
     <div
-      className={`flex h-screen font-sans transition-colors duration-300 ${
-        themeMode === "dark"
+      className={`flex h-screen font-sans transition-colors duration-300 ${themeMode === "dark"
           ? "bg-[#0f172a] text-slate-100"
           : "bg-[#F8FAFC] text-slate-800"
-      }`}
+        }`}
     >
       <NGOSidebar />
 
@@ -183,11 +183,10 @@ function NGOLayout({
         </main>
 
         <footer
-          className={`text-center py-3 text-[11px] border-t mt-auto transition-colors ${
-            themeMode === "dark"
+          className={`text-center py-3 text-[11px] border-t mt-auto transition-colors ${themeMode === "dark"
               ? "text-slate-500 border-slate-800"
               : "text-slate-400 border-slate-200/60"
-          }`}
+            }`}
         >
           FeedLink NGO Portal, Chattogram · FeedLink © 2026
         </footer>
@@ -326,6 +325,11 @@ function App() {
         <Route
           path="/restaurant/donation-history"
           element={<DonationHistory />}
+        />
+
+        <Route
+          path="/restaurant/notifications"
+          element={<Notifications />}
         />
 
         <Route

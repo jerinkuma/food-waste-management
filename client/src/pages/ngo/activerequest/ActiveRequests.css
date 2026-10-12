@@ -318,3 +318,28 @@
   gap: 16px;
   position: relative;
 }
+
+/* =========================================
+   Assign Driver / Modal Input Fix
+========================================= */
+
+.ar-modal-content input,
+.ar-modal-content textarea,
+.ar-modal-content select {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  caret-color: #0f172a;
+}
+
+.ar-modal-content input::placeholder,
+.ar-modal-content textarea::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1;
+}
+
+.ar-modal-content input:focus,
+.ar-modal-content textarea:focus,
+.ar-modal-content select:focus {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+}

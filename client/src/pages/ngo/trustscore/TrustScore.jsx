@@ -1,291 +1,544 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import './TrustScore.css'; // Optional custom styling
 
-const API_BASE = 'http://localhost:5000/api'; // Express Port
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import "./TrustScore.css";
 
-export default function TrustScore({ themeMode = 'light' }) {
-  // State definitions
+const API_BASE = "http://localhost:5000/api";
+
+const getStoredUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "null");
+  } catch {
+    return null;
+  }
+};
+
+const getId = (value) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return String(value._id || value.id || "");
+};
+
+const getDonorName = (donor) => {
+  if (!donor) return "Unknown Donor";
+  if (typeof donor === "string") return "Donor";
+  return donor.name || donor.restaurantName || donor.email || "Unknown Donor";
+};
+
+const getDonationStatus = (donation) =>
+  String(donation?.pipelineStatus || donation?.status || "").toLowerCase();
+
+const isCompletedDonation = (donation) => {
+  const status = getDonationStatus(donation);
+  return (
+    status.includes("completed") ||
+    status.includes("delivered")
+  );
+};
+
+const getDonationId = (donation) =>
+  donation?.donationId || getId(donation);
+
+const TrustScore = ({ themeMode = "light" }) => {
   const [donors, setDonors] = useState([]);
   const [pendingRatings, setPendingRatings] = useState([]);
   const [selectedDonorDetail, setSelectedDonorDetail] = useState(null);
   const [selectedRatingItem, setSelectedRatingItem] = useState(null);
+
   const [userStars, setUserStars] = useState(4);
-  const [selectedTag, setSelectedTag] = useState('Best Food Quality');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [reviewComment, setReviewComment] = useState('');
-  const [ratingTypeFilter, setRatingTypeFilter] = useState('all');
+  const [selectedTag, setSelectedTag] = useState("Best Food Quality");
+  const [reviewComment, setReviewComment] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [ratingTypeFilter, setRatingTypeFilter] = useState("all");
 
-  // Fetch Donors Dynamically on search or filter change
-  useEffect(() => {
-    fetchDonors();
-  }, [searchQuery, ratingTypeFilter]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  // Fetch Pending Feedbacks on Mount
-  useEffect(() => {
-    fetchPending();
-  }, []);
+  const isDark = themeMode === "dark";
 
-  const fetchDonors = async () => {
-    try {
-      const res = await axios.get(`${API_BASE}/donors?search=${searchQuery}&filter=${ratingTypeFilter}`);
-      setDonors(res.data);
-    } catch (err) {
-      console.error('Error fetching donors:', err);
-    }
+  const getAuthHeaders = () => {
+    const token =
+      localStorage.getItem("token") ||
+      localStorage.getItem("accessToken");
+
+    return token
+      ? { Authorization: `Bearer ${token}` }
+      : {};
   };
 
-  const fetchPending = async () => {
-    try {
-      const res = await axios.get(`${API_BASE}/pending-feedback`);
-      setPendingRatings(res.data);
-    } catch (err) {
-      console.error('Error fetching pending feedback:', err);
-    }
-  };
+  const fetchDonors = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    setSuccess("");
 
-  const toggleFollow = async (id) => {
     try {
-      const res = await axios.patch(`${API_BASE}/donors/${id}/follow`);
-      setDonors(prev =>
-        prev.map(d => d._id === id ? { ...d, isFollowed: res.data.isFollowed } : d)
-      );
-      if (selectedDonorDetail && selectedDonorDetail._id === id) {
-        setSelectedDonorDetail(prev => ({ ...prev, isFollowed: res.data.isFollowed }));
+      const user = getStoredUser();
+
+      if (!user) {
+        throw new Error(
+          "Login information পাওয়া যায়নি। NGO account দিয়ে আবার login করো।"
+        );
       }
-    } catch (err) {
-      console.error('Error toggling follow:', err);
-    }
-  };
 
-  const handleRatingSubmit = async () => {
-    if (!selectedRatingItem) return;
+      // The existing controller accepts either NGO profile ID
+      // or the user ID associated with that NGO profile.
+      const ngoId = getId(user);
 
-    try {
-      await axios.post(`${API_BASE}/rate-donor`, {
-        pendingId: selectedRatingItem._id,
-        donorName: selectedRatingItem.donorName || selectedRatingItem.donor,
-        userStars,
-        selectedTag,
-        reviewComment
+      if (!ngoId) {
+        throw new Error(
+          "NGO user ID পাওয়া যায়নি। আবার login করে চেষ্টা করো।"
+        );
+      }
+
+      const response = await axios.get(
+        `${API_BASE}/donations/ngo/${ngoId}`,
+        { headers: getAuthHeaders() }
+      );
+
+      const payload = response.data || {};
+
+      if (payload.success === false) {
+        throw new Error(
+          payload.message || "NGO donations load করা যায়নি।"
+        );
+      }
+
+      const donations = Array.isArray(payload.donations)
+        ? payload.donations
+        : [
+            ...(Array.isArray(payload.active) ? payload.active : []),
+            ...(Array.isArray(payload.archived) ? payload.archived : []),
+          ];
+
+      // Group donations by donor User ID.
+      const donorMap = new Map();
+
+      donations.forEach((donation) => {
+        const donor = donation?.donor;
+
+        if (!donor || typeof donor !== "object") return;
+
+        const donorId = getId(donor);
+
+        if (!donorId) return;
+
+        if (!donorMap.has(donorId)) {
+          donorMap.set(donorId, {
+            _id: donorId,
+            name: getDonorName(donor),
+            email: donor.email || "",
+            location:
+              donation.pickupAddress ||
+              donation.address ||
+              "Location not available",
+            totalDonations: 0,
+            trustScore: 0,
+            tags: [],
+            reviews: [],
+            recentImages: [],
+            isFollowed: false,
+            donations: [],
+          });
+        }
+
+        const donorEntry = donorMap.get(donorId);
+
+        donorEntry.totalDonations += 1;
+        donorEntry.donations.push(donation);
+
+        const location =
+          donation.pickupAddress || donation.address;
+
+        if (
+          location &&
+          donorEntry.location === "Location not available"
+        ) {
+          donorEntry.location = location;
+        }
       });
 
-      fetchDonors();
-      fetchPending();
-      setSelectedRatingItem(null);
-      setReviewComment('');
+      const donorList = Array.from(donorMap.values());
+
+      setDonors(donorList);
+
+      // Completed donations are candidates for feedback.
+      // Existing Feedback records are checked separately below
+      // only if the current backend response exposes them.
+      const completedDonations = donations.filter(
+        isCompletedDonation
+      );
+
+      setPendingRatings(
+        completedDonations.map((donation) => ({
+          _id: getId(donation),
+          donationId: getDonationId(donation),
+          orderId: donation.donationId || getId(donation),
+          donorId: getId(donation.donor),
+          donorName: getDonorName(donation.donor),
+          donor: getDonorName(donation.donor),
+          food: donation.foodName || "Food donation",
+          donation,
+        }))
+      );
     } catch (err) {
-      console.error('Error submitting rating:', err);
+      console.error(
+        "Trust Score loading error:",
+        err.response?.data || err
+      );
+
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Donor list load করা যায়নি। Backend connection check করো।"
+      );
+
+      setDonors([]);
+      setPendingRatings([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDonors();
+  }, [fetchDonors]);
+
+  const filteredDonors = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return donors.filter((donor) => {
+      const matchesSearch =
+        !query ||
+        donor.name.toLowerCase().includes(query) ||
+        donor.location.toLowerCase().includes(query) ||
+        donor.email.toLowerCase().includes(query);
+
+      // Ratings are not yet available in the donation response.
+      // Do not invent a rating to classify donors.
+      const matchesFilter =
+        ratingTypeFilter === "all";
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [donors, searchQuery, ratingTypeFilter]);
+
+  const handleRatingSubmit = async () => {
+    if (!selectedRatingItem || submitting) return;
+
+    const donation = selectedRatingItem.donation;
+    const donor = donation?.donor;
+    const ngo = donation?.ngoRequest?.requestedBy;
+
+    if (!donation || !getId(donor)) {
+      setError("এই donation-এর donor information পাওয়া যায়নি।");
+      return;
+    }
+
+    if (!getDonationId(donation)) {
+      setError("Donation ID পাওয়া যায়নি।");
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      /*
+       * Uses the existing POST /api/feedback route and the
+       * Feedback model fields already present in your backend.
+       *
+       * The existing submitFeedback controller must accept these
+       * fields and associate the feedback with the donation.
+       */
+      const response = await axios.post(
+        `${API_BASE}/feedback`,
+        {
+          donation: getId(donation),
+          donationId: String(getDonationId(donation)),
+          ngo: getId(ngo) || undefined,
+          donor: getId(donor),
+          donorName: getDonorName(donor),
+          category: "Donor Rating",
+          tags: [selectedTag],
+          rating: Number(userStars),
+          message:
+            reviewComment.trim() ||
+            `Donor rating: ${selectedTag}`,
+          comment: reviewComment.trim(),
+          submittedBy: "NGO Admin",
+          date: new Date().toISOString(),
+        },
+        { headers: getAuthHeaders() }
+      );
+
+      if (response.data?.success === false) {
+        throw new Error(
+          response.data.message || "Feedback submit করা যায়নি।"
+        );
+      }
+
+      setSuccess("Feedback submit হয়েছে।");
+      setSelectedRatingItem(null);
+      setReviewComment("");
+      setUserStars(4);
+      setSelectedTag("Best Food Quality");
+
+      // Refresh donation data after submitting feedback.
+      await fetchDonors();
+    } catch (err) {
+      console.error(
+        "Feedback submission error:",
+        err.response?.data || err
+      );
+
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Feedback submit করা যায়নি। Backend route ও validation check করো।"
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const isDark = themeMode === 'dark';
-
   const getRatingLabel = (stars) => {
-    switch (stars) {
-      case 5: return 'Excellent Experience';
-      case 4: return 'Good Experience';
-      case 3: return 'Average Experience';
-      case 2: return 'Poor Experience';
-      case 1: return 'Very Bad Experience';
-      default: return 'Rate Your Experience';
-    }
+    const labels = {
+      5: "Excellent Experience",
+      4: "Good Experience",
+      3: "Average Experience",
+      2: "Poor Experience",
+      1: "Very Bad Experience",
+    };
+
+    return labels[stars] || "Rate Your Experience";
+  };
+
+  const pageClass = isDark
+    ? "bg-slate-900 text-slate-100"
+    : "bg-slate-50 text-slate-900";
+
+  const cardClass = isDark
+    ? "bg-slate-800 border-slate-700"
+    : "bg-white border-slate-200";
+
+  const closeRatingModal = () => {
+    if (submitting) return;
+    setSelectedRatingItem(null);
+    setReviewComment("");
   };
 
   return (
-    <div className={`space-y-6 min-h-screen font-sans p-4 transition-colors ${
-      isDark ? 'bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-900'
-    }`}>
-      
+    <div
+      className={`min-h-screen space-y-6 p-4 font-sans transition-colors ${pageClass}`}
+    >
       {/* Header */}
-      <div className={`p-5 rounded-2xl border flex justify-between items-center flex-wrap gap-4 ${
-        isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-      }`}>
+      <div
+        className={`flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-5 ${cardClass}`}
+      >
         <div>
-          <h2 className="text-xl font-extrabold tracking-tight">DONOR TRUST SCORE & NETWORK</h2>
+          <h2 className="text-xl font-extrabold tracking-tight">
+            DONOR TRUST SCORE & NETWORK
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Donors connected to your accepted donations
+          </p>
         </div>
-        
-        <div className="bg-emerald-50 border border-emerald-300 px-4 py-2 rounded-xl text-xs font-bold text-emerald-800 flex items-center gap-2">
-          <span>Following:</span>
-          <span className="bg-emerald-700 text-white px-2 py-0.5 rounded-full text-[10px]">
-            {donors.filter(d => d.isFollowed).length} Followed
-          </span>
+
+        <div className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-800">
+          {donors.length} Donors
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-6 items-start">
-        
-        {/* Donor Leaderboard Section */}
-        <div className="col-span-12 lg:col-span-8 space-y-4">
-          <div className={`p-5 rounded-2xl border space-y-4 ${
-            isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-          }`}>
-            
-            <div className="flex justify-between items-center border-b pb-3 flex-wrap gap-2 border-slate-200">
+      {/* Status messages */}
+      {error && (
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800"
+        >
+          {error}
+        </div>
+      )}
+
+      {success && (
+        <div
+          role="status"
+          className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800"
+        >
+          {success}
+        </div>
+      )}
+
+      <div className="grid grid-cols-12 items-start gap-6">
+        {/* Donor network */}
+        <section className="col-span-12 space-y-4 lg:col-span-8">
+          <div className={`space-y-4 rounded-2xl border p-5 ${cardClass}`}>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
               <div>
-                <h3 className="font-extrabold text-sm tracking-wide text-slate-900">RESTAURANTS & DONORS NETWORK</h3>
-                <p className="text-[11px] text-slate-500">Filter by trust level or search by area</p>
+                <h3 className="text-sm font-extrabold tracking-wide">
+                  RESTAURANTS & DONORS NETWORK
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Donors are collected from your NGO donation history.
+                </p>
               </div>
-              
-              <div className="flex gap-1 text-xs font-bold">
-                <button
-                  onClick={() => setRatingTypeFilter('all')}
-                  className={`px-3 py-1 rounded-lg border ${
-                    ratingTypeFilter === 'all'
-                      ? 'bg-slate-800 text-white border-slate-700'
-                      : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
-                  }`}
-                >
-                  All Donors
-                </button>
-                <button
-                  onClick={() => setRatingTypeFilter('positive')}
-                  className={`px-3 py-1 rounded-lg border ${
-                    ratingTypeFilter === 'positive'
-                      ? 'bg-emerald-700 text-white border-emerald-600'
-                      : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
-                  }`}
-                >
-                  High Rated (4.0+)
-                </button>
-                <button
-                  onClick={() => setRatingTypeFilter('negative')}
-                  className={`px-3 py-1 rounded-lg border ${
-                    ratingTypeFilter === 'negative'
-                      ? 'bg-rose-700 text-white border-rose-600'
-                      : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
-                  }`}
-                >
-                  Low Rated / Issues
-                </button>
-              </div>
+
+              <button
+                type="button"
+                onClick={fetchDonors}
+                disabled={loading}
+                className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
+              >
+                {loading ? "Loading..." : "Refresh"}
+              </button>
             </div>
 
-            {/* Search Input */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search donor by name or location (Agrabad, WASA, GEC)..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full text-xs border rounded-xl px-3.5 py-2.5 bg-slate-50 border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-emerald-600"
-              />
-              {searchQuery && (
-                <button 
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-2.5 text-xs text-slate-500 hover:text-slate-900 font-bold"
-                >
-                  Clear
-                </button>
-              )}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setRatingTypeFilter("all")}
+                className={`rounded-lg border px-3 py-2 text-xs font-bold ${
+                  ratingTypeFilter === "all"
+                    ? "border-emerald-700 bg-emerald-700 text-white"
+                    : "border-slate-300 bg-slate-100 text-slate-700"
+                }`}
+              >
+                All Donors
+              </button>
             </div>
 
-            {/* Donor List */}
+            <input
+              type="text"
+              placeholder="Search donor by name, email or location..."
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-600"
+            />
+
             <div className="space-y-3">
-              {donors.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                  No donors match the current criteria.
+              {loading ? (
+                <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+                  Loading donors...
+                </div>
+              ) : filteredDonors.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+                  {error
+                    ? "Donor data load হয়নি। উপরের error message দেখো।"
+                    : "এই NGO-এর donation records-এ কোনো donor পাওয়া যায়নি।"}
                 </div>
               ) : (
-                donors.map((donor, index) => (
-                  <div 
-                    key={donor._id} 
-                    className="p-4 rounded-xl border border-slate-200 hover:border-emerald-400 hover:shadow-sm transition-all bg-white flex flex-wrap sm:flex-nowrap items-center justify-between gap-4"
+                filteredDonors.map((donor, index) => (
+                  <div
+                    key={donor._id}
+                    className={`flex flex-wrap items-center justify-between gap-4 rounded-xl border p-4 ${
+                      isDark
+                        ? "border-slate-700 bg-slate-800"
+                        : "border-slate-200 bg-white"
+                    }`}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-100 font-extrabold text-slate-700 flex items-center justify-center text-xs border border-slate-300 shrink-0">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-xs font-extrabold text-emerald-800">
                         #{index + 1}
                       </div>
 
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <button 
-                            onClick={() => setSelectedDonorDetail(donor)}
-                            className="font-extrabold text-sm text-emerald-700 hover:underline text-left block"
-                          >
-                            {donor.name}
-                          </button>
-                        </div>
-                        
-                        <p className="text-[11px] text-slate-600 font-semibold">{donor.location}</p>
-                        
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {donor.tags.map((tag, tIdx) => (
-                            <span 
-                              key={tIdx} 
-                              className={`text-[10px] px-2.5 py-1 rounded-md font-bold ${
-                                tag.toLowerCase().includes('late') || tag.toLowerCase().includes('cold') || tag.toLowerCase().includes('inconsistent')
-                                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                              }`}
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
+                      <div className="min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDonorDetail(donor)}
+                          className="break-words text-left text-sm font-extrabold text-emerald-700 hover:underline"
+                        >
+                          {donor.name}
+                        </button>
+
+                        <p className="mt-1 break-words text-xs text-slate-500">
+                          {donor.email || "Email not available"}
+                        </p>
+
+                        <p className="mt-1 break-words text-xs text-slate-500">
+                          {donor.location}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4 sm:flex-col sm:items-end sm:justify-center w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 justify-between">
-                      <div className="text-left sm:text-right">
-                        <div className="flex items-center gap-1">
-                          <span className="font-black text-slate-900 text-base">★ {donor.trustScore}</span>
-                          <span className="text-[10px] text-slate-500 font-bold">/ 5.0</span>
-                        </div>
-                        <p className="text-[10px] text-emerald-700 font-bold">{donor.totalDonations} Donations</p>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-sm font-bold">
+                          {donor.totalDonations} Donations
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Rating not calculated yet
+                        </p>
                       </div>
 
                       <button
-                        onClick={() => toggleFollow(donor._id)}
-                        className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
-                          donor.isFollowed
-                            ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300'
-                            : 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                        }`}
+                        type="button"
+                        onClick={() => setSelectedDonorDetail(donor)}
+                        className="rounded-lg border border-emerald-300 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50"
                       >
-                        {donor.isFollowed ? '- Unfollow' : '+ Follow'}
+                        Details
                       </button>
                     </div>
                   </div>
                 ))
               )}
             </div>
-
           </div>
-        </div>
+        </section>
 
-        {/* Pending Feedback Sidebar */}
-        <div className="col-span-12 lg:col-span-4 space-y-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            
-            <div className="border-b pb-3 border-slate-200">
-              <h3 className="font-extrabold text-sm tracking-wide text-slate-900">PENDING FEEDBACK</h3>
-              <p className="text-[10px] text-slate-500">Rate pickup quality to keep trust scores updated</p>
+        {/* Pending feedback */}
+        <aside className="col-span-12 space-y-4 lg:col-span-4">
+          <div className={`space-y-4 rounded-2xl border p-5 ${cardClass}`}>
+            <div className="border-b border-slate-200 pb-3">
+              <h3 className="text-sm font-extrabold tracking-wide">
+                PENDING FEEDBACK
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Completed donations eligible for review
+              </p>
             </div>
 
-            {pendingRatings.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                All completed deliveries have been reviewed.
+            {loading ? (
+              <p className="text-center text-sm text-slate-500">
+                Loading donations...
+              </p>
+            ) : pendingRatings.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-xs text-slate-500">
+                No completed donations found for feedback.
               </div>
             ) : (
               <div className="space-y-3">
                 {pendingRatings.map((item) => (
-                  <div key={item._id} className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
-                    <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-bold text-slate-500">{item.orderId}</span>
-                      <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
-                        Delivered
+                  <div
+                    key={item._id}
+                    className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3.5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="break-all text-[10px] font-bold text-slate-500">
+                        {item.orderId}
+                      </span>
+                      <span className="rounded-md bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800">
+                        Completed
                       </span>
                     </div>
 
-                    <div>
-                      <h5 className="font-extrabold text-slate-900 text-xs">{item.donorName || item.donor}</h5>
-                      <p className="text-[11px] text-slate-600 font-medium">{item.food}</p>
-                    </div>
+                    <h5 className="break-words text-xs font-extrabold text-slate-900">
+                      {item.donorName}
+                    </h5>
+
+                    <p className="text-xs text-slate-600">
+                      {item.food}
+                    </p>
 
                     <button
-                      onClick={() => setSelectedRatingItem(item)}
-                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold py-2 rounded-xl transition-all shadow-sm"
+                      type="button"
+                      onClick={() => {
+                        setError("");
+                        setSuccess("");
+                        setSelectedRatingItem(item);
+                      }}
+                      className="w-full rounded-xl bg-emerald-700 py-2 text-xs font-bold text-white hover:bg-emerald-800"
                     >
                       Rate This Donor
                     </button>
@@ -293,99 +546,119 @@ export default function TrustScore({ themeMode = 'light' }) {
                 ))}
               </div>
             )}
-
           </div>
-        </div>
-
+        </aside>
       </div>
 
-      {/* Donor Profile Details Modal */}
+      {/* Donor details modal */}
       {selectedDonorDetail && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4 border border-slate-200 text-slate-900">
-            <div className="flex justify-between items-center border-b pb-3 border-slate-200">
-              <div>
-                <h3 className="font-extrabold text-base text-slate-900">{selectedDonorDetail.name} Profile</h3>
-              </div>
-              <button onClick={() => setSelectedDonorDetail(null)} className="text-slate-500 hover:text-slate-900 font-bold text-lg">✕</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="max-h-[85vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="break-words text-base font-extrabold">
+                {selectedDonorDetail.name} — Donor Details
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedDonorDetail(null)}
+                className="px-2 text-lg font-bold text-slate-500"
+              >
+                ✕
+              </button>
             </div>
 
-            <div className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-2 bg-slate-100 p-3 rounded-xl border border-slate-200">
-                <p><strong className="text-slate-600">Location:</strong> {selectedDonorDetail.location}</p>
-                <p><strong className="text-slate-600">Trust Score:</strong> ★ {selectedDonorDetail.trustScore} / 5.0</p>
-                <p><strong className="text-slate-600">Total Donations:</strong> {selectedDonorDetail.totalDonations}</p>
-                <p><strong className="text-slate-600">Status:</strong> {selectedDonorDetail.isFollowed ? 'Following' : 'Not Followed'}</p>
-              </div>
-              
-              {selectedDonorDetail.recentImages && selectedDonorDetail.recentImages.length > 0 && (
-                <div>
-                  <strong className="text-slate-700 block mb-1">Recent Food Donation Proofs:</strong>
-                  <div className="flex gap-2">
-                    {selectedDonorDetail.recentImages.map((img, i) => (
-                      <img key={i} src={img} alt="Donation Proof" className="w-20 h-20 rounded-xl object-cover border border-slate-300" />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <strong className="text-slate-700 block mb-2">Community Feedback & Reviews:</strong>
-                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                  {selectedDonorDetail.reviews.map((rev, index) => (
-                    <div 
-                      key={rev._id || index} 
-                      className={`p-2.5 rounded-xl border text-[11px] space-y-1 ${
-                        rev.type === 'positive'
-                          ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                          : 'bg-rose-50 border-rose-200 text-rose-900'
-                      }`}
-                    >
-                      <div className="flex justify-between font-bold">
-                        <span>{rev.user}</span>
-                        <span>Rating: ★ {rev.rating}/5</span>
-                      </div>
-                      <p className="font-medium">{rev.comment}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <div className="grid grid-cols-1 gap-3 rounded-xl bg-slate-50 p-4 text-xs sm:grid-cols-2">
+              <p>
+                <strong>Location:</strong>{" "}
+                {selectedDonorDetail.location}
+              </p>
+              <p>
+                <strong>Email:</strong>{" "}
+                {selectedDonorDetail.email || "Not available"}
+              </p>
+              <p>
+                <strong>Total Donations:</strong>{" "}
+                {selectedDonorDetail.totalDonations}
+              </p>
             </div>
 
-            <button onClick={() => setSelectedDonorDetail(null)} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs">
+            <h4 className="text-sm font-extrabold">
+              Donation History
+            </h4>
+
+            <div className="space-y-2">
+              {selectedDonorDetail.donations.map((donation, index) => (
+                <div
+                  key={getId(donation) || index}
+                  className="rounded-xl border border-slate-200 p-3 text-xs"
+                >
+                  <p className="font-bold">
+                    {donation.foodName || "Food donation"}
+                  </p>
+                  <p className="mt-1 text-slate-500">
+                    ID: {getDonationId(donation)}
+                  </p>
+                  <p className="mt-1 text-slate-500">
+                    Status:{" "}
+                    {donation.pipelineStatus || donation.status || "Unknown"}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSelectedDonorDetail(null)}
+              className="w-full rounded-xl bg-slate-800 py-2.5 text-xs font-bold text-white hover:bg-slate-900"
+            >
               Close
             </button>
           </div>
         </div>
       )}
 
-      {/* Rating Modal */}
+      {/* Rating modal */}
       {selectedRatingItem && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4 border border-slate-200 text-slate-900">
-            
-            <div className="flex justify-between items-start border-b pb-3 border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3">
               <div>
-                <h3 className="font-extrabold text-base text-slate-900">Rate Donor Experience</h3>
-                <p className="text-xs text-slate-500 font-medium">Order #{selectedRatingItem.orderId} - {selectedRatingItem.donorName || selectedRatingItem.donor}</p>
+                <h3 className="text-base font-extrabold">
+                  Rate Donor Experience
+                </h3>
+                <p className="mt-1 break-words text-xs text-slate-500">
+                  {selectedRatingItem.donorName}
+                </p>
+                <p className="mt-1 break-all text-[10px] text-slate-500">
+                  Donation ID: {selectedRatingItem.orderId}
+                </p>
               </div>
-              <button onClick={() => setSelectedRatingItem(null)} className="text-slate-400 hover:text-slate-800 font-bold text-base">✕</button>
+
+              <button
+                type="button"
+                onClick={closeRatingModal}
+                disabled={submitting}
+                className="text-base font-bold text-slate-500 disabled:opacity-50"
+              >
+                ✕
+              </button>
             </div>
 
-            {/* Star Rating Selection */}
-            <div className="text-center space-y-2 py-2">
-              <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">SELECT SCORE RATING</label>
-              
-              <div className="flex justify-center items-center gap-2">
+            <div className="space-y-2 py-2 text-center">
+              <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                Select Rating
+              </label>
+
+              <div className="flex justify-center gap-2">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
                     type="button"
                     onClick={() => setUserStars(star)}
-                    className={`w-11 h-11 rounded-full border-2 text-lg font-bold flex items-center justify-center transition-all ${
-                      star <= userStars 
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm scale-105'
-                        : 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
+                    className={`flex h-10 w-10 items-center justify-center rounded-full border-2 text-lg ${
+                      star <= userStars
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-slate-300 bg-slate-100 text-slate-500"
                     }`}
                   >
                     ★
@@ -393,29 +666,33 @@ export default function TrustScore({ themeMode = 'light' }) {
                 ))}
               </div>
 
-              <div className="pt-1">
-                <span className="inline-block bg-emerald-50 text-emerald-800 border border-emerald-300 px-3 py-1 rounded-full text-xs font-bold">
-                  {getRatingLabel(userStars)}
-                </span>
-              </div>
+              <span className="inline-block rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">
+                {getRatingLabel(userStars)}
+              </span>
             </div>
 
-            {/* Highlight Feedback Buttons */}
             <div className="space-y-2">
-              <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">HIGHLIGHT FEEDBACK:</label>
-              <div className="flex flex-wrap gap-2 text-xs font-bold">
+              <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                Feedback Highlight
+              </label>
+
+              <div className="flex flex-wrap gap-2">
                 {[
-                  'Best Food Quality', 'Fresh Food', 'On Time Pickup', 
-                  'Delayed Pickup', 'Cold Food', 'Packaging Issue'
+                  "Best Food Quality",
+                  "Fresh Food",
+                  "On Time Pickup",
+                  "Delayed Pickup",
+                  "Cold Food",
+                  "Packaging Issue",
                 ].map((tag) => (
                   <button
                     key={tag}
                     type="button"
                     onClick={() => setSelectedTag(tag)}
-                    className={`px-3 py-1.5 rounded-xl border-2 transition-all ${
-                      selectedTag === tag 
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' 
-                        : 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200'
+                    className={`rounded-xl border px-3 py-1.5 text-xs font-bold ${
+                      selectedTag === tag
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-slate-300 bg-slate-100 text-slate-800"
                     }`}
                   >
                     {tag}
@@ -424,38 +701,43 @@ export default function TrustScore({ themeMode = 'light' }) {
               </div>
             </div>
 
-            {/* Detailed Review Textarea */}
             <div className="space-y-1">
-              <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">DETAILED REVIEW (OPTIONAL):</label>
+              <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                Detailed Review (Optional)
+              </label>
               <textarea
-                rows="3"
-                placeholder="Mention specific details about food condition, packaging, or timing..."
+                rows={3}
+                placeholder="Food quality, packaging or pickup experience..."
                 value={reviewComment}
-                onChange={(e) => setReviewComment(e.target.value)}
-                className="w-full text-xs p-3 border-2 rounded-xl bg-slate-50 border-slate-300 text-slate-900 font-semibold focus:outline-none focus:border-emerald-600 resize-none placeholder:text-slate-400"
+                onChange={(event) => setReviewComment(event.target.value)}
+                className="w-full resize-none rounded-xl border border-slate-300 bg-slate-50 p-3 text-xs text-slate-900 outline-none focus:border-emerald-600"
               />
             </div>
 
-            {/* Submit & Cancel Buttons */}
             <div className="flex gap-3 pt-2">
               <button
+                type="button"
                 onClick={handleRatingSubmit}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 rounded-xl text-xs transition-all shadow-md"
+                disabled={submitting}
+                className="flex-1 rounded-xl bg-emerald-600 py-3 text-xs font-extrabold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Submit Feedback
+                {submitting ? "Submitting..." : "Submit Feedback"}
               </button>
+
               <button
-                onClick={() => setSelectedRatingItem(null)}
-                className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-extrabold px-5 py-3 rounded-xl text-xs transition-colors"
+                type="button"
+                onClick={closeRatingModal}
+                disabled={submitting}
+                className="rounded-xl bg-slate-200 px-5 py-3 text-xs font-extrabold text-slate-800 disabled:opacity-50"
               >
                 Cancel
               </button>
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
-}
+};
+
+export default TrustScore;

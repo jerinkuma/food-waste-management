@@ -8,6 +8,7 @@ import {
   fetchFollowers,
   followPartner,
   unfollowPartner,
+  fetchNgoDonations,
 } from '../../../services/api';
 import './Partners.css';
 
@@ -25,23 +26,82 @@ export default function Partners() {
   const [suggestions, setSuggestions] = useState([]);
   const [following, setFollowing] = useState([]);
   const [followers, setFollowers] = useState([]);
+  const [donationPartners, setDonationPartners] = useState([]);
+  const [partnersError, setPartnersError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
 
   const loadAll = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+    setPartnersError("");
+
     try {
-      const [sugg, follows, backers] = await Promise.all([
-        fetchSuggestedPartners(user.id, user.role),
-        fetchFollowing(user.id),
-        fetchFollowers(user.id),
-      ]);
-      setSuggestions(sugg);
-      setFollowing(follows);
-      setFollowers(backers);
+      const [sugg, follows, backers, donationResult] =
+        await Promise.all([
+          fetchSuggestedPartners(user.id, user.role),
+          fetchFollowing(user.id),
+          fetchFollowers(user.id),
+          user.role === "ngo"
+            ? fetchNgoDonations(user.id)
+            : Promise.resolve({ donations: [] }),
+        ]);
+
+      setSuggestions(sugg || []);
+      setFollowing(follows || []);
+      setFollowers(backers || []);
+
+      // NGO যেসব donation request করেছে, সেগুলোর donor/restaurant
+      const donations = donationResult?.donations || [];
+
+      const uniquePartners = new Map();
+
+      donations.forEach((donation) => {
+        const donor = donation?.donor;
+
+        // Donor অবশ্যই populated User object হতে হবে
+        if (!donor || typeof donor !== "object" || !donor._id) {
+          return;
+        }
+
+        const donorId = String(donor._id);
+
+        if (!uniquePartners.has(donorId)) {
+          uniquePartners.set(donorId, {
+            userId: donorId,
+            name: donor.name || "Restaurant",
+            email: donor.email || "",
+            role: donor.role || "donor",
+            address:
+              donation.restaurantAddress ||
+              donation.pickupAddress ||
+              "",
+            donationCount: 1,
+            latestDonation: donation.foodName || "",
+          });
+        } else {
+          const partner = uniquePartners.get(donorId);
+          partner.donationCount += 1;
+
+          if (!partner.latestDonation && donation.foodName) {
+            partner.latestDonation = donation.foodName;
+          }
+        }
+      });
+
+      setDonationPartners(
+        Array.from(uniquePartners.values())
+      );
     } catch (error) {
-      console.error('Error loading partners:', error);
+      console.error("Error loading partners:", error);
+      setPartnersError(
+        error?.response?.data?.message ||
+        "Could not load donation partners."
+      );
     } finally {
       setLoading(false);
     }
@@ -138,6 +198,10 @@ export default function Partners() {
           </button>
         </div>
       </div>
+
+
+     
+
 
       {loading ? (
         <div className="pt-empty">Loading partners...</div>

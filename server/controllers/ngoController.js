@@ -1,27 +1,72 @@
 const Ngo = require("../models/Ngo");
 const Donation = require("../models/Donation");
+const jwt = require("jsonwebtoken");
 
 const getNgoProfile = async (req, res) => {
   try {
-    // যেহেতু মিডলওয়্যার নেই, তাই সরাসরি ডাটাবেজ থেকে প্রথম এনজিওটি নিয়ে নেব (অথবা ডামি ডেটা)
-    let ngo = await Ngo.findOne().populate("user", "name email role");
-    
-    if (!ngo) {
-      // যদি ডাটাবেজে কোনো এনজিও না থাকে, তবে একটি ডামি রেসপন্স দেবো যাতে সাইট ক্র্যাশ না করে
-      return res.status(200).json({
-        success: true,
-        ngo: {
-          name: "Shifat NGO Portal",
-          email: "shifat@example.com",
-          role: "ngo",
-          trustScore: 4.8
-        }
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        success: false,
+        message: "Authorization token missing",
       });
     }
 
-    res.status(200).json({ success: true, ngo });
+    const token = authHeader.split(" ")[1];
+
+    let decoded;
+
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (error) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired token",
+      });
+    }
+
+    const userId = decoded.id || decoded.userId || decoded._id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User ID not found in token",
+      });
+    }
+
+    // Find NGO belonging to the logged-in user
+    const ngo = await Ngo.findOne({ user: userId }).populate(
+      "user",
+      "name fullName email role"
+    );
+
+    if (!ngo) {
+      return res.status(404).json({
+        success: false,
+        message: "NGO profile not found for this account",
+      });
+    }
+
+    console.log("FETCH NGO DETAILS:", {
+      mongoId: ngo._id.toString(),
+      userId: ngo.user?._id?.toString(),
+      organizationId: ngo.organizationId,
+    });
+
+    return res.status(200).json({
+      success: true,
+      ngo,
+    });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: "Server error", error: error.message });
+    console.error("Get NGO Profile Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching NGO profile",
+      error: error.message,
+    });
   }
 };
 

@@ -11,7 +11,10 @@ const getRestaurantProfile = async (req, res) => {
 
     const restaurant = await Restaurant.findOne({
       user: userId,
-    }).populate("user", "name email role createdAt");
+    }).populate(
+      "user",
+      "name email role createdAt"
+    );
 
     if (!restaurant) {
       return res.status(404).json({
@@ -31,12 +34,33 @@ const getRestaurantProfile = async (req, res) => {
         phone: restaurant.phone,
         address: restaurant.address,
         tradeLicense: restaurant.tradeLicense,
-        profileImage: restaurant.profileImage || "",
-        createdAt: restaurant.user.createdAt,
+
+        // =====================================
+        // RESTAURANT LOCATION
+        // =====================================
+
+        location: {
+          latitude:
+            restaurant.location?.latitude ??
+            null,
+
+          longitude:
+            restaurant.location?.longitude ??
+            null,
+        },
+
+        profileImage:
+          restaurant.profileImage || "",
+
+        createdAt:
+          restaurant.user.createdAt,
       },
     });
   } catch (error) {
-    console.error("Get Restaurant Profile Error:", error);
+    console.error(
+      "Get Restaurant Profile Error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -50,7 +74,10 @@ const getRestaurantProfile = async (req, res) => {
 // UPDATE RESTAURANT PROFILE
 // =====================================
 
-const updateRestaurantProfile = async (req, res) => {
+const updateRestaurantProfile = async (
+  req,
+  res
+) => {
   try {
     const userId = req.params.userId;
 
@@ -59,20 +86,25 @@ const updateRestaurantProfile = async (req, res) => {
       phone,
       tradeLicense,
       address,
+      latitude,
+      longitude,
     } = req.body;
 
-    const restaurant = await Restaurant.findOne({
-      user: userId,
-    });
+    const restaurant =
+      await Restaurant.findOne({
+        user: userId,
+      });
 
     if (!restaurant) {
       return res.status(404).json({
         success: false,
-        message: "Restaurant profile not found",
+        message:
+          "Restaurant profile not found",
       });
     }
 
-    const user = await User.findById(userId);
+    const user =
+      await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({
@@ -81,26 +113,64 @@ const updateRestaurantProfile = async (req, res) => {
       });
     }
 
-    // Update user name
+    // =====================================
+    // UPDATE USER NAME
+    // =====================================
+
     if (name && name.trim()) {
       user.name = name.trim();
+
       await user.save();
     }
 
-    // Update restaurant information
+    // =====================================
+    // UPDATE RESTAURANT INFORMATION
+    // =====================================
+
     if (phone !== undefined) {
-      restaurant.phone = phone.trim();
+      restaurant.phone =
+        phone.trim();
     }
 
     if (tradeLicense !== undefined) {
-      restaurant.tradeLicense = tradeLicense.trim();
+      restaurant.tradeLicense =
+        tradeLicense.trim();
     }
 
     if (address !== undefined) {
-      restaurant.address = address.trim();
+      restaurant.address =
+        address.trim();
     }
 
-    // Save uploaded profile image
+    // =====================================
+    // UPDATE LOCATION
+    // =====================================
+
+    if (
+      latitude !== undefined &&
+      longitude !== undefined
+    ) {
+      const parsedLatitude =
+        Number(latitude);
+
+      const parsedLongitude =
+        Number(longitude);
+
+      if (
+        !Number.isNaN(parsedLatitude) &&
+        !Number.isNaN(parsedLongitude)
+      ) {
+        restaurant.location = {
+          latitude: parsedLatitude,
+          longitude: parsedLongitude,
+        };
+      }
+    }
+
+    // =====================================
+    // SAVE PROFILE IMAGE
+    // =====================================
+
     if (req.file) {
       restaurant.profileImage =
         `/uploads/profiles/${req.file.filename}`;
@@ -108,7 +178,10 @@ const updateRestaurantProfile = async (req, res) => {
 
     await restaurant.save();
 
-    // Get updated profile
+    // =====================================
+    // GET UPDATED PROFILE
+    // =====================================
+
     const updatedRestaurant =
       await Restaurant.findById(
         restaurant._id
@@ -119,19 +192,54 @@ const updateRestaurantProfile = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Restaurant profile updated successfully.",
+
+      message:
+        "Restaurant profile updated successfully.",
+
       restaurant: {
         id: updatedRestaurant._id,
-        userId: updatedRestaurant.user._id,
-        name: updatedRestaurant.user.name,
-        email: updatedRestaurant.user.email,
-        role: updatedRestaurant.user.role,
-        phone: updatedRestaurant.phone,
-        address: updatedRestaurant.address,
-        tradeLicense: updatedRestaurant.tradeLicense,
+
+        userId:
+          updatedRestaurant.user._id,
+
+        name:
+          updatedRestaurant.user.name,
+
+        email:
+          updatedRestaurant.user.email,
+
+        role:
+          updatedRestaurant.user.role,
+
+        phone:
+          updatedRestaurant.phone,
+
+        address:
+          updatedRestaurant.address,
+
+        tradeLicense:
+          updatedRestaurant.tradeLicense,
+
+        // =====================================
+        // LOCATION
+        // =====================================
+
+        location: {
+          latitude:
+            updatedRestaurant.location
+              ?.latitude ?? null,
+
+          longitude:
+            updatedRestaurant.location
+              ?.longitude ?? null,
+        },
+
         profileImage:
-          updatedRestaurant.profileImage || "",
-        createdAt: updatedRestaurant.user.createdAt,
+          updatedRestaurant.profileImage ||
+          "",
+
+        createdAt:
+          updatedRestaurant.user.createdAt,
       },
     });
   } catch (error) {
@@ -142,12 +250,19 @@ const updateRestaurantProfile = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Failed to update restaurant profile.",
+
+      message:
+        "Failed to update restaurant profile.",
+
       error: error.message,
     });
   }
 };
 
+
+// =====================================
+// EXPORT
+// =====================================
 
 module.exports = {
   getRestaurantProfile,

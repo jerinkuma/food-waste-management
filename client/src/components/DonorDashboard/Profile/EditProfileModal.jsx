@@ -4,6 +4,8 @@ import {
   Camera,
   Loader2,
   Store,
+  MapPin,
+  Navigation,
 } from "lucide-react";
 
 const EditProfileModal = ({
@@ -14,9 +16,13 @@ const EditProfileModal = ({
 }) => {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [tradeLicense, setTradeLicense] =
-    useState("");
+  const [tradeLicense, setTradeLicense] = useState("");
   const [address, setAddress] = useState("");
+
+  // Restaurant location
+  const [latitude, setLatitude] = useState(null);
+  const [longitude, setLongitude] = useState(null);
+  const [gettingLocation, setGettingLocation] = useState(false);
 
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState("");
@@ -32,12 +38,11 @@ const EditProfileModal = ({
     if (profile && isOpen) {
       setName(profile.name || "");
       setPhone(profile.phone || "");
-
-      setTradeLicense(
-        profile.tradeLicense || ""
-      );
-
+      setTradeLicense(profile.tradeLicense || "");
       setAddress(profile.address || "");
+
+      setLatitude(profile.location?.latitude ?? null);
+      setLongitude(profile.location?.longitude ?? null);
 
       setImage(null);
 
@@ -60,8 +65,7 @@ const EditProfileModal = ({
   // =====================================
 
   const handleImageChange = (e) => {
-    const selectedFile =
-      e.target.files?.[0];
+    const selectedFile = e.target.files?.[0];
 
     if (!selectedFile) {
       return;
@@ -74,36 +78,80 @@ const EditProfileModal = ({
       "image/webp",
     ];
 
-    if (
-      !allowedTypes.includes(
-        selectedFile.type
-      )
-    ) {
+    if (!allowedTypes.includes(selectedFile.type)) {
       setError(
         "Please select a JPG, JPEG, PNG or WEBP image."
       );
       return;
     }
 
-    if (
-      selectedFile.size >
-      5 * 1024 * 1024
-    ) {
-      setError(
-        "Image size must be less than 5 MB."
-      );
+    if (selectedFile.size > 5 * 1024 * 1024) {
+      setError("Image size must be less than 5 MB.");
       return;
     }
 
     setError("");
     setImage(selectedFile);
 
-    const imagePreview =
-      URL.createObjectURL(
-        selectedFile
-      );
-
+    const imagePreview = URL.createObjectURL(selectedFile);
     setPreview(imagePreview);
+  };
+
+  // =====================================
+  // GET CURRENT RESTAURANT LOCATION
+  // =====================================
+
+  const handleGetLocation = () => {
+    setError("");
+
+    if (!navigator.geolocation) {
+      setError(
+        "Geolocation is not supported by your browser."
+      );
+      return;
+    }
+
+    setGettingLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        setLatitude(lat);
+        setLongitude(lng);
+
+        setGettingLocation(false);
+      },
+      (locationError) => {
+        console.error(
+          "Location error:",
+          locationError
+        );
+
+        let message =
+          "Unable to get your current location.";
+
+        if (locationError.code === 1) {
+          message =
+            "Location permission was denied. Please allow location access in your browser.";
+        } else if (locationError.code === 2) {
+          message =
+            "Your location could not be determined. Please try again.";
+        } else if (locationError.code === 3) {
+          message =
+            "Location request timed out. Please try again.";
+        }
+
+        setError(message);
+        setGettingLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
   };
 
   // =====================================
@@ -114,36 +162,27 @@ const EditProfileModal = ({
     setError("");
 
     if (!name.trim()) {
-      setError(
-        "Restaurant name is required."
-      );
+      setError("Restaurant name is required.");
       return;
     }
 
     if (!phone.trim()) {
-      setError(
-        "Phone number is required."
-      );
+      setError("Phone number is required.");
       return;
     }
 
     if (!tradeLicense.trim()) {
-      setError(
-        "Trade license number is required."
-      );
+      setError("Trade license number is required.");
       return;
     }
 
     if (!address.trim()) {
-      setError(
-        "Address is required."
-      );
+      setError("Address is required.");
       return;
     }
 
     try {
-      const userData =
-        localStorage.getItem("user");
+      const userData = localStorage.getItem("user");
 
       const user = userData
         ? JSON.parse(userData)
@@ -158,34 +197,37 @@ const EditProfileModal = ({
 
       setSaving(true);
 
-      const formData =
-        new FormData();
+      const formData = new FormData();
 
-      formData.append(
-        "name",
-        name.trim()
-      );
-
-      formData.append(
-        "phone",
-        phone.trim()
-      );
-
+      formData.append("name", name.trim());
+      formData.append("phone", phone.trim());
       formData.append(
         "tradeLicense",
         tradeLicense.trim()
       );
+      formData.append("address", address.trim());
 
-      formData.append(
-        "address",
-        address.trim()
-      );
+      // =====================================
+      // SEND LOCATION
+      // =====================================
+
+      if (
+        latitude !== null &&
+        longitude !== null
+      ) {
+        formData.append(
+          "latitude",
+          latitude.toString()
+        );
+
+        formData.append(
+          "longitude",
+          longitude.toString()
+        );
+      }
 
       if (image) {
-        formData.append(
-          "profileImage",
-          image
-        );
+        formData.append("profileImage", image);
       }
 
       const response = await fetch(
@@ -196,8 +238,7 @@ const EditProfileModal = ({
         }
       );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -233,7 +274,6 @@ const EditProfileModal = ({
 
       // Close modal
       onClose();
-
     } catch (error) {
       console.error(
         "Profile update error:",
@@ -244,7 +284,6 @@ const EditProfileModal = ({
         error.message ||
           "Failed to update profile."
       );
-
     } finally {
       setSaving(false);
     }
@@ -252,12 +291,10 @@ const EditProfileModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
 
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
-
           <h2 className="text-2xl font-bold text-gray-900">
             Edit Profile
           </h2>
@@ -269,16 +306,12 @@ const EditProfileModal = ({
           >
             <X size={22} />
           </button>
-
         </div>
 
         {/* Profile Image */}
         <div className="mb-7 flex flex-col items-center">
-
           <div className="relative">
-
             <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-green-100 bg-green-100">
-
               {preview ? (
                 <img
                   src={preview}
@@ -291,25 +324,19 @@ const EditProfileModal = ({
                   className="text-green-700"
                 />
               )}
-
             </div>
 
             {/* Camera Button */}
             <label className="absolute bottom-0 right-0 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-green-600 text-white shadow-lg transition hover:bg-green-700">
-
               <Camera size={18} />
 
               <input
                 type="file"
                 accept="image/jpeg,image/jpg,image/png,image/webp"
-                onChange={
-                  handleImageChange
-                }
+                onChange={handleImageChange}
                 className="hidden"
               />
-
             </label>
-
           </div>
 
           <p className="mt-3 text-center text-sm text-gray-500">
@@ -319,7 +346,6 @@ const EditProfileModal = ({
           <p className="mt-1 text-xs text-gray-400">
             JPG, PNG or WEBP • Maximum 5 MB
           </p>
-
         </div>
 
         {/* Error */}
@@ -392,19 +418,83 @@ const EditProfileModal = ({
               rows={3}
               value={address}
               onChange={(e) =>
-                setAddress(
-                  e.target.value
-                )
+                setAddress(e.target.value)
               }
               className="w-full resize-none rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-green-500"
             />
           </div>
 
+          {/* Restaurant Location */}
+          <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-green-100 p-2">
+                <MapPin
+                  size={20}
+                  className="text-green-700"
+                />
+              </div>
+
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">
+                  Restaurant Location
+                </h3>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  Save your current location so delivery
+                  distance and estimated arrival can be
+                  calculated.
+                </p>
+
+                {latitude !== null &&
+                  longitude !== null && (
+                    <div className="mt-3 rounded-xl bg-white px-3 py-2 text-xs text-gray-600">
+                      <div>
+                        Latitude:{" "}
+                        <span className="font-medium text-gray-800">
+                          {latitude.toFixed(6)}
+                        </span>
+                      </div>
+
+                      <div className="mt-1">
+                        Longitude:{" "}
+                        <span className="font-medium text-gray-800">
+                          {longitude.toFixed(6)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                <button
+                  type="button"
+                  onClick={handleGetLocation}
+                  disabled={gettingLocation || saving}
+                  className="mt-3 flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {gettingLocation ? (
+                    <>
+                      <Loader2
+                        size={17}
+                        className="animate-spin"
+                      />
+                      Getting Location...
+                    </>
+                  ) : (
+                    <>
+                      <Navigation size={17} />
+                      {latitude !== null &&
+                      longitude !== null
+                        ? "Update Current Location"
+                        : "Use Current Location"}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Buttons */}
         <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-4">
-
           <button
             onClick={onClose}
             disabled={saving}
@@ -418,24 +508,19 @@ const EditProfileModal = ({
             disabled={saving}
             className="flex items-center justify-center gap-2 rounded-xl bg-green-600 px-6 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-
             {saving ? (
               <>
                 <Loader2
                   size={18}
                   className="animate-spin"
                 />
-
                 Saving...
               </>
             ) : (
               "Save Changes"
             )}
-
           </button>
-
         </div>
-
       </div>
     </div>
   );

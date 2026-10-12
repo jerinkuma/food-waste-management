@@ -7,7 +7,40 @@ import {
   Target,
 } from "lucide-react";
 
-const EnvironmentalImpact = () => {
+const EnvironmentalImpact = ({
+  carbonPrevented = null,
+  foodWasteDiverted = 0,
+  mealsServed = 0,
+  treesEquivalent = null,
+  waterSaved = 0,
+  annualGoal = 0,
+}) => {
+  // Format numbers for display
+  const formatNumber = (value) => {
+    const number = Number(value || 0);
+
+    return number.toLocaleString();
+  };
+
+  // Carbon and trees are not currently calculated
+  // by the backend, so we don't invent values here.
+  const carbonValue =
+    carbonPrevented !== null &&
+    carbonPrevented !== undefined
+      ? `${Number(carbonPrevented).toLocaleString()} KG`
+      : "N/A";
+
+  const treesValue =
+    treesEquivalent !== null &&
+    treesEquivalent !== undefined
+      ? `${Number(treesEquivalent).toLocaleString()} Trees`
+      : "N/A";
+
+  const goalValue = Math.min(
+    Math.max(Number(annualGoal) || 0, 0),
+    100
+  );
+
   return (
     <div className="environmental-impact rounded-3xl border border-gray-200 bg-white p-4 shadow-sm transition-colors duration-300 sm:p-6 lg:p-7">
       
@@ -46,7 +79,7 @@ const EnvironmentalImpact = () => {
           </p>
 
           <h3 className="mt-1 text-lg font-bold text-gray-800 sm:mt-2 sm:text-2xl">
-            2.3 Tons
+            {carbonValue}
           </h3>
         </div>
 
@@ -62,7 +95,7 @@ const EnvironmentalImpact = () => {
           </p>
 
           <h3 className="mt-1 text-lg font-bold text-gray-800 sm:mt-2 sm:text-2xl">
-            512 KG
+            {formatNumber(foodWasteDiverted)} KG
           </h3>
         </div>
 
@@ -78,7 +111,7 @@ const EnvironmentalImpact = () => {
           </p>
 
           <h3 className="mt-1 text-lg font-bold text-gray-800 sm:mt-2 sm:text-2xl">
-            3,240
+            {formatNumber(mealsServed)}
           </h3>
         </div>
 
@@ -94,7 +127,7 @@ const EnvironmentalImpact = () => {
           </p>
 
           <h3 className="mt-1 text-lg font-bold text-gray-800 sm:mt-2 sm:text-2xl">
-            108 Trees
+            {treesValue}
           </h3>
         </div>
 
@@ -110,7 +143,7 @@ const EnvironmentalImpact = () => {
           </p>
 
           <h3 className="mt-1 text-lg font-bold text-gray-800 sm:mt-2 sm:text-2xl">
-            8,450 L
+            {formatNumber(waterSaved)} L
           </h3>
         </div>
 
@@ -126,7 +159,7 @@ const EnvironmentalImpact = () => {
           </p>
 
           <h3 className="mt-1 text-lg font-bold text-gray-800 sm:mt-2 sm:text-2xl">
-            72%
+            {goalValue}%
           </h3>
         </div>
 
@@ -142,7 +175,7 @@ const EnvironmentalImpact = () => {
           </span>
 
           <span className="shrink-0 font-bold text-green-600">
-            72%
+            {goalValue}%
           </span>
 
         </div>
@@ -151,7 +184,9 @@ const EnvironmentalImpact = () => {
 
           <div
             className="h-full rounded-full bg-green-500 transition-all duration-500"
-            style={{ width: "72%" }}
+            style={{
+              width: `${goalValue}%`,
+            }}
           />
 
         </div>

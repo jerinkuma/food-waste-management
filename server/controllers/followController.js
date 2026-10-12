@@ -119,47 +119,96 @@ const getFollowers = async (req, res) => {
 // SUGGESTED PARTNERS (opposite role, not yet followed)
 // GET /api/follow/suggestions/:userId?role=ngo|donor
 // =====================================
+
 const getSuggestedPartners = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { role } = req.query; // role of the requesting user
+    const { role } = req.query;
 
-    const alreadyFollowing = await Follow.find({ follower: userId }).distinct("following");
-    const excludeIds = [...alreadyFollowing, userId];
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required.",
+      });
+    }
+
+    if (!["ngo", "donor"].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user role.",
+      });
+    }
+
+    // Users the current user already follows
+    const alreadyFollowing = await Follow.find({
+      follower: userId,
+    }).distinct("following");
+
+    const excludeIds = [
+      userId,
+      ...alreadyFollowing.map((id) => String(id)),
+    ];
 
     let suggestions = [];
 
     if (role === "ngo") {
-      const restaurants = await Restaurant.find({ user: { $nin: excludeIds } }).populate(
-        "user",
-        "name email role"
-      );
-      suggestions = restaurants.map((r) => ({
-        userId: r.user._id,
-        name: r.user.name,
-        role: "donor",
-        address: r.address,
-        profileImage: r.profileImage,
-        followerCount: r.followerCount,
-      }));
+      // NGOs discover restaurants
+      const restaurants = await Restaurant.find({
+        user: {
+          $nin: excludeIds,
+          $ne: null,
+        },
+      }).populate("user", "name email role");
+
+      suggestions = restaurants
+        .filter((restaurant) => restaurant.user?._id)
+        .map((restaurant) => ({
+          userId: restaurant.user._id.toString(),
+          name: restaurant.user.name || "Restaurant",
+          email: restaurant.user.email || "",
+          role: "donor",
+          address: restaurant.address || "",
+          profileImage: restaurant.profileImage || "",
+          followerCount: restaurant.followerCount || 0,
+        }));
     } else {
-      const ngos = await Ngo.find({ user: { $nin: excludeIds } }).populate("user", "name email role");
-      suggestions = ngos.map((n) => ({
-        userId: n.user._id,
-        name: n.user.name,
-        role: "ngo",
-        address: n.address,
-        organizationId: n.organizationId,
-        followerCount: n.followerCount,
-      }));
+      // Restaurants/donors discover NGOs
+      const ngos = await Ngo.find({
+        user: {
+          $nin: excludeIds,
+          $ne: null,
+        },
+      }).populate("user", "name email role");
+
+      suggestions = ngos
+        .filter((ngo) => ngo.user?._id)
+        .map((ngo) => ({
+          userId: ngo.user._id.toString(),
+          name: ngo.user.name || "NGO",
+          email: ngo.user.email || "",
+          role: "ngo",
+          address: ngo.address || "",
+          organizationId: ngo.organizationId || "",
+          followerCount: ngo.followerCount || 0,
+        }));
     }
 
-    return res.status(200).json({ success: true, count: suggestions.length, suggestions });
+    return res.status(200).json({
+      success: true,
+      count: suggestions.length,
+      suggestions,
+    });
   } catch (error) {
     console.error("Get suggested partners error:", error);
-    return res.status(500).json({ success: false, message: "Failed to load suggestions.", error: error.message });
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load suggestions.",
+      error: error.message,
+    });
   }
 };
+
 
 module.exports = {
   followUser,
