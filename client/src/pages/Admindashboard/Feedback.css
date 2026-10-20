@@ -5,3 +5,134 @@
 .feedback-header .rating { color: #f9b042; font-weight: 600; }
 .feedback-item p { font-size: 14px; color: #1a2a3a; }
 .feedback-item .time { color: #5f7f90; font-size: 12px; }
+
+
+.feedback-summary {
+  margin: 20px 0;
+}
+
+.feedback-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 320px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #edf3f8;
+  border-radius: 16px;
+}
+
+.feedback-summary-card span,
+.feedback-summary-card small,
+.feedback-results {
+  color: #5f7f90;
+  font-size: 13px;
+}
+
+.feedback-summary-card strong {
+  color: #1b5e20;
+  font-size: 30px;
+}
+
+.feedback-toolbar {
+  margin-bottom: 16px;
+}
+
+.feedback-toolbar .search-input {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 440px;
+  padding: 11px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  outline: none;
+}
+
+.feedback-toolbar .search-input:focus {
+  border-color: #2e7d32;
+  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
+}
+
+.feedback-results {
+  margin: 0 0 12px;
+}
+
+.feedback-list {
+  overflow: hidden;
+  background: white;
+  border: 1px solid #edf3f8;
+  border-radius: 16px;
+}
+
+.feedback-item {
+  padding: 18px 20px;
+  border-bottom: 1px solid #f0f5fa;
+}
+
+.feedback-item:last-child {
+  border-bottom: none;
+}
+
+.feedback-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.feedback-header strong {
+  overflow-wrap: anywhere;
+  color: #1a2a3a;
+}
+
+.feedback-header .rating {
+  flex-shrink: 0;
+  color: #c48616;
+  font-weight: 600;
+}
+
+.feedback-item p {
+  margin: 0 0 10px;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.feedback-item .time {
+  color: #5f7f90;
+  font-size: 12px;
+}
+
+.feedback-state {
+  padding: 28px 20px;
+  color: #64748b;
+  text-align: center;
+}
+
+.feedback-error {
+  color: #b91c1c;
+}
+
+.feedback-error button {
+  margin-top: 10px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #1b5e20;
+  color: white;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .feedback-item {
+    padding: 15px;
+  }
+
+  .feedback-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+}

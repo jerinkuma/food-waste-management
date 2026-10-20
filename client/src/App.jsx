@@ -199,13 +199,24 @@ function NGOLayout({
 // Admin Layout
 // =========================
 
+
+
 function AdminLayout() {
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
   return (
     <div className="app">
-      <AdminNavbar />
+      <AdminNavbar
+        onMenuClick={() =>
+          setMobileSidebarOpen((previous) => !previous)
+        }
+      />
 
       <div className="main-wrapper">
-        <AdminSidebar />
+        <AdminSidebar
+          mobileOpen={mobileSidebarOpen}
+          onClose={() => setMobileSidebarOpen(false)}
+        />
 
         <div className="content">
           <Routes>
@@ -261,6 +272,8 @@ function AdminLayout() {
     </div>
   );
 }
+
+
 
 // =========================
 // Main App

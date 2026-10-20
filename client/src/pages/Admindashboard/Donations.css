@@ -10,3 +10,97 @@
 .badge.delivered { background: #e2f3e6; color: #1e6f4a; }
 .badge.rejected { background: #fde8e8; color: #b34141; }
 .badge.pending { background: #fff4d6; color: #9e7a2c; }
+
+
+
+.donation-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.donation-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid #e2e8e4;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.donation-summary-label {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.donation-summary-card strong {
+  color: #1b5e20;
+  font-size: 30px;
+}
+
+.donation-summary-note,
+.donation-results {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.donation-toolbar {
+  margin-bottom: 16px;
+}
+
+.donation-toolbar .search-input {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 420px;
+  padding: 11px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  outline: none;
+}
+
+.donation-toolbar .search-input:focus {
+  border-color: #2e7d32;
+  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
+}
+
+.donation-results {
+  margin: 0 0 12px;
+}
+
+.donation-message,
+.donation-empty {
+  padding: 24px;
+  color: #64748b;
+  text-align: center;
+}
+
+.donation-error {
+  padding: 20px;
+  color: #b91c1c;
+}
+
+.donation-error button {
+  margin-top: 10px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #1b5e20;
+  color: #fff;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .donation-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  .table-wrap table {
+    min-width: 650px;
+  }
+}

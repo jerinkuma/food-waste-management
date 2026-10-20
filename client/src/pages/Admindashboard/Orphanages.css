@@ -7,3 +7,87 @@
 .badge.accepted { background: #d6eaff; color: #1a5a8a; }
 .badge.rejected { background: #fde8e8; color: #b34141; }
 .badge.pending { background: #fff4d6; color: #9e7a2c; }
+
+
+
+.ngo-summary {
+  margin: 20px 0;
+}
+
+.ngo-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 320px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #e2e8e4;
+  border-radius: 14px;
+}
+
+.ngo-summary-card span,
+.ngo-summary-card small,
+.ngo-results {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.ngo-summary-card strong {
+  color: #1b5e20;
+  font-size: 30px;
+}
+
+.ngo-toolbar {
+  margin-bottom: 16px;
+}
+
+.ngo-toolbar .search-input {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 420px;
+  padding: 11px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  outline: none;
+}
+
+.ngo-toolbar .search-input:focus {
+  border-color: #2e7d32;
+  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
+}
+
+.ngo-results {
+  margin-bottom: 12px;
+}
+
+.ngo-message,
+.ngo-empty {
+  padding: 24px;
+  color: #64748b;
+  text-align: center;
+}
+
+.ngo-error {
+  padding: 20px;
+  color: #b91c1c;
+}
+
+.ngo-error button {
+  margin-top: 10px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #1b5e20;
+  color: #fff;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  .table-wrap table {
+    min-width: 900px;
+  }
+}

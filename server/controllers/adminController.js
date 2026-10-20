@@ -9,43 +9,103 @@ const { getIO, rooms } = require("../utils/socket");
 // GET ALL USERS (merged Restaurant + NGO + plain User profiles)
 // Replaces the previously hardcoded fetchUsers() mock array.
 // =====================================
+
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().sort({ createdAt: -1 });
+    // Only donor accounts; exclude NGO and admin
+    const users = await User.find({ role: "donor" })
+      .select("-password")
+      .sort({ createdAt: -1 })
+      .lean();
 
-    const restaurants = await Restaurant.find();
-    const ngos = await Ngo.find();
+    const userIds = users.map((user) => user._id);
 
-    const restaurantByUser = new Map(restaurants.map((r) => [r.user.toString(), r]));
-    const ngoByUser = new Map(ngos.map((n) => [n.user.toString(), n]));
+    // Fetch restaurant profiles belonging to these donors
+    const restaurants = await Restaurant.find({
+      user: { $in: userIds },
+    }).lean();
 
-    const merged = users.map((u) => {
-      const base = {
-        id: u._id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        createdAt: u.createdAt,
-        status: u.status || "Active",
+    const restaurantByUser = new Map(
+      restaurants.map((restaurant) => [
+        String(restaurant.user),
+        restaurant,
+      ])
+    );
+
+    const donors = users.map((user) => {
+      const restaurant = restaurantByUser.get(String(user._id));
+
+      return {
+        id: String(user._id),
+        name: user.name || "N/A",
+        email: user.email || "N/A",
+        role: user.role,
+        status: user.status || "Active",
+        createdAt: user.createdAt || null,
+        location: restaurant?.address || "Not provided",
+        phone: restaurant?.phone || "Not provided",
+        tradeLicense: restaurant?.tradeLicense || "Not provided",
       };
-
-      const r = restaurantByUser.get(u._id.toString());
-      if (r) {
-        return { ...base, location: r.address, phone: r.phone, followerCount: r.followerCount, followingCount: r.followingCount };
-      }
-
-      const n = ngoByUser.get(u._id.toString());
-      if (n) {
-        return { ...base, location: n.address, phone: n.phone, organizationId: n.organizationId, followerCount: n.followerCount, followingCount: n.followingCount };
-      }
-
-      return base;
     });
 
-    return res.status(200).json({ success: true, count: merged.length, users: merged });
+    return res.status(200).json({
+      success: true,
+      count: donors.length,
+      users: donors,
+    });
   } catch (error) {
-    console.error("Get all users error:", error);
-    return res.status(500).json({ success: false, message: "Failed to load users.", error: error.message });
+    console.error("Get all donors error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load donor information.",
+    });
+  }
+};
+
+// get all ngos
+
+
+
+const getAllNgos = async (req, res) => {
+  try {
+    const ngos = await Ngo.find()
+      .populate("user", "name email role status createdAt")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const formattedNgos = ngos.map((ngo) => {
+      const user =
+        ngo.user && typeof ngo.user === "object"
+          ? ngo.user
+          : {};
+
+      return {
+        id: String(ngo._id),
+        name: user.name || ngo.name || "N/A",
+        email: user.email || ngo.email || "N/A",
+        role: user.role || "ngo",
+        status: user.status || "Active",
+        createdAt: user.createdAt || ngo.createdAt || null,
+        phone: ngo.phone || "Not provided",
+        address: ngo.address || "Not provided",
+        location: ngo.address || "Not provided",
+        organizationId: ngo.organizationId || "N/A",
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: formattedNgos.length,
+      ngos: formattedNgos,
+    });
+  } catch (error) {
+    console.error("Get all NGOs error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load NGO information.",
+    });
   }
 };
 
@@ -89,26 +149,61 @@ const getAllDonations = async (req, res) => {
 };
 
 // =====================================
+/// =====================================
 // DASHBOARD OVERVIEW STATS
-// Replaces the hardcoded fetchDashboardStats() mock object.
+// Real statistics from MongoDB
 // =====================================
 const getDashboardStats = async (req, res) => {
   try {
-    const [totalUsers, totalDonations, pendingDonations, feedbackCount, deliveredDonations] = await Promise.all([
-      User.countDocuments(),
+    const [
+      totalUsers,
+      totalDonations,
+      pendingDonations,
+      feedbackCount,
+      deliveredDonations,
+    ] = await Promise.all([
+      // Count donors and NGOs only. Exclude admins.
+      User.countDocuments({
+        role: { $in: ["donor", "ngo"] },
+      }),
+
+      // Count all donations
       Donation.countDocuments(),
-      Donation.countDocuments({ pipelineStatus: "Pending" }),
+
+      // Count pending donations
+      Donation.countDocuments({
+        pipelineStatus: "Pending",
+      }),
+
+      // Count all feedback records
       Feedback.countDocuments(),
-      Donation.find({ pipelineStatus: "Completed" }),
+
+      // Completed donations for the available-food calculation
+      Donation.find({
+        pipelineStatus: "Completed",
+      }).select("quantity"),
     ]);
 
-    const availableFoodKg = deliveredDonations.reduce((sum, d) => sum + (Number(d.quantity) || 0), 0);
+    const availableFoodKg = deliveredDonations.reduce(
+      (sum, donation) =>
+        sum + (Number(donation.quantity) || 0),
+      0
+    );
 
-    const recentDonations = await Donation.find().sort({ createdAt: -1 }).limit(6).populate("donor", "name");
-    const recentActivities = recentDonations.map((d) => ({
-      id: d._id,
-      text: `🍽️ ${d.donor?.name || "A restaurant"} posted ${d.quantity}kg of ${d.foodName}`,
-      time: d.createdAt,
+    // Recent donation activity
+    const recentDonations = await Donation.find()
+      .sort({ createdAt: -1 })
+      .limit(6)
+      .populate("donor", "name");
+
+    const recentActivities = recentDonations.map((donation) => ({
+      id: donation._id,
+      text: `🍽️ ${
+        donation.donor?.name || "A restaurant"
+      } posted ${donation.quantity || 0} kg of ${
+        donation.foodName || "food"
+      }`,
+      time: donation.createdAt,
     }));
 
     return res.status(200).json({
@@ -116,13 +211,24 @@ const getDashboardStats = async (req, res) => {
       totalUsers,
       totalDonations,
       pendingDonations,
-      availableFood: `${availableFoodKg} kg`,
       feedbackCount,
+      availableFood: `${availableFoodKg} kg`,
       recentActivities,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: "Failed to load dashboard stats.", error: error.message });
+    console.error("Get dashboard stats error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load dashboard statistics.",
+    });
   }
 };
 
-module.exports = { getAllUsers, updateUserStatus, getAllDonations, getDashboardStats };
+module.exports = {
+  getAllUsers,
+  updateUserStatus,
+  getAllDonations,
+  getDashboardStats,
+  getAllNgos,
+};
