@@ -176,7 +176,7 @@ const Inventory = () => {
         </div>
       )}
 
-      
+
 
       <section className="inventory-panel">
         <div className="inventory-panel-heading">

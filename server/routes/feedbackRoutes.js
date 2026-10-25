@@ -1,33 +1,28 @@
 const express = require("express");
 const router = express.Router();
+
+const feedbackController = require("../controllers/feedbackController");
+
+// কন্ট্রোলার থেকে ফাংশনগুলো নিরাপদভাবে নেওয়া
 const {
-  submitFeedback,
-  getAdminFeedback,
-  getRestaurantFeedback,
-  getNgoFeedbacks,
-  respondToFeedback,
-  markFeedbackRead,
-} = require("../controllers/feedbackController");
+  submitFeedback = (req, res) => res.status(500).json({ message: "submitFeedback undefined" }),
+  getAdminFeedback = (req, res) => res.status(500).json({ message: "getAdminFeedback undefined" }),
+  getRestaurantFeedback = (req, res) => res.status(500).json({ message: "getRestaurantFeedback undefined" }),
+  getNgoFeedbacks = (req, res) => res.status(500).json({ message: "getNgoFeedbacks undefined" }),
+  respondToFeedback = (req, res) => res.status(500).json({ message: "respondToFeedback undefined" }),
+  updateFeedbackStatus = (req, res) => res.status(500).json({ message: "updateFeedbackStatus undefined" }),
+  markFeedbackRead = (req, res) => res.status(500).json({ message: "markFeedbackRead undefined" }),
+} = feedbackController || {};
 
-// Submit feedback -> dual-routed to Admin + Restaurant
+// রাউটসমূহ
 router.post("/", submitFeedback);
-
-// Admin inbox
 router.get("/admin", getAdminFeedback);
-
-// Restaurant inbox
 router.get("/restaurant/:restaurantId", getRestaurantFeedback);
-
-// NGO's own submitted feedback
 router.get("/ngo/:ngoId", getNgoFeedbacks);
-
-// Restaurant responds to a piece of feedback
+router.get("/ngo", getNgoFeedbacks);
 router.put("/:id/respond", respondToFeedback);
-
-// Mark read by a given viewer
+router.patch("/:id/status", updateFeedbackStatus);
 router.patch("/:id/read", markFeedbackRead);
-
-// Backwards-compatible generic list (kept for anything still calling GET /api/feedback)
 router.get("/", getAdminFeedback);
 
 module.exports = router;

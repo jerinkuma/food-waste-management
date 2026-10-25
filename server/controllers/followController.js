@@ -1,219 +1,155 @@
-const Follow = require("../models/Follow");
 const User = require("../models/User");
 const Restaurant = require("../models/Restaurant");
 const Ngo = require("../models/Ngo");
-const { getIO, rooms } = require("../utils/socket");
-
-// =====================================
-// helper: bump the denormalized counters on Restaurant/Ngo
-// =====================================
-async function bumpCounts(userId, role, field, delta) {
-  const Model = role === "ngo" ? Ngo : Restaurant;
-  await Model.updateOne({ user: userId }, { $inc: { [field]: delta } });
-}
+const Follow = require("../models/Follow");
+const Donation = require("../models/Donation");
 
 // =====================================
 // FOLLOW A PARTNER
 // =====================================
-const followUser = async (req, res) => {
+const followPartner = async (req, res) => {
   try {
     const { followerId, followerRole, followingId, followingRole } = req.body;
 
-    if (!followerId || !followingId || followerId === followingId) {
-      return res.status(400).json({ success: false, message: "Invalid follow request." });
+    if (!followerId || !followingId) {
+      return res.status(400).json({ success: false, message: "Follower and Following IDs are required." });
     }
 
-    const existing = await Follow.findOne({ follower: followerId, following: followingId });
-    if (existing) {
-      return res.status(409).json({ success: false, message: "Already following this partner." });
-    }
-
-    const reverse = await Follow.findOne({ follower: followingId, following: followerId });
-
-    const follow = await Follow.create({
+    // Check if already following
+    const existingFollow = await Follow.findOne({
       follower: followerId,
-      followerRole,
-      following: followingId,
-      followingRole,
-      isMutualPartner: !!reverse,
+      following: followingId
     });
 
-    if (reverse) {
-      reverse.isMutualPartner = true;
-      await reverse.save();
+    if (existingFollow) {
+      return res.status(400).json({ success: false, message: "Already following this partner." });
     }
 
-    await bumpCounts(followerId, followerRole, "followingCount", 1);
-    await bumpCounts(followingId, followingRole, "followerCount", 1);
-
-    // Notify the followed party in real time (like an Instagram follow notification)
-    const targetRoom = followingRole === "ngo" ? rooms.ngo(followingId) : rooms.restaurant(followingId);
-    getIO().to(targetRoom).emit("follow:new", {
-      followerId,
-      followerRole,
-      isMutualPartner: follow.isMutualPartner,
+    const newFollow = new Follow({
+      follower: followerId,
+      followerRole: followerRole || 'ngo',
+      following: followingId,
+      followingRole: followingRole || 'donor'
     });
 
-    return res.status(201).json({ success: true, message: reverse ? "You're now official partners!" : "Followed.", follow });
+    await newFollow.save();
+
+    return res.status(200).json({ success: true, message: "Successfully followed partner." });
   } catch (error) {
-    console.error("Follow user error:", error);
-    return res.status(500).json({ success: false, message: "Failed to follow.", error: error.message });
+    console.error("Follow Partner Error:", error);
+    return res.status(500).json({ success: false, message: "Failed to follow partner.", error: error.message });
   }
 };
 
 // =====================================
 // UNFOLLOW A PARTNER
 // =====================================
-const unfollowUser = async (req, res) => {
+const unfollowPartner = async (req, res) => {
   try {
-    const { followerId, followerRole, followingId, followingRole } = req.body;
+    const { followerId, followingId } = req.body;
 
-    const removed = await Follow.findOneAndDelete({ follower: followerId, following: followingId });
-    if (!removed) {
-      return res.status(404).json({ success: false, message: "Not following this partner." });
+    if (!followerId || !followingId) {
+      return res.status(400).json({ success: false, message: "Follower and Following IDs are required." });
     }
 
-    // Break mutual partner status on the reverse edge, if any
-    await Follow.updateOne({ follower: followingId, following: followerId }, { isMutualPartner: false });
+    await Follow.findOneAndDelete({
+      follower: followerId,
+      following: followingId
+    });
 
-    await bumpCounts(followerId, followerRole, "followingCount", -1);
-    await bumpCounts(followingId, followingRole, "followerCount", -1);
-
-    const targetRoom = followingRole === "ngo" ? rooms.ngo(followingId) : rooms.restaurant(followingId);
-    getIO().to(targetRoom).emit("follow:removed", { followerId });
-
-    return res.status(200).json({ success: true, message: "Unfollowed." });
+    return res.status(200).json({ success: true, message: "Successfully unfollowed partner." });
   } catch (error) {
-    console.error("Unfollow user error:", error);
-    return res.status(500).json({ success: false, message: "Failed to unfollow.", error: error.message });
+    console.error("Unfollow Partner Error:", error);
+    return res.status(500).json({ success: false, message: "Failed to unfollow partner.", error: error.message });
   }
 };
 
 // =====================================
-// GET WHO A USER FOLLOWS (their partner list)
+// GET FOLLOWING LIST
 // =====================================
 const getFollowing = async (req, res) => {
   try {
     const { userId } = req.params;
-    const following = await Follow.find({ follower: userId }).populate("following", "name email role");
-    return res.status(200).json({ success: true, count: following.length, following });
+
+    const followingList = await Follow.find({ follower: userId })
+      .populate("following", "name email role")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({ success: true, following: followingList });
   } catch (error) {
-    return res.status(500).json({ success: false, message: "Failed to load following list.", error: error.message });
+    console.error("Get Following Error:", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch following list.", error: error.message });
   }
 };
 
 // =====================================
-// GET A USER'S FOLLOWERS
+// GET FOLLOWERS LIST
 // =====================================
 const getFollowers = async (req, res) => {
   try {
     const { userId } = req.params;
-    const followers = await Follow.find({ following: userId }).populate("follower", "name email role");
-    return res.status(200).json({ success: true, count: followers.length, followers });
+
+    const followersList = await Follow.find({ following: userId })
+      .populate("follower", "name email role")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({ success: true, followers: followersList });
   } catch (error) {
-    return res.status(500).json({ success: false, message: "Failed to load followers list.", error: error.message });
+    console.error("Get Followers Error:", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch followers list.", error: error.message });
   }
 };
 
 // =====================================
-// SUGGESTED PARTNERS (opposite role, not yet followed)
-// GET /api/follow/suggestions/:userId?role=ngo|donor
+// GET SUGGESTIONS
 // =====================================
-
 const getSuggestedPartners = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { role } = req.query;
+    const { role } = req.query; // role of the requesting user
 
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: "User ID is required.",
-      });
-    }
-
-    if (!["ngo", "donor"].includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid user role.",
-      });
-    }
-
-    // Users the current user already follows
-    const alreadyFollowing = await Follow.find({
-      follower: userId,
-    }).distinct("following");
-
-    const excludeIds = [
-      userId,
-      ...alreadyFollowing.map((id) => String(id)),
-    ];
+    const alreadyFollowing = await Follow.find({ follower: userId }).distinct("following");
+    const excludeIds = [...alreadyFollowing, userId];
 
     let suggestions = [];
 
     if (role === "ngo") {
-      // NGOs discover restaurants
-      const restaurants = await Restaurant.find({
-        user: {
-          $nin: excludeIds,
-          $ne: null,
-        },
-      }).populate("user", "name email role");
-
-      suggestions = restaurants
-        .filter((restaurant) => restaurant.user?._id)
-        .map((restaurant) => ({
-          userId: restaurant.user._id.toString(),
-          name: restaurant.user.name || "Restaurant",
-          email: restaurant.user.email || "",
-          role: "donor",
-          address: restaurant.address || "",
-          profileImage: restaurant.profileImage || "",
-          followerCount: restaurant.followerCount || 0,
-        }));
+      const restaurants = await Restaurant.find({ user: { $nin: excludeIds } }).populate(
+        "user",
+        "name email role"
+      );
+      suggestions = restaurants.map((r) => ({
+        userId: r.user._id,
+        name: r.user.name,
+        role: "donor",
+        address: r.address,
+        profileImage: r.profileImage,
+        followerCount: r.followerCount,
+      }));
     } else {
-      // Restaurants/donors discover NGOs
-      const ngos = await Ngo.find({
-        user: {
-          $nin: excludeIds,
-          $ne: null,
-        },
-      }).populate("user", "name email role");
-
-      suggestions = ngos
-        .filter((ngo) => ngo.user?._id)
-        .map((ngo) => ({
-          userId: ngo.user._id.toString(),
-          name: ngo.user.name || "NGO",
-          email: ngo.user.email || "",
-          role: "ngo",
-          address: ngo.address || "",
-          organizationId: ngo.organizationId || "",
-          followerCount: ngo.followerCount || 0,
-        }));
+      const ngos = await Ngo.find({ user: { $nin: excludeIds } }).populate("user", "name email role");
+      suggestions = ngos.map((n) => ({
+        userId: n.user._id,
+        name: n.user.name,
+        role: "ngo",
+        address: n.address,
+        organizationId: n.organizationId,
+        followerCount: n.followerCount,
+      }));
     }
 
-    return res.status(200).json({
-      success: true,
-      count: suggestions.length,
-      suggestions,
-    });
+    return res.status(200).json({ success: true, count: suggestions.length, suggestions });
   } catch (error) {
     console.error("Get suggested partners error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to load suggestions.",
-      error: error.message,
-    });
+    return res.status(500).json({ success: false, message: "Failed to load suggestions.", error: error.message });
   }
 };
 
-
 module.exports = {
-  followUser,
-  unfollowUser,
+  followPartner,
+  unfollowPartner,
   getFollowing,
   getFollowers,
-  getSuggestedPartners,
+  getSuggestions,
+  getPartnerDetails,
 };

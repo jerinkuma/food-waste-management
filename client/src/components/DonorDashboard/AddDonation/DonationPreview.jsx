@@ -219,7 +219,7 @@ const DonationPreview = ({ donationData }) => {
                 </div>
               </div>
 
-              
+
 
             </div>
           </div>

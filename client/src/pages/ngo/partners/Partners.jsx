@@ -8,7 +8,6 @@ import {
   fetchFollowers,
   followPartner,
   unfollowPartner,
-  fetchNgoDonations,
 } from '../../../services/api';
 import './Partners.css';
 
@@ -21,112 +20,83 @@ const initials = (name = '') =>
     .toUpperCase();
 
 export default function Partners() {
-  const user = getCurrentUser();
+  const user = getCurrentUser() || JSON.parse(localStorage.getItem("user") || "{}");
   const [tab, setTab] = useState('discover'); // discover | following | followers
   const [suggestions, setSuggestions] = useState([]);
   const [following, setFollowing] = useState([]);
   const [followers, setFollowers] = useState([]);
-  const [donationPartners, setDonationPartners] = useState([]);
-  const [partnersError, setPartnersError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
 
+  // পার্টনার ডিটেইলস, লাইভ ইনভেন্টরি, হিস্ট্রি ও রেটিং স্টেট
+  const [selectedPartner, setSelectedPartner] = useState(null);
+  const [partnerDetailsLoading, setPartnerDetailsLoading] = useState(false);
+  const [liveDonations, setLiveDonations] = useState([]);
+  const [pastDonations, setPastDonations] = useState([]);
+  const [partnerRatings, setPartnerRatings] = useState([]);
+
   const loadAll = useCallback(async () => {
-    if (!user?.id) {
-      setLoading(false);
-      return;
-    }
-
+    if (!user?.id) return;
     setLoading(true);
-    setPartnersError("");
-
     try {
-      const [sugg, follows, backers, donationResult] =
-        await Promise.all([
-          fetchSuggestedPartners(user.id, user.role),
-          fetchFollowing(user.id),
-          fetchFollowers(user.id),
-          user.role === "ngo"
-            ? fetchNgoDonations(user.id)
-            : Promise.resolve({ donations: [] }),
-        ]);
-
-      setSuggestions(sugg || []);
-      setFollowing(follows || []);
-      setFollowers(backers || []);
-
-      // NGO যেসব donation request করেছে, সেগুলোর donor/restaurant
-      const donations = donationResult?.donations || [];
-
-      const uniquePartners = new Map();
-
-      donations.forEach((donation) => {
-        const donor = donation?.donor;
-
-        // Donor অবশ্যই populated User object হতে হবে
-        if (!donor || typeof donor !== "object" || !donor._id) {
-          return;
-        }
-
-        const donorId = String(donor._id);
-
-        if (!uniquePartners.has(donorId)) {
-          uniquePartners.set(donorId, {
-            userId: donorId,
-            name: donor.name || "Restaurant",
-            email: donor.email || "",
-            role: donor.role || "donor",
-            address:
-              donation.restaurantAddress ||
-              donation.pickupAddress ||
-              "",
-            donationCount: 1,
-            latestDonation: donation.foodName || "",
-          });
-        } else {
-          const partner = uniquePartners.get(donorId);
-          partner.donationCount += 1;
-
-          if (!partner.latestDonation && donation.foodName) {
-            partner.latestDonation = donation.foodName;
-          }
-        }
-      });
-
-      setDonationPartners(
-        Array.from(uniquePartners.values())
-      );
+      const [sugg, follows, backers] = await Promise.all([
+        fetchSuggestedPartners(user.id, user.role),
+        fetchFollowing(user.id),
+        fetchFollowers(user.id),
+      ]);
+      setSuggestions(sugg);
+      setFollowing(follows);
+      setFollowers(backers);
     } catch (error) {
-      console.error("Error loading partners:", error);
-      setPartnersError(
-        error?.response?.data?.message ||
-        "Could not load donation partners."
-      );
+      console.error('Error loading partners:', error);
     } finally {
       setLoading(false);
     }
-  }, [user?.id, user?.role]);
+  }, [user?.id, user?._id, user?.role]);
 
+  // সার্চ মডাল ও সকেট থেকে রিয়েল-টাইম অটো-রিফ্রেশ হ্যান্ডলার
   useEffect(() => {
     loadAll();
 
-    // Live "someone followed you" notification, Instagram-style
+    // সার্চ মডাল থেকে ফলো দিলে যেন সাথে সাথে লিস্ট আপডেট হয়
+    const handleCustomEvent = () => loadAll();
+    window.addEventListener("partner_status_changed", handleCustomEvent);
+
     const socket = getSocket();
-    const onFollow = () => loadAll();
-    socket.on('follow:new', onFollow);
-    socket.on('follow:removed', onFollow);
+    if (socket) {
+      const onFollow = () => loadAll();
+      socket.on('follow:new', onFollow);
+      socket.on('follow:removed', onFollow);
+      return () => {
+        window.removeEventListener("partner_status_changed", handleCustomEvent);
+        socket.off('follow:new', onFollow);
+        socket.off('follow:removed', onFollow);
+      };
+    }
+
     return () => {
-      socket.off('follow:new', onFollow);
-      socket.off('follow:removed', onFollow);
+      window.removeEventListener("partner_status_changed", handleCustomEvent);
     };
   }, [loadAll]);
 
-  const isFollowing = (targetUserId) => following.some((f) => f.following?._id === targetUserId);
+  const isFollowing = (targetUserId) => {
+    if (!targetUserId || !Array.isArray(following)) return false;
+    return following.some((f) => {
+      const fId = f.following?._id || f.followingId || f.following || f._id || f.userId;
+      return String(fId) === String(targetUserId);
+    });
+  };
 
   const handleFollow = async (targetId, targetRole) => {
+    const currentUserId = user?.id || user?._id;
     setBusyId(targetId);
     try {
-      await followPartner(user.id, user.role, targetId, targetRole);
+      await axiosInstance.post("/partners/follow", {
+        followerId: currentUserId,
+        followerRole: user.role || 'ngo',
+        followingId: targetId,
+        followingRole: targetRole || 'donor'
+      });
       await loadAll();
     } catch (error) {
       alert(error?.response?.data?.message || 'Could not follow this partner.');
@@ -136,9 +106,15 @@ export default function Partners() {
   };
 
   const handleUnfollow = async (targetId, targetRole) => {
+    const currentUserId = user?.id || user?._id;
     setBusyId(targetId);
     try {
-      await unfollowPartner(user.id, user.role, targetId, targetRole);
+      await axiosInstance.post("/partners/unfollow", {
+        followerId: currentUserId,
+        followerRole: user.role || 'ngo',
+        followingId: targetId,
+        followingRole: targetRole || 'donor'
+      });
       await loadAll();
     } catch (error) {
       console.error(error);
@@ -147,40 +123,73 @@ export default function Partners() {
     }
   };
 
+  const handleOpenPartnerDetails = async (targetId) => {
+    if (!targetId) return;
+    setPartnerDetailsLoading(true);
+    try {
+      const res = await axiosInstance.get(`/partners/details/${targetId}`, {
+        validateStatus: () => true
+      });
+
+      if (res.data && res.data.success) {
+        setSelectedPartner(res.data.partner);
+        setLiveDonations(res.data.liveDonations || []);
+        setPastDonations(res.data.pastDonations || []);
+        setPartnerRatings(res.data.ratings || []);
+      } else {
+        alert(res.data?.message || "Failed to load partner details.");
+      }
+    } catch (error) {
+      console.error("Error fetching partner details:", error);
+      alert("Could not fetch partner details.");
+    } finally {
+      setPartnerDetailsLoading(false);
+    }
+  };
+
   const oppositeLabel = user?.role === 'ngo' ? 'Restaurants' : 'NGOs';
 
-  const renderCard = (item, { targetId, targetRole, name, meta, mutual }) => (
-    <div className="pt-card" key={targetId}>
-      <div className="pt-avatar">{initials(name)}</div>
-      <p className="pt-name">{name}</p>
-      <p className="pt-meta">{meta}</p>
-      {mutual && (
-        <span className="pt-partner-badge">
-          <Handshake className="w-3 h-3" style={{ display: 'inline', marginRight: 4 }} /> Official Partner
-        </span>
-      )}
-      <button
-        disabled={busyId === targetId}
-        className={`pt-follow-btn ${isFollowing(targetId) ? 'following' : 'not-following'}`}
-        onClick={() =>
-          isFollowing(targetId) ? handleUnfollow(targetId, targetRole) : handleFollow(targetId, targetRole)
-        }
-      >
-        {isFollowing(targetId) ? (
-          <>
-            <UserCheck className="w-3.5 h-3.5" style={{ display: 'inline', marginRight: 4 }} /> Following
-          </>
-        ) : (
-          <>
-            <UserPlus className="w-3.5 h-3.5" style={{ display: 'inline', marginRight: 4 }} /> Follow
-          </>
-        )}
-      </button>
-    </div>
-  );
+  const renderCard = (item, { targetId, targetRole, name, meta, mutual }) => {
+    const currentlyFollowing = isFollowing(targetId);
+
+    return (
+      <div className="pt-card" key={targetId}>
+        <div onClick={() => handleOpenPartnerDetails(targetId)} style={{ cursor: 'pointer' }}>
+          <div className="pt-avatar">{initials(name)}</div>
+          <p className="pt-name">{name}</p>
+          <p className="pt-meta">{meta}</p>
+          {mutual && (
+            <span className="pt-partner-badge">
+              <Handshake className="w-3 h-3" style={{ display: 'inline', marginRight: 4 }} /> Official Partner
+            </span>
+          )}
+        </div>
+
+        <button
+          disabled={busyId === targetId}
+          className={`pt-follow-btn ${currentlyFollowing ? 'following' : 'not-following'}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            currentlyFollowing ? handleUnfollow(targetId, targetRole) : handleFollow(targetId, targetRole);
+          }}
+        >
+          {currentlyFollowing ? (
+            <>
+              <UserCheck className="w-3.5 h-3.5" style={{ display: 'inline', marginRight: 4 }} /> Unfollow
+            </>
+          ) : (
+            <>
+              <UserPlus className="w-3.5 h-3.5" style={{ display: 'inline', marginRight: 4 }} /> Follow
+            </>
+          )}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="pt-container">
+      {partnersError && <div className="pt-error-banner" style={{ color: 'red', marginBottom: '15px' }}>{partnersError}</div>}
       <div className="pt-header">
         <div>
           <h2 className="pt-title">PARTNERS & CONNECTIONS</h2>
@@ -199,14 +208,10 @@ export default function Partners() {
         </div>
       </div>
 
-
-     
-
-
       {loading ? (
         <div className="pt-empty">Loading partners...</div>
       ) : tab === 'discover' ? (
-        suggestions.length === 0 ? (
+        !Array.isArray(suggestions) || suggestions.length === 0 ? (
           <div className="pt-empty">
             <Users className="w-6 h-6" style={{ margin: '0 auto 8px' }} />
             No new {oppositeLabel.toLowerCase()} to suggest right now.
@@ -214,42 +219,137 @@ export default function Partners() {
         ) : (
           <div className="pt-grid">
             {suggestions.map((s) =>
-              renderCard(s, { targetId: s.userId, targetRole: s.role, name: s.name, meta: s.address || s.organizationId || '' })
+              renderCard(s, {
+                targetId: s.userId || s._id,
+                targetRole: s.role || 'donor',
+                name: s.name || s.restaurantName || "Restaurant Partner",
+                meta: s.address || s.email || ''
+              })
             )}
           </div>
         )
       ) : tab === 'following' ? (
-        following.length === 0 ? (
+        !Array.isArray(following) || following.length === 0 ? (
           <div className="pt-empty">You aren't following anyone yet — check the Discover tab.</div>
         ) : (
           <div className="pt-grid">
             {following.map((f) =>
               renderCard(f, {
-                targetId: f.following?._id,
-                targetRole: f.followingRole,
-                name: f.following?.name,
-                meta: f.following?.email,
+                targetId: f.following?._id || f.followingId || f.following || f._id,
+                targetRole: f.followingRole || 'donor',
+                name: f.following?.name || f.name || "Restaurant",
+                meta: f.following?.email || f.email || "",
                 mutual: f.isMutualPartner,
               })
             )}
           </div>
         )
-      ) : followers.length === 0 ? (
+      ) : !Array.isArray(followers) || followers.length === 0 ? (
         <div className="pt-empty">No one is following you yet.</div>
       ) : (
         <div className="pt-grid">
-          {followers.map((f) => (
-            <div className="pt-card" key={f._id}>
-              <div className="pt-avatar">{initials(f.follower?.name)}</div>
-              <p className="pt-name">{f.follower?.name}</p>
-              <p className="pt-meta">{f.follower?.email}</p>
-              {f.isMutualPartner && (
-                <span className="pt-partner-badge">
-                  <Handshake className="w-3 h-3" style={{ display: 'inline', marginRight: 4 }} /> Official Partner
-                </span>
-              )}
+          {followers.map((f) => {
+            const fUserId = f.following?._id || f.followingId || f.following || f.follower?._id || f._id;
+            const fName = f.following?.name || f.follower?.name || f.name || "Partner";
+            const fEmail = f.following?.email || f.follower?.email || f.email || "";
+            return (
+              <div className="pt-card" key={f._id || fUserId} onClick={() => handleOpenPartnerDetails(fUserId)} style={{ cursor: 'pointer' }}>
+                <div className="pt-avatar">{initials(fName)}</div>
+                <p className="pt-name">{fName}</p>
+                <p className="pt-meta">{fEmail}</p>
+                {f.isMutualPartner && (
+                  <span className="pt-partner-badge">
+                    <Handshake className="w-3 h-3" style={{ display: 'inline', marginRight: 4 }} /> Official Partner
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* পার্টনার প্রোফাইল, লাইভ ইনভেন্টরি, রেটিং ও পাস্ট হিস্ট্রি মডাল */}
+      {selectedPartner && (
+        <div className="pt-modal-overlay">
+          <div className="pt-modal-content">
+            <button className="pt-modal-close" onClick={() => setSelectedPartner(null)}>
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="pt-modal-header">
+              <div className="pt-avatar" style={{ width: '52px', height: '52px', fontSize: '20px' }}>
+                {initials(selectedPartner.name)}
+              </div>
+              <div>
+                <h3 className="pt-modal-title">{selectedPartner.name}</h3>
+                <p className="pt-modal-text">
+                  <Mail className="w-3.5 h-3.5" style={{ display: 'inline', marginRight: 6 }} /> {selectedPartner.email}
+                </p>
+                <p className="pt-modal-text">
+                  <MapPin className="w-3.5 h-3.5" style={{ display: 'inline', marginRight: 6 }} /> {selectedPartner.address}
+                </p>
+              </div>
             </div>
-          ))}
+
+            {/* রেটিং ও এভারেজ স্কোর সেকশন */}
+            <div className="pt-rating-box">
+              <Star className="w-4 h-4" style={{ color: '#d97706', fill: '#d97706' }} />
+              <span>Rating: {selectedPartner.averageRating || '0.0'} / 5.0</span>
+              <span style={{ color: '#78350f', fontWeight: 'normal', fontSize: '0.8rem' }}>({selectedPartner.totalRatings || 0} reviews)</span>
+            </div>
+
+            <hr style={{ border: '0', borderTop: '1px solid #e2e8f0', margin: '16px 0' }} />
+
+            {partnerDetailsLoading ? (
+              <p style={{ textAlign: 'center', color: '#64748b', padding: '20px 0' }}>Loading partner details...</p>
+            ) : (
+              <>
+                {/* লাইভ ইনভেন্টরি সেকশন */}
+                <h4 className="pt-section-title">
+                  <Package className="w-4 h-4 text-green-600" /> Live Inventory (Active Donations)
+                </h4>
+                {liveDonations.length === 0 ? (
+                  <p style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '16px' }}>No active food donations right now from this partner.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                    {liveDonations.map((donation) => (
+                      <div key={donation._id} className="pt-inventory-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '0.85rem', color: '#0f172a' }}>
+                          <span>{donation.foodName || donation.title || 'Food Donation'}</span>
+                          <span style={{ color: '#059669' }}>Qty: {donation.quantity || 'N/A'}</span>
+                        </div>
+                        <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#475569' }}>{donation.description || 'No description provided.'}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* পাস্ট ডোনেশন হিস্ট্রি সেকশন */}
+                <h4 className="pt-section-title">
+                  <History className="w-4 h-4 text-blue-600" /> Past Donation History (Completed)
+                </h4>
+                {pastDonations.length === 0 ? (
+                  <p style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '10px' }}>No completed donation history yet.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '160px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {pastDonations.map((item) => (
+                      <div key={item._id} className="pt-history-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}>
+                          <span>{item.foodName || item.title || item.foodTitle || item.name || 'Donation Item'} (Qty: {item.quantity || item.qty || 'N/A'})</span>
+                          <span style={{ color: '#059669', fontSize: '0.75rem', fontWeight: '700' }}>Completed</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ক্লোজ বাটন */}
+            <button className="pt-close-action-btn" onClick={() => setSelectedPartner(null)}>
+              Close
+            </button>
+          </div>
         </div>
       )}
     </div>

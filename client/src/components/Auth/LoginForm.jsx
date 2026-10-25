@@ -45,9 +45,24 @@ const LoginForm = ({ setIsSignup }) => {
         return;
       }
 
+      // টোকেন সেভ করা
       localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
 
+      // 👉 এনজিও বা অন্যান্য ইউজারের জন্য avatar ও সঠিক নাম লোকালস্টোরেজে পার্মানেন্টলি সেভ করার ফিক্স
+      const userDataToStore = {
+        id: data.user.id || data.user._id,
+        name: data.user.ngoName || data.user.name, // এনজিও হলে ngoName বা নাম
+        fullName: data.user.ngoName || data.user.name,
+        ngoName: data.user.ngoName || data.user.name,
+        email: data.user.email,
+        role: data.user.role,
+        avatar: data.user.avatar || null, // ইউজারের নিজস্ব ছবি সিঙ্ক করা হলো
+        image: data.user.avatar || null
+      };
+
+      localStorage.setItem("user", JSON.stringify(userDataToStore));
+
+      // রোল অনুযায়ী রিডাইরেক্ট করা
       if (data.user.role === "admin") {
         navigate("/admin/dashboard");
       } else if (data.user.role === "ngo") {

@@ -30,8 +30,11 @@ export default function NGODashboard() {
 
   const [stats, setStats] = useState({
     totalClaimed: 0,
+    todayClaimed: 0,
     mealsDistributed: 0,
+    todayMeals: 0,
     trustScore: 0,
+    reviewCount: 0,
     foodWasteSaved: "0 Kg",
   });
   const [requests, setRequests] = useState([]);
@@ -40,16 +43,38 @@ export default function NGODashboard() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const [statsData, profile] = await Promise.all([
+      const [statsRes, profileRes] = await Promise.all([
         fetchNgoStats().catch(() => null),
         fetchNgoProfile().catch(() => null),
       ]);
-      if (statsData) setStats(statsData);
-      setNgoId(profile?._id || null);
+
+      // ব্যাকএন্ড থেকে আসা stats অবজেক্ট বা রেসপন্স হ্যান্ডেল করা
+      if (statsRes) {
+        const statsData = statsRes.stats || statsRes;
+        setStats({
+          totalClaimed: statsData.totalClaimed || 0,
+          todayClaimed: statsData.todayClaimed || 0,
+          mealsDistributed: statsData.mealsDistributed || 0,
+          todayMeals: statsData.todayMeals || 0,
+          trustScore: statsData.trustScore || statsData.avgRating || statsData.restaurantRatings || 0,
+          reviewCount: statsData.reviewCount || statsData.totalReviews || 0,
+          foodWasteSaved: statsData.foodWasteSaved || "0.0 Kg",
+        });
+      }
+
+      // profile রেসপন্স থেকে ngoId বা _id সেট করা
+      const profileData = profileRes?.ngo || profileRes;
+      setNgoId(profileData?._id || profileData?.id || null);
 
       navigator.geolocation?.getCurrentPosition(
-        async (pos) => setRequests(await fetchAvailableDonations(pos.coords.latitude, pos.coords.longitude)),
-        async () => setRequests(await fetchAvailableDonations()),
+        async (pos) => {
+          const donations = await fetchAvailableDonations(pos.coords.latitude, pos.coords.longitude);
+          setRequests(Array.isArray(donations) ? donations : donations?.donations || []);
+        },
+        async () => {
+          const donations = await fetchAvailableDonations();
+          setRequests(Array.isArray(donations) ? donations : donations?.donations || []);
+        },
         { timeout: 4000 }
       );
     } catch (err) {
@@ -62,12 +87,14 @@ export default function NGODashboard() {
 
     // Real-time: new donations & status changes refresh this view instantly
     const socket = getSocket();
-    socket.on("donation:new", loadDashboard);
-    socket.on("donation:updated", loadDashboard);
-    return () => {
-      socket.off("donation:new", loadDashboard);
-      socket.off("donation:updated", loadDashboard);
-    };
+    if (socket) {
+      socket.on("donation:new", loadDashboard);
+      socket.on("donation:updated", loadDashboard);
+      return () => {
+        socket.off("donation:new", loadDashboard);
+        socket.off("donation:updated", loadDashboard);
+      };
+    }
   }, [loadDashboard]);
 
   const handleAccept = async (donationId) => {
@@ -90,7 +117,7 @@ export default function NGODashboard() {
   const handleDecline = async (donationId) => {
     setBusyId(donationId);
     try {
-      await updateDonationStatus(donationId, "Rejected", "Declined from dashboard", user?.id);
+      await updateDonationStatus(donationId, "Rejected", "Declined from dashboard", user?.id || user?._id);
       await loadDashboard();
     } catch (err) {
       console.error("Failed to reject request", err);
@@ -99,7 +126,7 @@ export default function NGODashboard() {
     }
   };
 
-  const displayedRequests = requests.slice(0, 2);
+  const displayedRequests = Array.isArray(requests) ? requests.slice(0, 2) : [];
   const goToMap = () => navigate("/ngo/donation-map");
 
   return (
@@ -142,10 +169,11 @@ export default function NGODashboard() {
           </div>
         </div>
 
+        {/* Restaurant Ratings Card */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-36">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-semibold text-slate-400">Trust Score</p>
+              <p className="text-xs font-semibold text-slate-400">Restaurant Ratings</p>
               <h3 className="text-3xl font-bold text-slate-900 mt-2">
                 {stats.trustScore} <span className="text-amber-400 text-xl">★</span>
               </h3>
@@ -156,7 +184,7 @@ export default function NGODashboard() {
           </div>
           <div className="flex justify-between items-center text-[11px]">
             <span className="text-slate-600 font-semibold bg-slate-100 px-2 py-0.5 rounded-md">
-              {stats.reviewCount || 0} Reviews
+              {stats.reviewCount} Reviews Given
             </span>
             <span className="text-slate-400">Live</span>
           </div>
@@ -198,7 +226,7 @@ export default function NGODashboard() {
 
           <div onClick={goToMap} className="relative w-full h-80 rounded-xl overflow-hidden border border-slate-200 cursor-pointer group">
             <PigeonMap defaultCenter={[22.3569, 91.7832]} defaultZoom={12}>
-              {requests
+              {Array.isArray(requests) && requests
                 .filter((r) => r.resolvedLocation)
                 .map((r) => (
                   <Marker key={r._id} width={36} anchor={[r.resolvedLocation.lat, r.resolvedLocation.lng]} color="#059669" />
@@ -218,7 +246,7 @@ export default function NGODashboard() {
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-bold text-slate-900 text-sm">ACTIVE REQUESTS</h3>
               <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                {requests.length} Total
+                {Array.isArray(requests) ? requests.length : 0} Total
               </span>
             </div>
 
@@ -227,7 +255,9 @@ export default function NGODashboard() {
                 <div key={req._id} className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h4 className="font-bold text-slate-900 text-xs">{req.donor?.name || "Restaurant"}</h4>
+                      <h4 className="font-bold text-slate-900 text-xs">
+                        {req.donor?.organizationName || req.donor?.name || "Restaurant"}
+                      </h4>
                       <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
                         <Truck className="w-3 h-3 text-rose-500" />
                         {req.foodName}
@@ -273,7 +303,7 @@ export default function NGODashboard() {
             onClick={goToMap}
             className="w-full mt-4 bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>SEE ALL ACTIVE REQUESTS ({requests.length})</span>
+            <span>SEE ALL ACTIVE REQUESTS ({Array.isArray(requests) ? requests.length : 0})</span>
             <ArrowRight className="w-4 h-4 text-emerald-400" />
           </button>
         </div>

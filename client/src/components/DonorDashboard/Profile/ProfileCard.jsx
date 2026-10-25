@@ -49,10 +49,10 @@ const ProfileCard = ({
         </h2>
 
 
-        
 
 
-        
+
+
 
         {/* Edit Profile */}
         <button

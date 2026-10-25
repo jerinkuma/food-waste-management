@@ -11,7 +11,7 @@ const SafetyDeclaration = ({
 
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-      
+
       <div className="flex items-start gap-4">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100">
           <ShieldCheck

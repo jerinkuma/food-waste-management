@@ -105,9 +105,9 @@ const donationSchema = new mongoose.Schema(
       lng: { type: Number, default: null },
     },
 
-    coords: { 
+    coords: {
       type: [Number], // [latitude, longitude]
-      required: false, 
+      required: false,
       default: [22.3569, 91.7832] // চট্টগ্রামের ডিফল্ট পিন
     },
 
@@ -131,8 +131,8 @@ const donationSchema = new mongoose.Schema(
       required: true,
     },
 
-    requestId: { 
-      type: String, 
+    requestId: {
+      type: String,
       unique: true,
       sparse: true,
       default: () => "REQ-" + Math.floor(1000 + Math.random() * 9000)
@@ -147,25 +147,25 @@ const donationSchema = new mongoose.Schema(
     // LOGISTICS & EXTRA FIELDS (NGO NEEDED)
     // =====================================
 
-    logistics: { 
-      type: String, 
+    logistics: {
+      type: String,
       enum: ["FoodPanda Tracking", "By Self Option", "Third-party Delivery"],
-      default: "By Self Option" 
+      default: "By Self Option"
     },
 
-    estimatedArrival: { 
-      type: String, 
-      default: "15 mins" 
+    estimatedArrival: {
+      type: String,
+      default: "15 mins"
     },
 
-    message: { 
-      type: String, 
-      trim: true 
+    message: {
+      type: String,
+      trim: true
     },
 
-    timeAgo: { 
-      type: String, 
-      default: 'Recent' 
+    timeAgo: {
+      type: String,
+      default: 'Recent'
     },
 
     // =====================================
@@ -287,6 +287,27 @@ const donationSchema = new mongoose.Schema(
       },
 
       lastUpdated: {
+        type: Date,
+        default: null,
+      },
+    },
+    // =====================================
+    // RATING & REVIEW (NGO to Restaurant)
+    // =====================================
+
+    rating: {
+      score: {
+        type: Number,
+        min: 1,
+        max: 5,
+        default: null,
+      },
+      comment: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+      ratedAt: {
         type: Date,
         default: null,
       },

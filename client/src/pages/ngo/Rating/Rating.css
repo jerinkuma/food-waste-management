@@ -1,0 +1,277 @@
+/* =========================================
+   FEEDLINK NGO RATING STYLES (CLEAN & FIXED)
+   ========================================= */
+
+.ngo-rating-wrapper {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 20px 30px;
+  box-sizing: border-box;
+  background-color: #f8fafc;
+  min-height: 100vh;
+}
+
+.ngo-rating-header-box {
+  margin-bottom: 24px;
+}
+
+.ngo-rating-title-flex {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ngo-rating-big-icon {
+  font-size: 32px;
+  background: #fef3c7;
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.ngo-rating-title-flex h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.ngo-rating-title-flex p {
+  font-size: 14px;
+  color: #64748b;
+  margin: 4px 0 0 0;
+}
+
+.ngo-rating-main-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  padding: 24px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ngo-card-inner-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+}
+
+.ngo-card-inner-header p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0 0 20px 0;
+}
+
+.ngo-rating-status-msg {
+  text-align: center;
+  padding: 40px;
+  color: #64748b;
+  font-size: 15px;
+}
+
+/* Table Design */
+.ngo-table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.ngo-custom-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  min-width: 700px;
+}
+
+.ngo-custom-table th {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 14px 16px;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.ngo-custom-table td {
+  padding: 16px;
+  font-size: 14px;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.fw-bold {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.ngo-status-pill {
+  background-color: #d1fae5;
+  color: #065f46;
+  padding: 6px 12px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.rating-star-text {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.text-muted {
+  color: #94a3b8;
+  font-weight: normal;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.ngo-rate-action-btn {
+  background-color: #059669;
+  color: #ffffff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.ngo-rate-action-btn:hover {
+  background-color: #047857;
+}
+
+/* Modal Popup Styles */
+.ngo-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.ngo-modal-box {
+  background: #ffffff;
+  width: 100%;
+  max-width: 450px;
+  padding: 28px;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+}
+
+.ngo-modal-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ngo-modal-top h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.ngo-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #64748b;
+  padding: 0;
+}
+
+.ngo-modal-sub-id {
+  font-size: 13px;
+  color: #64748b;
+  margin: 4px 0 20px 0;
+}
+
+.ngo-form-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+.ngo-star-row {
+  display: flex;
+  gap: 10px;
+}
+
+.ngo-star-item {
+  font-size: 32px;
+  cursor: pointer;
+  color: #cbd5e1;
+  transition: color 0.2s;
+}
+
+.ngo-star-item.selected {
+  color: #f59e0b;
+}
+
+.ngo-text-area {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+  color: #1e293b;
+  box-sizing: border-box;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.ngo-text-area:focus {
+  outline: none;
+  border-color: #059669;
+}
+
+.ngo-modal-btn-group {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.ngo-submit-action-btn {
+  background-color: #059669;
+  color: #ffffff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  flex: 1;
+}
+
+.ngo-submit-action-btn:hover {
+  background-color: #047857;
+}
+
+.ngo-cancel-action-btn {
+  background-color: #f1f5f9;
+  color: #475569;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ngo-cancel-action-btn:hover {
+  background-color: #e2e8f0;
+}

@@ -43,7 +43,7 @@ const EnvironmentalImpact = ({
 
   return (
     <div className="environmental-impact rounded-3xl border border-gray-200 bg-white p-4 shadow-sm transition-colors duration-300 sm:p-6 lg:p-7">
-      
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>

@@ -39,7 +39,7 @@ const Settings = () => {
 
   return (
     <main className="settings-page">
-      
+
 
       <section className="settings-card">
         <div className="settings-cover">

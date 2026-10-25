@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const { 
-  getActiveRequests, 
-  archiveRequest 
+const {
+  getActiveRequests,
+  archiveRequest
 } = require("../controllers/requestController");
 
 // ১. সকল অ্যাক্টিভ ও ম্যাপের রিকোয়েস্ট আনার রাউট

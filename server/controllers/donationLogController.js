@@ -1,40 +1,45 @@
 const DonationLog = require('../models/DonationLog');
 
-// ১. Fetch History Logs with Safe Filtering & Search
 exports.getDonationLogs = async (req, res) => {
   try {
     const { donor, foodType, logistics, location, search } = req.query;
     let query = {};
 
-    // donor ফিল্টার
+    // ১. ডোনর ফিল্টার
     if (donor && donor !== 'ALL' && donor !== 'All Donors') {
       query.donorName = donor;
     }
 
-    // foodType ফিল্টার
+    // ২. ফুড টাইপ ফিল্টার
     if (foodType && foodType !== 'ALL' && foodType !== 'All Types') {
-      query.foodType = { $regex: foodType, $options: 'i' };
+      query.$or = [
+        { foodType: { $regex: foodType, $options: 'i' } },
+        { foodCategory: { $regex: foodType, $options: 'i' } }
+      ];
     }
 
-    // logistics ফিল্টার
+    // ৩. লজিস্টিকস ফিল্টার
     if (logistics && logistics !== 'ALL' && logistics !== 'FoodPanda & Self') {
       query.logistics = logistics;
     }
 
-    // location ফিল্টার
+    // ৪. লোকেশন ফিল্টার
     if (location && location !== 'ALL' && location !== 'All Locations') {
-      query.location = location;
+      query.pickupAddress = { $regex: location, $options: 'i' };
     }
 
-    // search ফিল্টার (যদি সার্চবক্স ফাকা না থাকে)
+    // ৫. সার্চ বক্স ফিল্টার (Donation ID, Donor Name বা Food Category দিয়ে সার্চ)
     if (search && search.trim() !== '') {
+      const searchRegex = { $regex: search.trim(), $options: 'i' };
       query.$or = [
-        { donationId: { $regex: search.trim(), $options: 'i' } },
-        { donorName: { $regex: search.trim(), $options: 'i' } }
+        { donationId: searchRegex },
+        { donorName: searchRegex },
+        { foodCategory: searchRegex },
+        { foodType: searchRegex }
       ];
     }
 
-    // ডাটাবেস থেকে সব ডাটা রিট্রিভ করা
+    // ডেটাবেস থেকে সর্টিং করে ডেটা আনা
     const logs = await DonationLog.find(query).sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -43,6 +48,7 @@ exports.getDonationLogs = async (req, res) => {
       data: logs
     });
   } catch (error) {
+    console.error("Error in getDonationLogs:", error);
     res.status(500).json({
       success: false,
       message: error.message

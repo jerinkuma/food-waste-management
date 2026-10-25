@@ -118,7 +118,7 @@ const Profile = () => {
 
       <div className="space-y-6 sm:space-y-8">
 
-        
+
 
 
         {/* Profile Card */}

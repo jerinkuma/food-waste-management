@@ -3,14 +3,14 @@ const Donation = require('../models/Donation');
 // ১. ম্যাপ এবং অ্যাক্টিভ রিকোয়েস্ট উভয়ের জন্য ডেটা ফেচ করার ফাংশন
 const getDonationRequests = async (req, res) => {
   try {
-    const requests = await Donation.find({ 
-      status: { $ne: 'Archived' } 
+    const requests = await Donation.find({
+      status: { $ne: 'Archived' }
     }).sort({ createdAt: -1 });
 
-    res.status(200).json({ 
-      success: true, 
+    res.status(200).json({
+      success: true,
       count: requests.length,
-      data: requests 
+      data: requests
     });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error", error: error.message });
@@ -36,23 +36,23 @@ const getActiveRequests = async (req, res) => {
 const archiveRequest = async (req, res) => {
   try {
     const newStatus = req.body.status || "Archived";
-    
+
     await Donation.findByIdAndUpdate(
-      req.params.id, 
+      req.params.id,
       { status: newStatus }
     );
 
-    res.status(200).json({ 
-      success: true, 
-      message: "Request processed successfully" 
+    res.status(200).json({
+      success: true,
+      message: "Request processed successfully"
     });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };
 
-module.exports = { 
-  getDonationRequests, 
-  getActiveRequests, 
-  archiveRequest 
+module.exports = {
+  getDonationRequests,
+  getActiveRequests,
+  archiveRequest
 };

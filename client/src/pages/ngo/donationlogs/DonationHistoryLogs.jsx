@@ -1,129 +1,122 @@
 
-import React, { useEffect, useMemo, useState } from "react";
-import { FileDown, Search, Eye } from "lucide-react";
-import { getCurrentUser } from "../../../services/auth";
-import { fetchNgoDonations } from "../../../services/api";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { Search, FileDown, FileText, Package } from "lucide-react";
 import "./DonationHistoryLogs.css";
 
 export default function DonationHistoryLogs() {
-  const user = getCurrentUser();
-
   const [logsData, setLogsData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [showAllLogs, setShowAllLogs] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [error, setError] = useState("");
 
+  // Fetch donation logs from the backend
   useEffect(() => {
-    let cancelled = false;
-
-    const loadHistory = async () => {
-      if (!user?.id) {
-        setError("NGO user information was not found. Please log in again.");
-        setLoading(false);
-        return;
-      }
-
+    const fetchLogs = async () => {
       try {
         setLoading(true);
         setError("");
 
-        // Fetch this NGO's donations from the existing donation API.
-        const result = await fetchNgoDonations(user.id);
-
-        // The API returns donations, active and archived.
-        // Keep completed donations for the History & Logs page.
-        const donations = Array.isArray(result?.donations)
-          ? result.donations
-          : [
-              ...(result?.archived || []),
-              ...(result?.active || []),
-            ];
-
-        const completed = donations.filter(
-          (donation) =>
-            String(
-              donation.pipelineStatus || donation.status || ""
-            ).toLowerCase() === "completed"
+        const res = await axios.get(
+          "http://localhost:5000/api/donation-logs/all"
         );
 
-        if (!cancelled) {
-          setLogsData(completed);
+        if (res.data?.success) {
+          setLogsData(Array.isArray(res.data.data) ? res.data.data : []);
+        } else {
+          setLogsData([]);
+          setError("Could not load donation history.");
         }
       } catch (err) {
-        console.error("Failed to load donation history:", err);
-
-        if (!cancelled) {
-          setError(
-            err?.response?.data?.message ||
-              "Could not load donation history. Please try again."
-          );
-        }
+        console.error("Database fetch failed:", err);
+        setError("Unable to load donation records. Please try again.");
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
     };
 
-    loadHistory();
+    fetchLogs();
+  }, []);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id]);
+  // Filter donation logs by ID, donor, or food name
+  const filteredLogs = logsData.filter((log) => {
+    const search = searchTerm.trim().toLowerCase();
+    const donationId = String(log.donationId || log._id || "").toLowerCase();
+    const donorName = String(
+      log.donorId?.name || log.donor || ""
+    ).toLowerCase();
+    const foodName = String(
+      log.foodType || log.food || log.foodName || ""
+    ).toLowerCase();
 
-  const filteredLogs = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-
-    if (!term) return logsData;
-
-    return logsData.filter((log) => {
-      const donorName =
-        typeof log.donor === "object"
-          ? log.donor?.name || ""
-          : log.donor || "";
-
-      const donationId = log.donationId || log._id || "";
-      const foodName = log.foodName || log.foodType || log.food || "";
-
-      return (
-        String(donationId).toLowerCase().includes(term) ||
-        String(donorName).toLowerCase().includes(term) ||
-        String(foodName).toLowerCase().includes(term)
-      );
-    });
-  }, [logsData, searchTerm]);
+    return (
+      donationId.includes(search) ||
+      donorName.includes(search) ||
+      foodName.includes(search)
+    );
+  });
 
   const displayedLogs = showAllLogs
     ? filteredLogs
     : filteredLogs.slice(0, 4);
 
+  // Format dates safely
+  const formatDate = (dateValue) => {
+    if (!dateValue) return "N/A";
+
+    const date = new Date(dateValue);
+
+    if (Number.isNaN(date.getTime())) return "N/A";
+
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  // Export the currently filtered records as CSV
   const exportReport = () => {
-    const rows = [
-      ["Donation ID", "Date", "Donor", "Food", "Quantity", "Status"],
-      ...filteredLogs.map((log) => [
-        log.donationId || log._id || "",
-        log.createdAt
-          ? new Date(log.createdAt).toLocaleDateString()
-          : "",
-        typeof log.donor === "object"
-          ? log.donor?.name || ""
-          : log.donor || "",
-        log.foodName || log.foodType || log.food || "",
-        log.quantity ?? log.quantityKg ?? log.qty ?? "",
-        log.pipelineStatus || log.status || "",
-      ]),
+    if (filteredLogs.length === 0) {
+      window.alert("There are no donation records to export.");
+      return;
+    }
+
+    const headers = [
+      "Donation ID",
+      "Food",
+      "Restaurant / Donor",
+      "Quantity",
+      "Estimated Meals",
+      "Date",
+      "Status",
     ];
 
-    const csv = rows
-      .map((row) =>
-        row
-          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
-          .join(",")
-      )
-      .join("\r\n");
+    const rows = filteredLogs.map((log) => [
+      log.donationId || log._id || "",
+      log.foodType || log.food || log.foodName || "",
+      log.restaurantId?.name ||
+        log.restaurant?.name ||
+        log.donorId?.name ||
+        log.donor ||
+        "N/A",
+      log.quantity ?? log.qty ?? "",
+      log.estimatedMeals ?? log.meals ?? "",
+      formatDate(log.createdAt || log.date),
+      log.status || "Delivered",
+    ]);
 
-    const blob = new Blob(["\uFEFF" + csv], {
+    const escapeCSV = (value) =>
+      `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+    const csvContent = [
+      headers.map(escapeCSV).join(","),
+      ...rows.map((row) => row.map(escapeCSV).join(",")),
+    ].join("\r\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], {
       type: "text/csv;charset=utf-8;",
     });
 
@@ -131,60 +124,137 @@ export default function DonationHistoryLogs() {
     const link = document.createElement("a");
 
     link.href = url;
-    link.download = "feedlink-donation-history.csv";
+    link.download = "donation-history-report.csv";
+    document.body.appendChild(link);
     link.click();
+    link.remove();
 
     URL.revokeObjectURL(url);
   };
 
+  const getStatusClass = (status) => {
+    const normalizedStatus = String(status || "Delivered").toLowerCase();
+
+    if (
+      normalizedStatus.includes("deliver") ||
+      normalizedStatus.includes("complete") ||
+      normalizedStatus.includes("received")
+    ) {
+      return "bg-emerald-50 text-emerald-700";
+    }
+
+    if (
+      normalizedStatus.includes("pending") ||
+      normalizedStatus.includes("progress")
+    ) {
+      return "bg-amber-50 text-amber-700";
+    }
+
+    if (
+      normalizedStatus.includes("cancel") ||
+      normalizedStatus.includes("reject")
+    ) {
+      return "bg-rose-50 text-rose-700";
+    }
+
+    return "bg-slate-100 text-slate-700";
+  };
+
+  const getRestaurantName = (log) =>
+    log.restaurantId?.name ||
+    log.restaurant?.name ||
+    log.donorId?.name ||
+    log.donor ||
+    "N/A";
+
+  const getFoodName = (log) =>
+    log.foodType || log.food || log.foodName || "N/A";
+
+  const getQuantity = (log) => {
+    const quantity = log.quantity ?? log.qty;
+
+    if (quantity === undefined || quantity === null || quantity === "") {
+      return "N/A";
+    }
+
+    return `${quantity}${typeof quantity === "number" ? " kg" : ""}`;
+  };
+
+  const getEstimatedMeals = (log) => {
+    if (log.estimatedMeals !== undefined && log.estimatedMeals !== null) {
+      return log.estimatedMeals;
+    }
+
+    if (log.meals !== undefined && log.meals !== null) {
+      return log.meals;
+    }
+
+    const quantity = Number(log.quantity ?? log.qty);
+
+    return Number.isFinite(quantity) && quantity > 0
+      ? Math.floor(quantity / 0.25)
+      : "N/A";
+  };
+
   return (
-    <div className="dhl-container">
+    <div className="dhl-container min-h-screen">
+      {/* Header */}
       <div className="dhl-header">
         <div>
           <div className="dhl-title-group">
-            <span className="text-xl">📦</span>
+            <Package size={22} className="text-emerald-600" />
             <h2 className="dhl-title">
-              HISTORY & LOGS: Completed Donations
+              HISTORY &amp; LOGS: Completed Donations
             </h2>
           </div>
+
           <p className="dhl-subtitle">
-            Completed donations and their audit records
+            NGO donation history, records and proof receipts
           </p>
         </div>
 
         <button
+          type="button"
           className="dhl-export-btn"
           onClick={exportReport}
-          disabled={filteredLogs.length === 0}
         >
-          <FileDown size={16} />
-          EXPORT REPORT
+          <FileDown size={17} />
+          <span>EXPORT REPORT</span>
         </button>
       </div>
 
+      {/* Search */}
       <div className="dhl-filters-panel">
-        <div>
-          <label className="dhl-filter-label">
-            Search ID / Donor / Food
+        <div className="w-full">
+          <label
+            htmlFor="donation-history-search"
+            className="dhl-filter-label"
+          >
+            Search Donation ID, Donor or Food
           </label>
 
           <div className="relative">
             <Search
-              size={16}
+              size={18}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
             />
 
             <input
-              type="text"
-              placeholder="Search..."
+              id="donation-history-search"
+              type="search"
+              placeholder="Search donation records..."
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              className="dhl-filter-input pl-9"
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setShowAllLogs(false);
+              }}
+              className="dhl-filter-input w-full"
             />
           </div>
         </div>
       </div>
 
+      {/* Donation history */}
       <div className="dhl-main-grid">
         <div className="dhl-table-col">
           <div className="dhl-table-header">
@@ -192,8 +262,9 @@ export default function DonationHistoryLogs() {
               <h3 className="dhl-table-title">
                 DONATION HISTORY LOGS
               </h3>
+
               <p className="text-[11px] text-slate-400">
-                Records from the NGO donation database
+                Live MongoDB Database Logs
               </p>
             </div>
 
@@ -202,121 +273,96 @@ export default function DonationHistoryLogs() {
             </span>
           </div>
 
-          <div className="dhl-table-wrapper">
+          <div className="dhl-table-wrapper overflow-x-auto">
             {loading ? (
               <div className="p-8 text-center text-slate-500">
-                Loading donation history...
+                Loading donation records...
               </div>
             ) : error ? (
-              <div className="p-8 text-center text-red-600">
-                <p>{error}</p>
-                <button
-                  className="mt-3 rounded-lg bg-green-600 px-4 py-2 text-white"
-                  onClick={() => window.location.reload()}
-                >
-                  Retry
-                </button>
+              <div className="p-8 text-center text-rose-600">
+                {error}
+              </div>
+            ) : filteredLogs.length === 0 ? (
+              <div className="p-8 text-center text-slate-500">
+                No donation records found.
               </div>
             ) : (
-              <table className="dhl-custom-table">
+              <table className="dhl-custom-table w-full">
                 <thead>
                   <tr>
                     <th className="p-3">Donation ID</th>
+                    <th className="p-3">Food</th>
+                    <th className="p-3">Restaurant / Donor</th>
+                    <th className="p-3">Quantity</th>
+                    <th className="p-3">Estimated Meals</th>
                     <th className="p-3">Date</th>
-                    <th className="p-3">Donor</th>
-                    <th className="p-3">Food Type</th>
-                    <th className="p-3">Qty</th>
                     <th className="p-3">Status</th>
                     <th className="p-3 text-center">Actions</th>
                   </tr>
                 </thead>
 
                 <tbody className="divide-y divide-slate-100">
-                  {displayedLogs.map((log) => {
-                    const donorName =
-                      typeof log.donor === "object"
-                        ? log.donor?.name || "N/A"
-                        : log.donor || "N/A";
+                  {displayedLogs.map((log) => (
+                    <tr
+                      key={log._id || log.id || log.donationId}
+                      className="hover:bg-slate-50"
+                    >
+                      <td className="p-3 font-bold text-slate-900">
+                        {log.donationId ||
+                          (log._id ? log._id.slice(-6) : log.id) ||
+                          "N/A"}
+                      </td>
 
-                    return (
-                      <tr
-                        key={log._id || log.donationId}
-                        className="hover:bg-slate-50"
-                      >
-                        <td className="p-3 font-bold text-slate-900">
-                          {log.donationId ||
-                            log._id?.slice(-6) ||
-                            "N/A"}
-                        </td>
+                      <td className="p-3 text-slate-700">
+                        {getFoodName(log)}
+                      </td>
 
-                        <td className="p-3 text-slate-500">
-                          {log.createdAt
-                            ? new Date(
-                                log.createdAt
-                              ).toLocaleDateString()
-                            : "N/A"}
-                        </td>
+                      <td className="p-3 text-slate-700">
+                        {getRestaurantName(log)}
+                      </td>
 
-                        <td className="p-3 font-semibold text-slate-800">
-                          {donorName}
-                        </td>
+                      <td className="p-3 font-semibold text-slate-800">
+                        {getQuantity(log)}
+                      </td>
 
-                        <td className="p-3 text-slate-700">
-                          {log.foodName ||
-                            log.foodType ||
-                            log.food ||
-                            "N/A"}
-                        </td>
+                      <td className="p-3 text-slate-700">
+                        {getEstimatedMeals(log)}
+                      </td>
 
-                        <td className="p-3 font-semibold text-slate-900">
-                          {log.quantity ??
-                            log.quantityKg ??
-                            log.qty ??
-                            "N/A"}
-                          {log.quantity != null ||
-                          log.quantityKg != null
-                            ? " kg"
-                            : ""}
-                        </td>
+                      <td className="p-3 text-slate-500">
+                        {formatDate(log.createdAt || log.date)}
+                      </td>
 
-                        <td className="p-3">
-                          <span className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
-                            ✓ {log.pipelineStatus || log.status}
-                          </span>
-                        </td>
+                      <td className="p-3">
+                        <span
+                          className={`inline-block rounded-md px-2 py-1 text-[10px] font-bold ${getStatusClass(
+                            log.status
+                          )}`}
+                        >
+                          {log.status || "Delivered"}
+                        </span>
+                      </td>
 
-                        <td className="p-3 text-center">
-                          <button
-                            onClick={() => setSelectedReceipt(log)}
-                            className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-200"
-                          >
-                            <Eye size={13} />
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-
-                  {!loading && filteredLogs.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={7}
-                        className="p-8 text-center text-slate-500"
-                      >
-                        {searchTerm
-                          ? "No records match your search."
-                          : "No completed donations found for this NGO."}
+                      <td className="p-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedReceipt(log)}
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                        >
+                          <FileText size={14} />
+                          View
+                        </button>
                       </td>
                     </tr>
-                  )}
+                  ))}
                 </tbody>
               </table>
             )}
           </div>
 
-          {filteredLogs.length > 4 && (
+          {filteredLogs.length > 4 && !loading && !error && (
             <button
+              type="button"
               onClick={() => setShowAllLogs((previous) => !previous)}
               className="dhl-see-more-btn"
             >
@@ -328,65 +374,104 @@ export default function DonationHistoryLogs() {
         </div>
       </div>
 
+      {/* Receipt modal */}
       {selectedReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-lg font-bold text-slate-800">
-                Donation Receipt
-              </h3>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setSelectedReceipt(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="donation-receipt-title"
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <div>
+                <h3
+                  id="donation-receipt-title"
+                  className="text-lg font-bold text-slate-900"
+                >
+                  Donation Receipt
+                </h3>
+                <p className="text-sm text-slate-500">
+                  Donation record details
+                </p>
+              </div>
 
               <button
+                type="button"
                 onClick={() => setSelectedReceipt(null)}
-                className="rounded-lg px-3 py-1 text-slate-500 hover:bg-slate-100"
+                className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
               >
                 Close
               </button>
             </div>
 
-            <div className="mt-4 space-y-3 text-sm text-slate-600">
-              <p>
-                <strong>Donation ID:</strong>{" "}
-                {selectedReceipt.donationId ||
-                  selectedReceipt._id ||
-                  "N/A"}
-              </p>
-              <p>
-                <strong>Donor:</strong>{" "}
-                {typeof selectedReceipt.donor === "object"
-                  ? selectedReceipt.donor?.name || "N/A"
-                  : selectedReceipt.donor || "N/A"}
-              </p>
-              <p>
-                <strong>Food:</strong>{" "}
-                {selectedReceipt.foodName ||
-                  selectedReceipt.foodType ||
-                  selectedReceipt.food ||
-                  "N/A"}
-              </p>
-              <p>
-                <strong>Quantity:</strong>{" "}
-                {selectedReceipt.quantity ??
-                  selectedReceipt.quantityKg ??
-                  selectedReceipt.qty ??
-                  "N/A"}
-              </p>
-              <p>
-                <strong>Status:</strong>{" "}
-                {selectedReceipt.pipelineStatus ||
-                  selectedReceipt.status ||
-                  "N/A"}
-              </p>
-              <p>
-                <strong>Completed/Created:</strong>{" "}
-                {selectedReceipt.updatedAt || selectedReceipt.createdAt
-                  ? new Date(
-                      selectedReceipt.updatedAt ||
-                        selectedReceipt.createdAt
-                    ).toLocaleString()
-                  : "N/A"}
-              </p>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between gap-4 border-b pb-2">
+                <span className="text-slate-500">Donation ID</span>
+                <span className="break-all text-right font-semibold text-slate-800">
+                  {selectedReceipt.donationId ||
+                    selectedReceipt._id ||
+                    selectedReceipt.id ||
+                    "N/A"}
+                </span>
+              </div>
+
+              <div className="flex justify-between gap-4 border-b pb-2">
+                <span className="text-slate-500">Food</span>
+                <span className="text-right font-semibold text-slate-800">
+                  {getFoodName(selectedReceipt)}
+                </span>
+              </div>
+
+              <div className="flex justify-between gap-4 border-b pb-2">
+                <span className="text-slate-500">Restaurant / Donor</span>
+                <span className="text-right font-semibold text-slate-800">
+                  {getRestaurantName(selectedReceipt)}
+                </span>
+              </div>
+
+              <div className="flex justify-between gap-4 border-b pb-2">
+                <span className="text-slate-500">Quantity</span>
+                <span className="text-right font-semibold text-slate-800">
+                  {getQuantity(selectedReceipt)}
+                </span>
+              </div>
+
+              <div className="flex justify-between gap-4 border-b pb-2">
+                <span className="text-slate-500">Estimated Meals</span>
+                <span className="text-right font-semibold text-slate-800">
+                  {getEstimatedMeals(selectedReceipt)}
+                </span>
+              </div>
+
+              <div className="flex justify-between gap-4 border-b pb-2">
+                <span className="text-slate-500">Date</span>
+                <span className="text-right font-semibold text-slate-800">
+                  {formatDate(
+                    selectedReceipt.createdAt || selectedReceipt.date
+                  )}
+                </span>
+              </div>
+
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500">Status</span>
+                <span className="text-right font-semibold text-slate-800">
+                  {selectedReceipt.status || "Delivered"}
+                </span>
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setSelectedReceipt(null)}
+              className="mt-6 w-full rounded-xl bg-emerald-700 px-4 py-3 font-semibold text-white hover:bg-emerald-800"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}

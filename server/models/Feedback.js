@@ -7,16 +7,15 @@ const feedbackSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Donation",
     },
-    donationId: { 
-      type: String, 
-      required: true 
+    donationId: {
+      type: String,
+      required: true
     },
     ngo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Ngo",
     },
-    // The restaurant (User with role "donor") this feedback is about -
-    // this is what makes dual-routing to the Restaurant dashboard possible.
+    // The restaurant (User with role "donor") this feedback is about
     restaurant: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -26,15 +25,13 @@ const feedbackSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-    donorName: { 
-      type: String, 
-      required: true 
+    donorName: {
+      type: String,
+      required: true
     },
 
     // =====================================
-    // DUAL-DESTINATION ROUTING
-    // Every feedback submission is routed to the Admin panel AND
-    // (when a restaurant is linked) to that Restaurant's own dashboard.
+    // DUAL-DESTINATION ROUTING & STATUS
     // =====================================
     routedTo: {
       admin: { type: Boolean, default: true },
@@ -42,32 +39,40 @@ const feedbackSchema = new mongoose.Schema(
     },
     adminRead: { type: Boolean, default: false },
     restaurantRead: { type: Boolean, default: false },
+
+    // Status management: Pending / Awaiting Response / Approved / Declined
+    status: {
+      type: String,
+      enum: ["Pending", "Awaiting Response", "Approved", "Declined", "Resolved"],
+      default: "Awaiting Response"
+    },
+
     restaurantResponse: {
       message: { type: String, default: "" },
       respondedAt: { type: Date, default: null },
     },
 
     // Feedback Content & Categorization
-    category: { 
-      type: String, 
-      required: true 
+    category: {
+      type: String,
+      required: true
     },
-    tags: [{ 
-      type: String 
+    tags: [{
+      type: String
     }],
-    priority: { 
-      type: String, 
-      enum: ["Low", "Normal", "High / Urgent"], 
-      default: "Normal" 
+    priority: {
+      type: String,
+      enum: ["Low", "Normal", "High / Urgent"],
+      default: "Normal"
     },
     rating: {
       type: Number,
       min: 1,
       max: 5,
     },
-    message: { 
-      type: String, 
-      required: true 
+    message: {
+      type: String,
+      required: true
     },
     comment: {
       type: String,
@@ -75,12 +80,12 @@ const feedbackSchema = new mongoose.Schema(
     },
 
     // Metadata
-    submittedBy: { 
-      type: String, 
-      default: "NGO Admin" 
+    submittedBy: {
+      type: String,
+      default: "NGO"
     },
-    date: { 
-      type: String 
+    date: {
+      type: String
     },
   },
   { timestamps: true }

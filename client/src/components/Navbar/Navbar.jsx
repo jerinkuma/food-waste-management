@@ -41,7 +41,7 @@ const Navbar = () => {
         }`}
       >
         <div className="relative max-w-7xl mx-auto flex items-center justify-between px-6">
-          
+
           {/* Logo */}
           <h1
             className={`text-3xl font-bold ${
@@ -96,7 +96,7 @@ const Navbar = () => {
 
         {/* Center Menu Container */}
         <div className="mobile-menu-container">
-          
+
           {/* Close Button */}
           <button
             className="mobile-menu-close"
@@ -108,7 +108,7 @@ const Navbar = () => {
 
           {/* Glass Menu Box */}
           <div className="mobile-menu-box">
-            
+
             <p className="mobile-menu-title">
               Feed<span>Link</span>
             </p>

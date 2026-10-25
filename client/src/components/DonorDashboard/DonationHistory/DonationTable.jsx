@@ -55,13 +55,13 @@ const DonationTable = ({
 
   return (
     <div className="w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      
+
       <div className="w-full overflow-x-auto">
         <table className="w-full min-w-[650px]">
-          
+
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
-              
+
               <th className="px-4 py-4 text-left text-sm font-semibold text-gray-700 sm:px-6">
                 Food
               </th>
@@ -91,7 +91,7 @@ const DonationTable = ({
                 key={donation._id}
                 className="border-b border-gray-100 transition hover:bg-gray-50"
               >
-                
+
                 {/* Food */}
                 <td className="px-4 py-4 sm:px-6">
                   <div>

@@ -16,6 +16,7 @@ const notificationSchema = new mongoose.Schema(
       required: true,
       enum: [
         "NEW_DONATION",
+        "PRIORITY_DONATION", // ← এটি এখানে যোগ করা হলো
         "DONATION_REQUEST",
         "DONATION_ACCEPTED",
         "DONATION_REJECTED",
@@ -65,7 +66,7 @@ const notificationSchema = new mongoose.Schema(
       default: {},
     },
 
-    // Notification পড়া হয়েছে কিনা
+    // Notification পড়া হয়েছে কিনা
     read: {
       type: Boolean,
       default: false,

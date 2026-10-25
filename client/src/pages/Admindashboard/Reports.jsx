@@ -134,7 +134,7 @@ const Reports = () => {
         </div>
       ) : report ? (
         <>
-          
+
 
           <div className="reports-content-grid">
             <section className="reports-panel">

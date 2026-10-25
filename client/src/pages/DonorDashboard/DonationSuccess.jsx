@@ -129,7 +129,7 @@ const DonationSuccess = () => {
     http://localhost:5173/ngo/verify/FD-2026-123456
   */
 
-  
+
 const qrValue = `${window.location.origin}/delivery/safety/${donation.donationId}`;
 
 
