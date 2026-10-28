@@ -31,7 +31,6 @@ export const acceptDonation = async (donationId, ngoId) => {
   return data;
 };
 
-
 export const assignDeliveryDriver = async (
   donationId,
   name,
@@ -102,28 +101,32 @@ export const fetchRestaurantProfile = async (userId) => {
 // =====================================================================
 // FOLLOW / PARTNER SYSTEM
 // =====================================================================
+
+// =====================================================================
+// FOLLOW / PARTNER SYSTEM
+// =====================================================================
 export const fetchSuggestedPartners = async (userId, role) => {
-  const { data } = await client.get(`/follow/suggestions/${userId}`, { params: { role } });
+  const { data } = await client.get(`/partners/suggestions/${userId}`, { params: { role } });
   return data.suggestions || [];
 };
 
 export const fetchFollowing = async (userId) => {
-  const { data } = await client.get(`/follow/following/${userId}`);
+  const { data } = await client.get(`/partners/following/${userId}`);
   return data.following || [];
 };
 
 export const fetchFollowers = async (userId) => {
-  const { data } = await client.get(`/follow/followers/${userId}`);
+  const { data } = await client.get(`/partners/followers/${userId}`);
   return data.followers || [];
 };
 
 export const followPartner = async (followerId, followerRole, followingId, followingRole) => {
-  const { data } = await client.post("/follow", { followerId, followerRole, followingId, followingRole });
+  const { data } = await client.post("/partners/follow", { followerId, followerRole, followingId, followingRole });
   return data;
 };
 
 export const unfollowPartner = async (followerId, followerRole, followingId, followingRole) => {
-  const { data } = await client.delete("/follow", { data: { followerId, followerRole, followingId, followingRole } });
+  const { data } = await client.post("/partners/unfollow", { followerId, followerRole, followingId, followingRole });
   return data;
 };
 
@@ -155,18 +158,20 @@ export const respondToFeedback = async (feedbackId, message) => {
   return data;
 };
 
+// 👉 নতুন যোগ করা হলো: অ্যাডমিন ফিডব্যাক স্ট্যাটাস পরিবর্তন করার জন্য (Approve / Decline)
+export const updateFeedbackStatus = async (feedbackId, status) => {
+  const { data } = await client.patch(`/feedback/${feedbackId}/status`, { status });
+  return data;
+};
+
 export const markFeedbackRead = async (feedbackId, viewer) => {
   const { data } = await client.patch(`/feedback/${feedbackId}/read`, {}, { params: { viewer } });
   return data;
 };
 
 // =====================================================================
-// ADMIN (Static Fallback / Mock Data as requested)
+// ADMIN (Real Backend Connections)
 // =====================================================================
-// =====================================
-// ADMIN DASHBOARD STATS
-// Fetch real statistics from backend
-// =====================================
 export const fetchDashboardStats = async () => {
   const { data } = await client.get("/admin/dashboard-stats");
   return data;
@@ -182,31 +187,24 @@ export const updateUserStatus = async (userId, status) => {
   return data;
 };
 
-
 export const fetchDonations = async () => {
   const { data } = await client.get("/admin/donations");
   return data;
 };
-
-
 
 export const fetchOrphanages = async () => {
   const { data } = await client.get("/admin/ngos");
   return data;
 };
 
-
 export const fetchFeedback = async () => {
   const { data } = await client.get("/feedback/admin");
-  return data;
+  return data.feedback || [];
 };
-
-
 
 export const fetchInventory = async () => {
   const { data } = await client.get("/admin/donations");
   return data;
 };
-
 
 export default client;

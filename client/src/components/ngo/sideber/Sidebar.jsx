@@ -7,7 +7,7 @@ import {
   MapPin,
   Clock,
   History,
-  ShieldCheck,
+  Star,
   MessageSquare,
   Settings,
   LogOut,
@@ -31,7 +31,7 @@ export function Sidebar({ handleLogout }) {
     { path: "/ngo/active-requests", name: "ACTIVE REQUESTS", icon: Clock },
     { path: "/ngo/partners", name: "PARTNERS", icon: Handshake },
     { path: "/ngo/history", name: "HISTORY & LOGS", icon: History },
-    { path: "/ngo/trust-score", name: "TRUST SCORE", icon: ShieldCheck },
+    { path: "/ngo/rating", name: "RATINGS", icon: Star }, // ট্রাস্ট স্কোর থেকে রেটিং এ আপডেট করা হয়েছে
     { path: "/ngo/feedback", name: "FEEDBACK", icon: MessageSquare },
     { path: "/ngo/settings", name: "SETTINGS", icon: Settings },
   ];
@@ -126,12 +126,12 @@ export default function NgoLayout({ children }) {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    // 1. LocalStorage & SessionStorage ক্লিয়ার করা
+    // 1. LocalStorage & SessionStorage ক্লিয়ার করা
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     sessionStorage.clear();
 
-    // 2. ইউজারকে লগইন পেজে রিডাইরেক্ট করা (fixed: route is /auth, not /login)
+    // 2. ইউজারকে লগইন পেজে রিডাইরেক্ট করা
     navigate("/auth");
   };
 

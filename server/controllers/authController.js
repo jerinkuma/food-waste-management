@@ -40,7 +40,7 @@ const signup = async (req, res) => {
     }
 
     // Check existing user
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
 
     if (existingUser) {
       return res.status(400).json({
@@ -55,7 +55,7 @@ const signup = async (req, res) => {
     // Create user
     const user = await User.create({
       name,
-      email,
+      email: email.toLowerCase(),
       password: hashedPassword,
       role,
     });
@@ -76,6 +76,7 @@ const signup = async (req, res) => {
 
       await Ngo.create({
         user: user._id,
+        ngoName: name, // 👉 এনজিওর নাম হিসেবে ইউজারনেম/নাম সেভ নিশ্চিত করা হলো
         organizationId,
         maximumCapacity,
         phone,
@@ -94,6 +95,7 @@ const signup = async (req, res) => {
 
       await Restaurant.create({
         user: user._id,
+        restaurantName: name, // 👉 রেস্টুরেন্টের নাম সেভ নিশ্চিত করা হলো
         tradeLicense,
         phone,
         address,
@@ -131,7 +133,6 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validation
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -139,7 +140,6 @@ const login = async (req, res) => {
       });
     }
 
-    // Find user
     const user = await User.findOne({
       email: email.toLowerCase(),
     });
@@ -151,7 +151,6 @@ const login = async (req, res) => {
       });
     }
 
-    // Compare password
     const isPasswordCorrect = await bcrypt.compare(
       password,
       user.password
@@ -164,17 +163,32 @@ const login = async (req, res) => {
       });
     }
 
-    // Create JWT token
+    let ngoDetails = null;
+    let restaurantDetails = null;
+
+    // 👉 রোল অনুযায়ী সঠিক টেবিল থেকে অর্গানাইজেশন বা এনজিওর নাম ফেচ করা হলো
+    if (user.role === "ngo") {
+      ngoDetails = await Ngo.findOne({ user: user._id });
+    } else if (user.role === "donor") {
+      restaurantDetails = await Restaurant.findOne({ user: user._id });
+    }
+
     const token = jwt.sign(
       {
         id: user._id,
         role: user.role,
       },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'your_jwt_secret_key',
       {
         expiresIn: "7d",
       }
     );
+
+    // 👉 ফিক্সড অর্গানাইজেশন বা এনজিও নাম রেসপন্সে পাঠানো
+    const organizationName = 
+      ngoDetails?.ngoName || 
+      restaurantDetails?.restaurantName || 
+      user.name;
 
     return res.status(200).json({
       success: true,
@@ -183,14 +197,15 @@ const login = async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
+        ngoName: organizationName, // হেডার এবং সেটিংসের জন্য সঠিক নাম
         email: user.email,
         role: user.role,
+        avatar: user.avatar || null, // ইউজারের নিজস্ব ছবি
       },
     });
 
   } catch (error) {
     console.error("Login Error:", error);
-
     return res.status(500).json({
       success: false,
       message: "Server error during login",
@@ -198,6 +213,7 @@ const login = async (req, res) => {
     });
   }
 };
+
 
 // ===============================
 // CHANGE PASSWORD

@@ -28,7 +28,7 @@ import Header from "./components/ngo/header/Header";
 import DonationMap from "./pages/ngo/donationmap/DonationMap";
 import ActiveRequests from "./pages/ngo/activerequest/ActiveRequests";
 import DonationHistoryLogs from "./pages/ngo/donationlogs/DonationHistoryLogs";
-import TrustScore from "./pages/ngo/trustscore/TrustScore";
+import Rating from "./pages/ngo/Rating/Rating.jsx"; // আপডেটেড রেটিং কম্পোনেন্ট
 import Feedback from "./pages/ngo/feedback/Feedback";
 import Partners from "./pages/ngo/partners/Partners";
 import Settings from "./pages/ngo/setting/Settings";
@@ -107,8 +107,8 @@ function NGOLayout({
   return (
     <div
       className={`flex h-screen font-sans transition-colors duration-300 ${themeMode === "dark"
-          ? "bg-[#0f172a] text-slate-100"
-          : "bg-[#F8FAFC] text-slate-800"
+        ? "bg-[#0f172a] text-slate-100"
+        : "bg-[#F8FAFC] text-slate-800"
         }`}
     >
       <NGOSidebar />
@@ -155,9 +155,10 @@ function NGOLayout({
               element={<DonationHistoryLogs />}
             />
 
+            {/* ট্রাস্ট স্কোরের বদলে নতুন রেটিং রাউট */}
             <Route
-              path="trust-score"
-              element={<TrustScore themeMode={themeMode} />}
+              path="rating"
+              element={<Rating themeMode={themeMode} />}
             />
 
             <Route
@@ -184,8 +185,8 @@ function NGOLayout({
 
         <footer
           className={`text-center py-3 text-[11px] border-t mt-auto transition-colors ${themeMode === "dark"
-              ? "text-slate-500 border-slate-800"
-              : "text-slate-400 border-slate-200/60"
+            ? "text-slate-500 border-slate-800"
+            : "text-slate-400 border-slate-200/60"
             }`}
         >
           FeedLink NGO Portal, Chattogram · FeedLink © 2026
@@ -198,8 +199,6 @@ function NGOLayout({
 // =========================
 // Admin Layout
 // =========================
-
-
 
 function AdminLayout() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -272,8 +271,6 @@ function AdminLayout() {
     </div>
   );
 }
-
-
 
 // =========================
 // Main App

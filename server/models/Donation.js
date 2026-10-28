@@ -291,6 +291,27 @@ const donationSchema = new mongoose.Schema(
         default: null,
       },
     },
+    // =====================================
+    // RATING & REVIEW (NGO to Restaurant)
+    // =====================================
+
+    rating: {
+      score: {
+        type: Number,
+        min: 1,
+        max: 5,
+        default: null,
+      },
+      comment: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+      ratedAt: {
+        type: Date,
+        default: null,
+      },
+    },
 
     // =====================================
     // FOOD VERIFICATION

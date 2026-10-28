@@ -376,7 +376,40 @@ const createDonation = async (req, res) => {
     getIO()
       .to(rooms.admins())
       .emit("donation:new", donation);
+// ==================================================
+    // 🔥 প্রায়োরিটি নোটিফিকেশন সিস্টেম (অটো ট্রিগার)
+    // ==================================================
+    try {
+      const Follow = require("../models/Follow");
+      // ডোনরকে যারা ফলো করে তাদের খুঁজে বের করা
+      const followers = await Follow.find({ followingId: donor });
+      
+      if (followers && followers.length > 0) {
+        followers.forEach(async (f) => {
+          const ngoUser = f.followerId; 
+          if (ngoUser) {
+            await createNotification({
+              recipient: ngoUser.toString(),
+              type: "PRIORITY_DONATION",
+              title: "🔥 Alert: Followed Restaurant Posted!",
+              message: `Your partner restaurant posted a new donation: "${foodName || 'Food'}"`,
+              donation: donation._id,
+              data: {
+                role: "ngo",
+                donationId: donation.donationId,
+                action: "view-donation",
+              },
+            });
 
+            getIO()
+              .to(rooms.ngo(ngoUser.toString()))
+              .emit("donation:priority-new", donation);
+          }
+        });
+      }
+    } catch (notifErr) {
+      console.error("Priority notification error:", notifErr);
+    }
     // ==================================================
     // RESPONSE
     // ==================================================

@@ -7,28 +7,21 @@ const http = require("http");
 require("dotenv").config();
 
 const { initSocket } = require("./utils/socket");
-
-const {
-  startFreshnessMonitor,
-} = require("./utils/freshnessNotifier");
+const { startFreshnessMonitor } = require("./utils/freshnessNotifier");
 
 const app = express();
 const httpServer = http.createServer(app);
-
-
-const notificationRoutes = require("./routes/notificationRoutes");
 
 // =====================================
 // MIDDLEWARE SETUP
 // =====================================
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Serve Uploaded Static Files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-
-app.use("/api/notifications", notificationRoutes);
 // =====================================
 // IMPORT ALL ROUTES
 // =====================================
@@ -38,11 +31,13 @@ const donationRoutes = require("./routes/donationRoutes");
 const ngoRoutes = require("./routes/ngoRoutes");
 const requestRoutes = require("./routes/requestRoutes");
 const donationLogRoutes = require("./routes/donationLogRoutes");
-const trustScoreRoutes = require("./routes/trustScoreRoutes");
+const ratingRoutes = require("./routes/Rating"); 
 const feedbackRoutes = require("./routes/feedbackRoutes");
 const ngoSettingsRoutes = require("./routes/ngoSettingsRoutes");
 const followRoutes = require("./routes/followRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const searchRoutes = require("./routes/searchRoutes");
 
 // =====================================
 // API ROUTES INTEGRATION
@@ -52,22 +47,18 @@ const adminRoutes = require("./routes/adminRoutes");
 app.use("/api/auth", authRoutes);
 
 // Restaurant / Donor
-// Multer handles restaurant profile image upload here
 app.use("/api/restaurants", restaurantRoutes);
 
 // Donations
 app.use("/api/donations", donationRoutes);
 
+// Notifications & Global Search
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/search", searchRoutes);
+
 // =====================================
 // NGO FILE UPLOAD MIDDLEWARE
 // =====================================
-
-// express-fileupload is used by NGO Settings
-// (req.files.avatar)
-//
-// IMPORTANT:
-// It is placed AFTER restaurant routes so it does
-// not interfere with Multer in restaurantRoutes.js.
 app.use(fileUpload());
 
 // NGO
@@ -79,9 +70,12 @@ app.use("/api/ngo", ngoSettingsRoutes);
 // Other APIs
 app.use("/api/requests", requestRoutes);
 app.use("/api/donation-logs", donationLogRoutes);
-app.use("/api/trust-score", trustScoreRoutes);
+app.use("/api/ratings", ratingRoutes); 
 app.use("/api/feedback", feedbackRoutes);
-app.use("/api/follow", followRoutes);
+
+// /api/follow এর পরিবর্তে /api/partners করা হলো যাতে ফ্রন্টএন্ডের সাথে ম্যাচ করে
+app.use("/api/partners", followRoutes);
+
 app.use("/api/admin", adminRoutes);
 
 // =====================================
@@ -105,12 +99,6 @@ mongoose
   .then(() => {
     console.log("Central Database Connected Successfully!");
 
-    // =====================================
-    // FRESHNESS NOTIFICATION MONITOR
-    // =====================================
-    // Checks active donations periodically
-    // and sends real-time expiry alerts
-    // to the respective donor through Socket.IO.
     startFreshnessMonitor();
 
     httpServer.listen(PORT, () => {

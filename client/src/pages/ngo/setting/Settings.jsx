@@ -8,20 +8,22 @@ export default function Settings({
   userProfile = {}, 
   setUserProfile = () => {}, 
   themeMode: externalThemeMode, 
-  setThemeMode: externalSetThemeMode
+  themeModeSetter: externalSetThemeMode
 }) {
   const DEFAULT_AVATAR = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&auto=format&fit=crop&q=80";
 
   // Form State
   const [formData, setFormData] = useState({
-    fullName: 'NGO Representative 1',
-    ngoName: 'FeedLink Partner NGO',
-    email: 'ngo1@feedlink.org',
-    phone: '+880 1812-345678',
-    licenseNo: 'LIC-2026-9901',
-    address: 'Chittagong, Bangladesh',
-    avatar: DEFAULT_AVATAR
+    fullName: userProfile?.fullName || 'Asha Foundation',
+    ngoName: userProfile?.ngoName || 'Asha Foundation',
+    email: userProfile?.email || 'asha@gmail.com',
+    phone: userProfile?.phone || '0192367890',
+    licenseNo: userProfile?.licenseNo || userProfile?.organizationId || '2223445',
+    address: userProfile?.address || 'Chittagong, Bangladesh',
+    avatar: userProfile?.avatar || DEFAULT_AVATAR
   });
+
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const [passwordData, setPasswordData] = useState({ 
     current: '', 
@@ -29,36 +31,64 @@ export default function Settings({
     confirm: '' 
   });
 
-  // Fetch current NGO settings on component mount
+  // Fetch real user settings from backend with correct per-user avatar & data
+  const fetchUserSettings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const res = await axios.get(`${API_BASE}/settings`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.data) {
+        const fetched = res.data;
+        
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const activeAvatar = fetched.avatar || storedUser.image || storedUser.avatar || DEFAULT_AVATAR;
+
+        setFormData(prev => ({
+          ...prev,
+          fullName: fetched.fullName || prev.fullName,
+          ngoName: fetched.ngoName || prev.ngoName,
+          email: fetched.email || prev.email,
+          phone: fetched.phone || prev.phone,
+          licenseNo: fetched.licenseNo || prev.licenseNo,
+          address: fetched.address || prev.address,
+          avatar: activeAvatar
+        }));
+
+        setUserProfile(prev => ({
+          ...prev,
+          fullName: fetched.fullName || prev?.fullName,
+          ngoName: fetched.ngoName || prev?.ngoName,
+          avatar: activeAvatar
+        }));
+      }
+    } catch (err) {
+      console.warn("Using current profile state.");
+    }
+  };
+
   useEffect(() => {
     fetchUserSettings();
   }, []);
 
-  const fetchUserSettings = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${API_BASE}/settings`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (res.data) {
-        setFormData({
-          fullName: res.data.fullName || userProfile?.fullName || '',
-          ngoName: res.data.ngoName || userProfile?.ngoName || '',
-          email: res.data.email || userProfile?.email || '',
-          phone: res.data.phone || userProfile?.phone || '',
-          licenseNo: res.data.licenseNo || userProfile?.licenseNo || '',
-          address: res.data.address || userProfile?.address || '',
-          avatar: res.data.avatar || userProfile?.avatar || DEFAULT_AVATAR
-        });
-      }
-    } catch (err) {
-      console.warn("Backend connection failed or unauthorized. Using local defaults.");
+  useEffect(() => {
+    if (userProfile && Object.keys(userProfile).length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        fullName: userProfile.fullName || prev.fullName,
+        ngoName: userProfile.ngoName || prev.ngoName,
+        email: userProfile.email || prev.email,
+        phone: userProfile.phone || prev.phone,
+        licenseNo: userProfile.licenseNo || userProfile.organizationId || prev.licenseNo,
+        address: userProfile.address || prev.address,
+        avatar: userProfile.avatar || prev.avatar
+      }));
     }
-  };
+  }, [userProfile]);
 
-  // Direct Theme State
   const [localTheme, setLocalTheme] = useState('dark');
   const isDark = (externalThemeMode || localTheme) === 'dark';
 
@@ -69,7 +99,6 @@ export default function Settings({
     setLocalTheme(mode);
   };
 
-  // Image Upload
   const handleImageUpload = (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
@@ -77,38 +106,84 @@ export default function Settings({
         alert('Please select a valid image file (PNG, JPG, JPEG).');
         return;
       }
+      setSelectedFile(file);
       const imagePreviewUrl = URL.createObjectURL(file);
       setFormData((prev) => ({ ...prev, avatar: imagePreviewUrl }));
     }
   };
 
-  // Remove Image
   const handleRemoveAvatar = () => {
-    setFormData((prev) => ({ ...prev, avatar: null }));
+    setSelectedFile(null);
+    setFormData((prev) => ({ ...prev, avatar: DEFAULT_AVATAR }));
   };
 
-  // -------------------------------------------------------------
-  // ১. Profile Update Request (এখানে নতুন কোড যুক্ত করা হয়েছে)
-  // -------------------------------------------------------------
+  // Profile Update Handler
   const handleProfileUpdate = async (e) => {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+    
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.put(`${API_BASE}/settings/profile`, formData, {
+      const data = new FormData();
+      data.append('fullName', formData.fullName);
+      data.append('ngoName', formData.ngoName);
+      data.append('email', formData.email);
+      data.append('phone', formData.phone);
+      data.append('licenseNo', formData.licenseNo);
+      data.append('address', formData.address);
+
+      if (selectedFile) {
+        data.append('avatar', selectedFile);
+      }
+
+      const res = await axios.put(`${API_BASE}/settings/profile`, data, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
         }
       });
-      setUserProfile(res.data.data || formData);
+
+      const updatedData = res.data?.data || formData;
+      const finalAvatar = updatedData.avatar || formData.avatar;
+
+      // 1. Form State update
+      setFormData(prev => ({
+        ...prev,
+        ...updatedData,
+        avatar: finalAvatar
+      }));
+
+      setSelectedFile(null);
+
+      // 2. Parent / Header State update
+      if (typeof setUserProfile === 'function') {
+        setUserProfile(prev => ({ ...prev, ...updatedData, avatar: finalAvatar }));
+      }
+
+      // 3. LocalStorage update
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const newStoredUser = { 
+        ...storedUser, 
+        ...updatedData, 
+        name: updatedData.ngoName || updatedData.fullName || storedUser.name,
+        ngoName: updatedData.ngoName || storedUser.ngoName,
+        fullName: updatedData.fullName || storedUser.fullName,
+        image: finalAvatar,
+        avatar: finalAvatar 
+      };
+      localStorage.setItem('user', JSON.stringify(newStoredUser));
+
+      // 4. Trigger custom window event for header sync
+      window.dispatchEvent(new Event("ngo_profile_updated"));
+
       alert('Profile updated successfully!');
     } catch (err) {
+      console.error("Profile update error:", err);
       alert(err.response?.data?.message || 'Failed to update profile');
     }
   };
 
-  // -------------------------------------------------------------
-  // ২. Password Update Request (এখানে নতুন কোড যুক্ত করা হয়েছে)
-  // -------------------------------------------------------------
   const handlePasswordUpdate = async (e) => {
     e.preventDefault();
 
@@ -141,15 +216,12 @@ export default function Settings({
   return (
     <div className={`settings-container ${isDark ? 'dark-mode' : 'light-mode'}`}>
       
-      {/* HEADER BANNER */}
       <div className="settings-card header-banner">
         <h2>System Settings & Configuration</h2>
       </div>
 
-      {/* MAIN GRID */}
       <div className="settings-grid">
         
-        {/* LEFT COLUMN: PROFILE & ORGANIZATION DETAILS */}
         <div className="settings-col-left">
           <div className="settings-card space-y">
             <div className="card-header">
@@ -157,7 +229,6 @@ export default function Settings({
               <p className="sub-text">Update official identity and contact details</p>
             </div>
 
-            {/* AVATAR UPLOAD & DELETE AREA */}
             <div className="avatar-section">
               <div className="avatar-wrapper">
                 {formData.avatar ? (
@@ -196,7 +267,6 @@ export default function Settings({
               </div>
             </div>
 
-            {/* FORM INPUTS */}
             <form onSubmit={handleProfileUpdate} className="settings-form">
               <div className="form-row">
                 <div className="form-group">
@@ -250,17 +320,18 @@ export default function Settings({
                 />
               </div>
 
-              <button type="submit" className="btn-primary">
+              <button 
+                type="submit" 
+                className="btn-primary"
+              >
                 Save Profile Changes
               </button>
             </form>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: THEME SWITCHER & SECURITY */}
         <div className="settings-col-right">
           
-          {/* THEME SWITCHER */}
           <div className="settings-card">
             <div className="card-header">
               <h3>Theme & Interface Appearance</h3>
@@ -286,7 +357,6 @@ export default function Settings({
             </div>
           </div>
 
-          {/* SECURITY & PASSWORD */}
           <div className="settings-card">
             <div className="card-header">
               <h3>Security & Authentication</h3>
