@@ -1,3 +1,4 @@
+
 const mongoose = require("mongoose");
 
 const donationSchema = new mongoose.Schema(
@@ -29,11 +30,6 @@ const donationSchema = new mongoose.Schema(
     },
 
     quantity: {
-      type: Number,
-      required: true,
-    },
-
-    estimatedMeals: {
       type: Number,
       required: true,
     },
@@ -98,17 +94,18 @@ const donationSchema = new mongoose.Schema(
     },
 
     // =====================================
-    // PICKUP GEOLOCATION (lat/lng & coords)
+    // PICKUP GEOLOCATION
     // =====================================
+
     pickupLocation: {
       lat: { type: Number, default: null },
       lng: { type: Number, default: null },
     },
 
-    coords: { 
-      type: [Number], // [latitude, longitude]
-      required: false, 
-      default: [22.3569, 91.7832] // চট্টগ্রামের ডিফল্ট পিন
+    coords: {
+      type: [Number],
+      required: false,
+      default: [22.3569, 91.7832],
     },
 
     // =====================================
@@ -131,11 +128,12 @@ const donationSchema = new mongoose.Schema(
       required: true,
     },
 
-    requestId: { 
-      type: String, 
+    requestId: {
+      type: String,
       unique: true,
       sparse: true,
-      default: () => "REQ-" + Math.floor(1000 + Math.random() * 9000)
+      default: () =>
+        "REQ-" + Math.floor(1000 + Math.random() * 9000),
     },
 
     qrCode: {
@@ -144,28 +142,32 @@ const donationSchema = new mongoose.Schema(
     },
 
     // =====================================
-    // LOGISTICS & EXTRA FIELDS (NGO NEEDED)
+    // LOGISTICS & EXTRA FIELDS
     // =====================================
 
-    logistics: { 
-      type: String, 
-      enum: ["FoodPanda Tracking", "By Self Option", "Third-party Delivery"],
-      default: "By Self Option" 
+    logistics: {
+      type: String,
+      enum: [
+        "FoodPanda Tracking",
+        "By Self Option",
+        "Third-party Delivery",
+      ],
+      default: "By Self Option",
     },
 
-    estimatedArrival: { 
-      type: String, 
-      default: "15 mins" 
+    estimatedArrival: {
+      type: String,
+      default: "15 mins",
     },
 
-    message: { 
-      type: String, 
-      trim: true 
+    message: {
+      type: String,
+      trim: true,
     },
 
-    timeAgo: { 
-      type: String, 
-      default: 'Recent' 
+    timeAgo: {
+      type: String,
+      default: "Recent",
     },
 
     // =====================================
@@ -192,7 +194,7 @@ const donationSchema = new mongoose.Schema(
         "In Transit",
         "Picked Up",
         "Driver Assigned",
-        "Archived"
+        "Archived",
       ],
       default: "Waiting for NGO Acceptance",
     },
@@ -200,9 +202,16 @@ const donationSchema = new mongoose.Schema(
     // =====================================
     // SIMPLIFIED NGO-FACING PIPELINE STATUS
     // =====================================
+
     pipelineStatus: {
       type: String,
-      enum: ["Pending", "Accepted", "Out for Delivery", "Completed", "Rejected"],
+      enum: [
+        "Pending",
+        "Accepted",
+        "Out for Delivery",
+        "Completed",
+        "Rejected",
+      ],
       default: "Pending",
     },
 
@@ -210,13 +219,57 @@ const donationSchema = new mongoose.Schema(
       {
         status: { type: String },
         changedAt: { type: Date, default: Date.now },
-        changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        changedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          default: null,
+        },
         note: { type: String, default: "" },
       },
     ],
 
     // =====================================
-    // NGO REQUEST
+    // MULTIPLE NGO REQUESTS
+    // =====================================
+
+    ngoRequests: [
+      {
+        requestedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Ngo",
+          required: true,
+        },
+
+        status: {
+          type: String,
+          enum: ["Pending", "Accepted", "Rejected"],
+          default: "Pending",
+        },
+
+        requestedAt: {
+          type: Date,
+          default: Date.now,
+        },
+
+        respondedAt: {
+          type: Date,
+          default: null,
+        },
+      },
+    ],
+
+    // =====================================
+    // DONOR SELECTED NGO
+    // =====================================
+
+    selectedNgo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Ngo",
+      default: null,
+    },
+
+    // =====================================
+    // OLD NGO REQUEST (KEEP THIS)
     // =====================================
 
     ngoRequest: {
@@ -291,8 +344,9 @@ const donationSchema = new mongoose.Schema(
         default: null,
       },
     },
+
     // =====================================
-    // RATING & REVIEW (NGO to Restaurant)
+    // RATING & REVIEW
     // =====================================
 
     rating: {
@@ -302,11 +356,13 @@ const donationSchema = new mongoose.Schema(
         max: 5,
         default: null,
       },
+
       comment: {
         type: String,
         default: "",
         trim: true,
       },
+
       ratedAt: {
         type: Date,
         default: null,
@@ -345,11 +401,13 @@ const donationSchema = new mongoose.Schema(
       },
     },
   },
-
   {
     timestamps: true,
   }
 );
 
-
-module.exports = mongoose.model("Donation", donationSchema, "donations");
+module.exports = mongoose.model(
+  "Donation",
+  donationSchema,
+  "donations"
+);

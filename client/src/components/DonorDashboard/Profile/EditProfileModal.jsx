@@ -1,11 +1,10 @@
+
 import { useEffect, useState } from "react";
 import {
   X,
   Camera,
   Loader2,
   Store,
-  MapPin,
-  Navigation,
 } from "lucide-react";
 
 const EditProfileModal = ({
@@ -18,11 +17,6 @@ const EditProfileModal = ({
   const [phone, setPhone] = useState("");
   const [tradeLicense, setTradeLicense] = useState("");
   const [address, setAddress] = useState("");
-
-  // Restaurant location
-  const [latitude, setLatitude] = useState(null);
-  const [longitude, setLongitude] = useState(null);
-  const [gettingLocation, setGettingLocation] = useState(false);
 
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState("");
@@ -40,9 +34,6 @@ const EditProfileModal = ({
       setPhone(profile.phone || "");
       setTradeLicense(profile.tradeLicense || "");
       setAddress(profile.address || "");
-
-      setLatitude(profile.location?.latitude ?? null);
-      setLongitude(profile.location?.longitude ?? null);
 
       setImage(null);
 
@@ -98,63 +89,6 @@ const EditProfileModal = ({
   };
 
   // =====================================
-  // GET CURRENT RESTAURANT LOCATION
-  // =====================================
-
-  const handleGetLocation = () => {
-    setError("");
-
-    if (!navigator.geolocation) {
-      setError(
-        "Geolocation is not supported by your browser."
-      );
-      return;
-    }
-
-    setGettingLocation(true);
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-
-        setLatitude(lat);
-        setLongitude(lng);
-
-        setGettingLocation(false);
-      },
-      (locationError) => {
-        console.error(
-          "Location error:",
-          locationError
-        );
-
-        let message =
-          "Unable to get your current location.";
-
-        if (locationError.code === 1) {
-          message =
-            "Location permission was denied. Please allow location access in your browser.";
-        } else if (locationError.code === 2) {
-          message =
-            "Your location could not be determined. Please try again.";
-        } else if (locationError.code === 3) {
-          message =
-            "Location request timed out. Please try again.";
-        }
-
-        setError(message);
-        setGettingLocation(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-      }
-    );
-  };
-
-  // =====================================
   // SAVE PROFILE
   // =====================================
 
@@ -207,25 +141,6 @@ const EditProfileModal = ({
       );
       formData.append("address", address.trim());
 
-      // =====================================
-      // SEND LOCATION
-      // =====================================
-
-      if (
-        latitude !== null &&
-        longitude !== null
-      ) {
-        formData.append(
-          "latitude",
-          latitude.toString()
-        );
-
-        formData.append(
-          "longitude",
-          longitude.toString()
-        );
-      }
-
       if (image) {
         formData.append("profileImage", image);
       }
@@ -269,10 +184,8 @@ const EditProfileModal = ({
         JSON.stringify(updatedUser)
       );
 
-      // Reset selected image
       setImage(null);
 
-      // Close modal
       onClose();
     } catch (error) {
       console.error(
@@ -400,9 +313,7 @@ const EditProfileModal = ({
               type="text"
               value={tradeLicense}
               onChange={(e) =>
-                setTradeLicense(
-                  e.target.value
-                )
+                setTradeLicense(e.target.value)
               }
               className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-green-500"
             />
@@ -422,74 +333,6 @@ const EditProfileModal = ({
               }
               className="w-full resize-none rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-green-500"
             />
-          </div>
-
-          {/* Restaurant Location */}
-          <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-green-100 p-2">
-                <MapPin
-                  size={20}
-                  className="text-green-700"
-                />
-              </div>
-
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-800">
-                  Restaurant Location
-                </h3>
-
-                <p className="mt-1 text-sm text-gray-500">
-                  Save your current location so delivery
-                  distance and estimated arrival can be
-                  calculated.
-                </p>
-
-                {latitude !== null &&
-                  longitude !== null && (
-                    <div className="mt-3 rounded-xl bg-white px-3 py-2 text-xs text-gray-600">
-                      <div>
-                        Latitude:{" "}
-                        <span className="font-medium text-gray-800">
-                          {latitude.toFixed(6)}
-                        </span>
-                      </div>
-
-                      <div className="mt-1">
-                        Longitude:{" "}
-                        <span className="font-medium text-gray-800">
-                          {longitude.toFixed(6)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                <button
-                  type="button"
-                  onClick={handleGetLocation}
-                  disabled={gettingLocation || saving}
-                  className="mt-3 flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {gettingLocation ? (
-                    <>
-                      <Loader2
-                        size={17}
-                        className="animate-spin"
-                      />
-                      Getting Location...
-                    </>
-                  ) : (
-                    <>
-                      <Navigation size={17} />
-                      {latitude !== null &&
-                      longitude !== null
-                        ? "Update Current Location"
-                        : "Use Current Location"}
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
           </div>
         </div>
 

@@ -1,79 +1,189 @@
+
 const Donation = require("../models/Donation");
-const Notification = require("../models/Notification");
 const Ngo = require("../models/Ngo");
 const mongoose = require("mongoose");
 
-// নির্দিষ্ট এই এনজিওর কমপ্লিট হওয়া ডোনেশনগুলো বের করা
+const {
+  createNotification,
+} = require("../utils/notificationUtils");
+
+// ======================================================
+// GET COMPLETED DONATIONS FOR NGO
+// ======================================================
+
 const getCompletedDonationsForNGO = async (req, res) => {
   try {
     const { ngoId } = req.params;
 
-    const ngoDoc = await Ngo.findOne({ 
-      $or: [{ _id: ngoId }, { user: ngoId }] 
+    const ngoDoc = await Ngo.findOne({
+      $or: [
+        { _id: ngoId },
+        { user: ngoId },
+      ],
     });
 
     const targetIds = [ngoId];
+
     if (ngoDoc) {
       targetIds.push(ngoDoc._id);
     }
 
     const donations = await Donation.find({
-      "ngoRequest.requestedBy": { $in: targetIds },
+      "ngoRequest.requestedBy": {
+        $in: targetIds,
+      },
       $or: [
-        { status: { $in: ["Completed", "completed", "COMPLETED"] } },
-        { pipelineStatus: { $in: ["Completed", "completed", "COMPLETED"] } }
-      ]
-    }).populate("donor", "name restaurantName email");
+        {
+          status: {
+            $in: [
+              "Completed",
+              "completed",
+              "COMPLETED",
+            ],
+          },
+        },
+        {
+          pipelineStatus: {
+            $in: [
+              "Completed",
+              "completed",
+              "COMPLETED",
+            ],
+          },
+        },
+      ],
+    }).populate(
+      "donor",
+      "name restaurantName email"
+    );
 
-    console.log(`NGO Donations Loaded | NGO: ${ngoId} | Total: ${donations.length}`);
+    console.log(
+      `NGO Donations Loaded | NGO: ${ngoId} | Total: ${donations.length}`
+    );
 
-    return res.status(200).json({ success: true, donations });
+    return res.status(200).json({
+      success: true,
+      donations,
+    });
   } catch (error) {
-    console.error("Fetch completed donations error:", error);
-    return res.status(500).json({ success: false, message: "Failed to load donations." });
+    console.error(
+      "Fetch completed donations error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load donations.",
+    });
   }
 };
 
-// রেটিং সাবমিট করার কন্ট্রোলার (আইডি কাস্টিং এরর ফিক্সড)
+// ======================================================
+// SUBMIT RATING
+// ======================================================
+
 const submitRating = async (req, res) => {
   try {
-    const { donationId, rating, comment } = req.body;
+    const {
+      donationId,
+      rating,
+      comment,
+    } = req.body;
 
-    if (!donationId || !rating) {
-      return res.status(400).json({ success: false, message: "Donation ID and Rating are required." });
+    // ----------------------------------------------
+    // VALIDATION
+    // ----------------------------------------------
+
+    const score = Number(rating);
+
+    if (
+      !donationId ||
+      rating === undefined ||
+      rating === null ||
+      !Number.isFinite(score) ||
+      score < 1 ||
+      score > 5
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Valid Donation ID and Rating (1-5) are required.",
+      });
     }
 
-    // সেফ কুয়েরি: আইডিটি ObjectId নাকি কাস্টম string (donationId) তা যাচাই করা হচ্ছে
+    // ----------------------------------------------
+    // FIND DONATION
+    // ----------------------------------------------
+
     let query;
-    if (mongoose.Types.ObjectId.isValid(donationId) && donationId.length === 24) {
-      query = { $or: [{ _id: donationId }, { donationId: donationId }] };
+
+    if (
+      mongoose.Types.ObjectId.isValid(donationId) &&
+      donationId.length === 24
+    ) {
+      query = {
+        $or: [
+          { _id: donationId },
+          { donationId: donationId },
+        ],
+      };
     } else {
-      query = { donationId: donationId };
+      query = {
+        donationId: donationId,
+      };
     }
 
     const donation = await Donation.findOne(query);
 
     if (!donation) {
-      return res.status(404).json({ success: false, message: "Donation not found." });
+      return res.status(404).json({
+        success: false,
+        message: "Donation not found.",
+      });
     }
 
+    // ----------------------------------------------
+    // SAVE RATING
+    // ----------------------------------------------
+
     donation.rating = {
-      score: Number(rating),
+      score,
       comment: comment || "",
       ratedAt: new Date(),
     };
+
     await donation.save();
 
-    if (Notification && donation.donor) {
-      await Notification.create({
+    // ----------------------------------------------
+    // NOTIFY DONOR
+    // ----------------------------------------------
+
+    if (donation.donor) {
+      await createNotification({
         recipient: donation.donor,
+
         type: "RATING_RECEIVED",
+
         title: "New Rating Received ⭐",
-        message: `An NGO rated your donation with ${rating} stars: "${comment || 'No comment provided'}"`,
+
+        message:
+          `An NGO rated your donation with ${score} stars: "${comment || "No comment provided"}"`,
+
         donation: donation._id,
-        read: false,
+
+        data: {
+          role: "donor",
+          donationId:
+            donation.donationId ||
+            donation._id.toString(),
+          rating: score,
+        },
       });
     }
+
+    // ----------------------------------------------
+    // RESPONSE
+    // ----------------------------------------------
 
     return res.status(200).json({
       success: true,
@@ -81,10 +191,21 @@ const submitRating = async (req, res) => {
       donation,
     });
   } catch (error) {
-    console.error("Submit rating error:", error);
-    return res.status(500).json({ success: false, message: "Failed to process rating." });
+    console.error(
+      "Submit rating error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to process rating.",
+    });
   }
 };
+
+// ======================================================
+// EXPORTS
+// ======================================================
 
 module.exports = {
   getCompletedDonationsForNGO,

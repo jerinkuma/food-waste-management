@@ -8,6 +8,11 @@ import {
 
 import Home from "./pages/Home/Home";
 import Auth from "./pages/Auth/Auth";
+import ForgotPassword from "./pages/Auth/ForgotPassword";
+import ResetPassword from "./pages/Auth/ResetPassword";
+
+
+
 
 // Restaurant / Donor
 import Dashboard from "./pages/DonorDashboard/Dashboard";
@@ -15,8 +20,11 @@ import AddDonation from "./pages/DonorDashboard/AddDonation";
 import DonationSuccess from "./pages/DonorDashboard/DonationSuccess";
 import DonationHistory from "./pages/DonorDashboard/DonationHistory";
 import Analytics from "./pages/DonorDashboard/Analytics";
+import NGOReviews from "./pages/DonorDashboard/NGOReviews";
 import Profile from "./pages/DonorDashboard/Profile";
 import Notifications from "./pages/DonorDashboard/Notifications";
+
+import DonorFeedback from "./pages/DonorDashboard/Feedback";
 
 // Delivery
 import SafetyVerification from "./pages/Delivery/SafetyVerification";
@@ -47,6 +55,8 @@ import AdminFeedback from "./pages/Admindashboard/Feedback";
 import AdminReports from "./pages/Admindashboard/Reports";
 import AdminInventory from "./pages/Admindashboard/Inventory";
 import AdminSettings from "./pages/Admindashboard/Settings";
+
+import AdminContactMessages from "./pages/Admindashboard/ContactMessages";
 
 import "./App.css";
 
@@ -250,6 +260,11 @@ function AdminLayout() {
             />
 
             <Route
+              path="contact-messages"
+              element={<AdminContactMessages />}
+            />
+
+            <Route
               path="reports"
               element={<AdminReports />}
             />
@@ -316,6 +331,18 @@ function App() {
           element={<Auth />}
         />
 
+        {/* ================= FORGOT PASSWORD ================= */}
+        <Route
+          path="/forgot-password"
+          element={<ForgotPassword />}
+        />
+
+        {/* ================= RESET PASSWORD ================= */}
+        <Route
+          path="/reset-password/:token"
+          element={<ResetPassword />}
+        />
+
         {/* ================= RESTAURANT / DONOR ================= */}
         <Route
           path="/restaurant/dashboard"
@@ -345,6 +372,15 @@ function App() {
         <Route
           path="/restaurant/analytics"
           element={<Analytics />}
+        />
+
+        <Route
+          path="/restaurant/ngo-reviews"
+          element={<NGOReviews />}
+        />
+        <Route
+          path="/restaurant/feedback"
+          element={<DonorFeedback />}
         />
 
         <Route

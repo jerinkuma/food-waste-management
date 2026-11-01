@@ -1,31 +1,46 @@
+
 import {
-  ClipboardList,
   CheckCircle,
   Clock3,
   XCircle,
+  PackageCheck,
 } from "lucide-react";
 
 const HistoryStats = ({ donations = [] }) => {
-  const total = donations.length;
-
-  const accepted = donations.filter(
-    (donation) => donation.status === "NGO Accepted"
+  // Total completed donations
+  const completed = donations.filter(
+    (donation) =>
+      donation.status === "Food Picked Up" ||
+      donation.pipelineStatus === "Completed"
   ).length;
 
+  // Total accepted donations
+  const accepted = donations.filter(
+    (donation) =>
+      donation.status === "NGO Accepted" ||
+      donation.status === "NGO Requested" ||
+      donation.pipelineStatus === "Accepted"
+  ).length;
+
+  // Pending donations (NGO Requested excluded)
   const pending = donations.filter(
     (donation) =>
-      donation.status === "Waiting for NGO Acceptance"
+      donation.status === "Waiting for NGO Acceptance" &&
+      donation.pipelineStatus !== "Accepted"
   ).length;
 
+  // Total rejected donations
   const rejected = donations.filter(
-    (donation) => donation.status === "Rejected"
+    (donation) =>
+      donation.status === "Rejected" ||
+      donation.pipelineStatus === "Rejected"
   ).length;
 
   const stats = [
     {
-      title: "Total Donations",
-      value: total,
-      icon: ClipboardList,
+      title: "Completed",
+      value: completed,
+      icon: PackageCheck,
       color: "bg-blue-100 text-blue-600",
     },
     {

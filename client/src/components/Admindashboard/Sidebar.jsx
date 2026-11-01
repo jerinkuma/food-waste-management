@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { fetchAdminUnreadContactCount } from "../../services/api";
 import "./Sidebar.css";
 
 const menuItems = [
@@ -9,6 +10,12 @@ const menuItems = [
   { path: "/admin/donations", icon: "🍱", label: "Donations" },
   { path: "/admin/orphanages", icon: "🏠", label: "NGOs" },
   { path: "/admin/feedback", icon: "💬", label: "Feedback" },
+  {
+    path: "/admin/contact-messages",
+    icon: "📩",
+    label: "Contact Messages",
+    showUnread: true,
+  },
   { path: "/admin/reports", icon: "📈", label: "Reports" },
   { path: "/admin/inventory", icon: "📦", label: "Inventory" },
   { path: "/admin/settings", icon: "👤", label: "Profile" },
@@ -16,9 +23,12 @@ const menuItems = [
 
 const Sidebar = ({ mobileOpen = false, onClose }) => {
   const location = useLocation();
+
   const [isMobile, setIsMobile] = useState(
     () => window.innerWidth <= 768
   );
+
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const handleResize = () => {
@@ -26,14 +36,43 @@ const Sidebar = ({ mobileOpen = false, onClose }) => {
     };
 
     window.addEventListener("resize", handleResize);
+
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Fetch unread contact message count
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUnreadCount = async () => {
+      try {
+        const count = await fetchAdminUnreadContactCount();
+
+        if (isMounted) {
+          setUnreadCount(count);
+        }
+      } catch (error) {
+        console.error(
+          "Unread contact count error:",
+          error.response?.data || error.message
+        );
+      }
+    };
+
+    loadUnreadCount();
+
+    const interval = setInterval(loadUnreadCount, 30000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [location.pathname]);
 
   useEffect(() => {
     if (isMobile && onClose) {
       onClose();
     }
-    // Close mobile sidebar whenever the route changes.
   }, [location.pathname]);
 
   useEffect(() => {
@@ -46,6 +85,7 @@ const Sidebar = ({ mobileOpen = false, onClose }) => {
     };
 
     document.addEventListener("keydown", handleEscape);
+
     return () => document.removeEventListener("keydown", handleEscape);
   }, [isMobile, mobileOpen, onClose]);
 
@@ -62,13 +102,15 @@ const Sidebar = ({ mobileOpen = false, onClose }) => {
 
       <aside
         id="admin-sidebar"
-        className={`sidebar ${isMobile ? "sidebar-mobile" : ""} ${mobileOpen ? "sidebar-open" : ""
-          }`}
+        className={`sidebar ${isMobile ? "sidebar-mobile" : ""} ${
+          mobileOpen ? "sidebar-open" : ""
+        }`}
         aria-label="Admin navigation"
       >
         {isMobile && (
           <div className="sidebar-mobile-header">
             <span>Admin Menu</span>
+
             <button
               type="button"
               className="sidebar-close"
@@ -93,7 +135,14 @@ const Sidebar = ({ mobileOpen = false, onClose }) => {
               }
             >
               <span className="sidebar-icon">{item.icon}</span>
+
               <span className="sidebar-label">{item.label}</span>
+
+              {item.showUnread && unreadCount > 0 && (
+                <span className="sidebar-unread-badge">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

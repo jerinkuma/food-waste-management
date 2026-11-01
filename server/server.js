@@ -6,6 +6,9 @@ const path = require("path");
 const http = require("http");
 require("dotenv").config();
 
+
+
+
 const { initSocket } = require("./utils/socket");
 const { startFreshnessMonitor } = require("./utils/freshnessNotifier");
 
@@ -39,12 +42,21 @@ const adminRoutes = require("./routes/adminRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const searchRoutes = require("./routes/searchRoutes");
 
+
+const contactRoutes = require("./routes/contactRoutes");
+const contactAdminRoutes = require("./routes/contactAdminRoutes");
+
 // =====================================
 // API ROUTES INTEGRATION
 // =====================================
 
 // Authentication
 app.use("/api/auth", authRoutes);
+
+
+//contact
+app.use("/api/contact", contactRoutes);
+app.use("/api/admin/contact-messages", contactAdminRoutes);
 
 // Restaurant / Donor
 app.use("/api/restaurants", restaurantRoutes);

@@ -5,6 +5,11 @@ const Ngo = require("../models/Ngo");
 const QRCode = require("qrcode");
 const { getIO, rooms } = require("../utils/socket");
 const { createNotification } = require("../utils/notificationUtils");
+
+
+const Feedback = require("../models/Feedback");
+
+
 const {
   haversineKm,
   resolveDonationLocation,
@@ -22,9 +27,56 @@ const getCurrentNgo = async (userId) => {
   });
 };
 
+
+// ======================================================
+// NGO NAME HELPER
+// ======================================================
+const getNgoDisplayName = (ngo) => {
+  return (
+    ngo?.organizationName ||
+    ngo?.user?.name ||
+    ngo?.organizationId ||
+    "NGO"
+  );
+};
+
+// ======================================================
+// NOTIFY DONOR ABOUT NGO ACTION
+// ======================================================
+const notifyDonorAboutNgoAction = async ({
+  donation,
+  ngo,
+  type,
+  actionMessage,
+}) => {
+  try {
+    if (!donation?.donor || !ngo) return;
+
+    const ngoName = getNgoDisplayName(ngo);
+
+    await createNotification({
+      recipient: donation.donor.toString(),
+      type,
+      title: ngoName,
+      message: `${actionMessage}: ${donation.foodName || "your donation"}.`,
+      donation: donation._id,
+      data: {
+        role: "donor",
+        donationId: donation.donationId,
+        donationObjectId: donation._id,
+        ngoId: ngo._id,
+        action: "view-donation",
+      },
+    });
+  } catch (error) {
+    console.error("Donor NGO action notification error:", error);
+  }
+};
+
 // ======================================================
 // CREATE DONATION
 // ======================================================
+
 const createDonation = async (req, res) => {
   try {
     const {
@@ -34,7 +86,6 @@ const createDonation = async (req, res) => {
       foodName,
       foodType,
       quantity,
-      estimatedMeals,
       cookingTime,
       bestBefore,
 
@@ -96,8 +147,7 @@ const createDonation = async (req, res) => {
     if (!foodName || !foodType) {
       return res.status(400).json({
         success: false,
-        message:
-          "Food name and food type are required.",
+        message: "Food name and food type are required.",
       });
     }
 
@@ -110,17 +160,6 @@ const createDonation = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Quantity must be greater than 0.",
-      });
-    }
-
-    if (
-      estimatedMeals === undefined ||
-      estimatedMeals === null ||
-      estimatedMeals === ""
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Estimated meals are required.",
       });
     }
 
@@ -184,8 +223,7 @@ const createDonation = async (req, res) => {
     if (!finalSafetyDeclaration) {
       return res.status(400).json({
         success: false,
-        message:
-          "Safety declaration must be confirmed.",
+        message: "Safety declaration must be confirmed.",
       });
     }
 
@@ -200,9 +238,6 @@ const createDonation = async (req, res) => {
 
     const finalQuantity = Number(quantity);
 
-    const finalEstimatedMeals =
-      Number(estimatedMeals);
-
     if (
       Number.isNaN(finalQuantity) ||
       finalQuantity <= 0
@@ -210,16 +245,6 @@ const createDonation = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Invalid quantity.",
-      });
-    }
-
-    if (
-      Number.isNaN(finalEstimatedMeals) ||
-      finalEstimatedMeals < 0
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid estimated meals.",
       });
     }
 
@@ -245,27 +270,20 @@ const createDonation = async (req, res) => {
 
       donor,
 
-      // -----------------------------------------------
       // FOOD INFORMATION
-      // -----------------------------------------------
       foodName,
       foodType,
       quantity: finalQuantity,
-      estimatedMeals: finalEstimatedMeals,
       cookingTime,
       bestBefore,
 
-      // -----------------------------------------------
       // FOOD CONDITION / CATEGORY
-      // -----------------------------------------------
       condition: finalCondition,
       foodCondition: finalCondition,
       foodCategory,
       storageCondition,
 
-      // -----------------------------------------------
       // PICKUP INFORMATION
-      // -----------------------------------------------
       pickupAddress: finalPickupAddress,
       address: finalPickupAddress,
 
@@ -277,33 +295,25 @@ const createDonation = async (req, res) => {
       specialInstructions:
         specialInstructions || "",
 
-      // -----------------------------------------------
       // LOCATION
-      // -----------------------------------------------
       latitude:
-        latitude !== undefined &&
-          latitude !== ""
+        latitude !== undefined && latitude !== ""
           ? Number(latitude)
           : undefined,
 
       longitude:
-        longitude !== undefined &&
-          longitude !== ""
+        longitude !== undefined && longitude !== ""
           ? Number(longitude)
           : undefined,
 
-      // -----------------------------------------------
       // SAFETY
-      // -----------------------------------------------
       safetyDeclaration:
         Boolean(finalSafetyDeclaration),
 
       safetyConfirmed:
         Boolean(finalSafetyDeclaration),
 
-      // -----------------------------------------------
       // NGO REQUEST
-      // -----------------------------------------------
       ngoRequest: {
         requested: false,
         requestedBy: null,
@@ -311,9 +321,7 @@ const createDonation = async (req, res) => {
         acceptedAt: null,
       },
 
-      // -----------------------------------------------
       // DELIVERY MAN
-      // -----------------------------------------------
       deliveryMan: {
         name: "",
         phone: "",
@@ -321,13 +329,7 @@ const createDonation = async (req, res) => {
         assignedAt: null,
       },
 
-      // -----------------------------------------------
       // VERIFICATION
-      //
-      // IMPORTANT:
-      // Donation model expects checks as Boolean array.
-      // So NEVER use {} here.
-      // -----------------------------------------------
       verification: {
         scannedAt: null,
         checks: [],
@@ -336,22 +338,14 @@ const createDonation = async (req, res) => {
         rejectionReason: "",
       },
 
-      // -----------------------------------------------
       // QR CODE
-      // -----------------------------------------------
       qrCode,
 
-      // -----------------------------------------------
       // STATUS
-      // -----------------------------------------------
-      status:
-        "Waiting for NGO Acceptance",
-
+      status: "Waiting for NGO Acceptance",
       pipelineStatus: "Pending",
 
-      // -----------------------------------------------
       // STATUS HISTORY
-      // -----------------------------------------------
       statusHistory: [
         {
           status: "Pending",
@@ -376,23 +370,27 @@ const createDonation = async (req, res) => {
     getIO()
       .to(rooms.admins())
       .emit("donation:new", donation);
-// ==================================================
-    // 🔥 প্রায়োরিটি নোটিফিকেশন সিস্টেম (অটো ট্রিগার)
+
+    // ==================================================
+    // PRIORITY NOTIFICATION SYSTEM
     // ==================================================
     try {
       const Follow = require("../models/Follow");
-      // ডোনরকে যারা ফলো করে তাদের খুঁজে বের করা
-      const followers = await Follow.find({ followingId: donor });
-      
+
+      const followers = await Follow.find({
+        followingId: donor,
+      });
+
       if (followers && followers.length > 0) {
         followers.forEach(async (f) => {
-          const ngoUser = f.followerId; 
+          const ngoUser = f.followerId;
+
           if (ngoUser) {
             await createNotification({
               recipient: ngoUser.toString(),
               type: "PRIORITY_DONATION",
               title: "🔥 Alert: Followed Restaurant Posted!",
-              message: `Your partner restaurant posted a new donation: "${foodName || 'Food'}"`,
+              message: `Your partner restaurant posted a new donation: "${foodName || "Food"}"`,
               donation: donation._id,
               data: {
                 role: "ngo",
@@ -408,31 +406,31 @@ const createDonation = async (req, res) => {
         });
       }
     } catch (notifErr) {
-      console.error("Priority notification error:", notifErr);
+      console.error(
+        "Priority notification error:",
+        notifErr
+      );
     }
+
     // ==================================================
     // RESPONSE
     // ==================================================
     return res.status(201).json({
       success: true,
-      message:
-        "Donation created successfully.",
+      message: "Donation created successfully.",
       donation,
     });
   } catch (error) {
-    console.error(
-      "Create Donation Error:",
-      error
-    );
+    console.error("Create Donation Error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to create donation.",
+      message: "Failed to create donation.",
       error: error.message,
     });
   }
 };
+
 
 // ======================================================
 // GET DONATION BY ID
@@ -1052,174 +1050,192 @@ const verifyDonation = async (req, res) => {
 
 // ======================================================
 // REJECT DONATION
+// NGO WITHDRAW / REJECT OWN REQUEST
 // ======================================================
-const rejectDonation = async (
-  req,
-  res
-) => {
+const rejectDonation = async (req, res) => {
   try {
     const { id } = req.params;
 
     if (!req.user?._id) {
       return res.status(401).json({
         success: false,
-        message:
-          "Authentication required.",
+        message: "Authentication required.",
       });
     }
 
-    const ngo =
-      await getCurrentNgo(
-        req.user._id
-      );
+    const ngo = await getCurrentNgo(req.user._id);
 
     if (!ngo) {
       return res.status(404).json({
         success: false,
-        message:
-          "NGO profile not found.",
+        message: "NGO profile not found.",
       });
     }
 
-    const donation =
-      await Donation.findById(id);
+    const donation = await Donation.findById(id);
 
     if (!donation) {
       return res.status(404).json({
         success: false,
-        message:
-          "Donation not found.",
+        message: "Donation not found.",
       });
     }
-
-    const requestedBy =
-      donation.ngoRequest
-        ?.requestedBy;
 
     if (
-      !requestedBy ||
-      requestedBy.toString() !==
-        ngo._id.toString()
+      donation.selectedNgo &&
+      donation.selectedNgo.toString() === ngo._id.toString()
     ) {
-      return res.status(403).json({
+      return res.status(400).json({
         success: false,
-        message:
-          "You are not authorized to reject this donation.",
+        message: "Selected NGO cannot withdraw after donor acceptance.",
       });
     }
 
-    const rejectionReason =
-      req.body?.rejectionReason ||
-      "Donation rejected by NGO.";
+    const request = donation.ngoRequests.find(
+      (item) =>
+        item.requestedBy.toString() === ngo._id.toString() &&
+        item.status === "Pending"
+    );
 
-    donation.pipelineStatus =
-      "Rejected";
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Your pending request was not found.",
+      });
+    }
 
-    donation.status =
-      "Rejected";
-
-    donation.verification = {
-      ...(donation.verification || {}),
-      approved: false,
-      rejectionReason,
-    };
-
-    donation.statusHistory.push({
-      status: "Rejected",
-      changedAt: new Date(),
-      changedBy:
-        req.user._id,
-      note: rejectionReason,
-    });
+    request.status = "Rejected";
+    request.respondedAt = new Date();
 
     await donation.save();
 
-    // =====================================
-    // CREATE DONOR NOTIFICATION
-    // =====================================
-    if (donation.donor) {
-      await createNotification({
-        recipient:
-          donation.donor.toString(),
-
-        type:
-          "DONATION_REJECTED",
-
-        title:
-          "Donation Rejected",
-
-        message:
-          `Your donation "${donation.foodName}" has been rejected by an NGO.`,
-
-        donation:
-          donation._id,
-
-        data: {
-          role: "donor",
-          donationId:
-            donation.donationId,
-          action:
-            "view-donation",
+    const updated = await Donation.findById(id)
+      .populate({
+        path: "ngoRequests.requestedBy",
+        select: "organizationId phone address organizationName user",
+        populate: {
+          path: "user",
+          select: "name email",
         },
       });
-    }
 
-    // =====================================
-    // REAL-TIME DONATION UPDATE - DONOR
-    // =====================================
-    if (donation.donor) {
-      getIO()
-        .to(
-          rooms.restaurant(
-            donation.donor.toString()
-          )
-        )
-        .emit(
-          "donation:updated",
-          donation
-        );
-    }
-
-    // =====================================
-    // REAL-TIME DONATION UPDATE - NGO
-    // =====================================
     getIO()
-      .to(
-        rooms.ngo(
-          req.user._id.toString()
-        )
-      )
-      .emit(
-        "donation:updated",
-        donation
-      );
+      .to(rooms.restaurant(donation.donor.toString()))
+      .emit("donation:updated", updated);
 
-    // =====================================
-    // REAL-TIME DONATION UPDATE - ADMINS
-    // =====================================
     getIO()
-      .to(rooms.admins())
-      .emit(
-        "donation:updated",
-        donation
-      );
+      .to(rooms.ngos())
+      .emit("donation:updated", updated);
 
     return res.json({
       success: true,
-      message:
-        "Donation rejected successfully.",
-      donation,
+      message: "Your donation request has been withdrawn.",
+      donation: updated,
     });
   } catch (error) {
-    console.error(
-      "Reject Donation Error:",
-      error
-    );
+    console.error("Reject NGO Request Error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to reject donation.",
+      message: "Failed to withdraw request.",
+      error: error.message,
+    });
+  }
+};
+
+// ======================================================
+// DONOR DECLINES AN NGO REQUEST
+// ======================================================
+const declineNgoRequest = async (req, res) => {
+  try {
+    const { id, ngoId } = req.params;
+    const donorId = req.user.id;
+
+    const donation = await Donation.findOne({
+      _id: id,
+      donor: donorId,
+    });
+
+    if (!donation) {
+      return res.status(404).json({
+        success: false,
+        message: "Donation not found or unauthorized",
+      });
+    }
+
+    if (
+      donation.pipelineStatus !== "Pending" ||
+      donation.selectedNgo
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "NGO requests can no longer be declined",
+      });
+    }
+
+    const ngoRequest = donation.ngoRequests.find(
+      (request) =>
+        request.requestedBy.toString() === ngoId &&
+        request.status === "Pending"
+    );
+
+    if (!ngoRequest) {
+      return res.status(404).json({
+        success: false,
+        message: "Pending NGO request not found",
+      });
+    }
+
+    ngoRequest.status = "Rejected";
+    ngoRequest.respondedAt = new Date();
+
+    await donation.save();
+
+    const updatedDonation = await Donation.findById(id)
+      .populate({
+        path: "ngoRequests.requestedBy",
+        populate: {
+          path: "user",
+          select: "name email",
+        },
+      })
+      .populate("donor", "name email");
+
+    const io = getIO();
+
+    // Notify the donor
+    io.to(rooms.restaurant(donorId)).emit(
+      "donation:updated",
+      updatedDonation
+    );
+
+    // Notify the declined NGO
+    const declinedNgo = await Ngo.findById(ngoId).select("user");
+
+    if (declinedNgo?.user) {
+      io.to(rooms.ngo(declinedNgo.user.toString())).emit(
+        "donation:updated",
+        updatedDonation
+      );
+    }
+
+    // Update all NGO dashboards
+    io.to(rooms.ngos()).emit(
+      "donation:updated",
+      updatedDonation
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "NGO request declined successfully",
+      donation: updatedDonation,
+    });
+  } catch (error) {
+    console.error("Decline NGO Request Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to decline NGO request",
       error: error.message,
     });
   }
@@ -1228,44 +1244,63 @@ const rejectDonation = async (
 //======================================================
 // GET DONOR DONATIONS
 // ======================================================
-const getDonorDonations = async (
-  req,
-  res
-) => {
+const getDonorDonations = async (req, res) => {
   try {
-    const { donorId } =
-      req.params;
+    const { donorId } = req.params;
 
     if (!donorId) {
       return res.status(400).json({
         success: false,
-        message:
-          "Donor ID is required.",
+        message: "Donor ID is required.",
       });
     }
 
-    const donations =
-      await Donation.find({
-        donor: donorId,
+    const donations = await Donation.find({
+      donor: donorId,
+    })
+      // Donor information
+      .populate(
+        "donor",
+        "name email role"
+      )
+
+      // NGO selected/accepted by donor (legacy field)
+      .populate({
+        path: "ngoRequest.requestedBy",
+        select:
+          "organizationId phone address organizationName user",
+        populate: {
+          path: "user",
+          select: "name email",
+        },
       })
-        .populate(
-          "donor",
-          "name email role"
-        )
-        .populate({
-          path:
-            "ngoRequest.requestedBy",
-          select:
-            "organizationId phone address user",
-          populate: {
-            path: "user",
-            select:
-              "name email",
-          },
-        })
-        .sort({
-          createdAt: -1,
-        });
+
+      // All NGOs that requested the donation
+      .populate({
+        path: "ngoRequests.requestedBy",
+        select:
+          "organizationId phone address organizationName user",
+        populate: {
+          path: "user",
+          select: "name email",
+        },
+      })
+
+      // NGO finally selected by donor
+      .populate({
+        path: "selectedNgo",
+        select:
+          "organizationId phone address organizationName user",
+        populate: {
+          path: "user",
+          select: "name email",
+        },
+      })
+
+      // Latest donations first
+      .sort({
+        createdAt: -1,
+      });
 
     return res.status(200).json({
       success: true,
@@ -1279,140 +1314,280 @@ const getDonorDonations = async (
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to fetch donor donations.",
+      message: "Failed to fetch donor donations.",
       error: error.message,
     });
   }
 };
 
 // ======================================================
+
 // GET DONOR DASHBOARD
 // ======================================================
+
 const getDonorDashboard = async (
   req,
   res
 ) => {
   try {
-    const { donorId } =
-      req.params;
+    const { donorId } = req.params;
 
     if (!donorId) {
       return res.status(400).json({
         success: false,
-        message:
-          "Donor ID is required.",
+        message: "Donor ID is required.",
       });
     }
 
-    const donations =
-      await Donation.find({
-        donor: donorId,
+    const donations = await Donation.find({
+      donor: donorId,
+    })
+      .populate({
+        path: "ngoRequest.requestedBy",
+        select: "organizationId phone address organizationName user",
+        populate: {
+          path: "user",
+          select: "name email",
+        },
       })
-        .populate({
-          path:
-            "ngoRequest.requestedBy",
-          select:
-            "organizationId phone address organizationName user",
-          populate: {
-            path: "user",
-            select:
-              "name email",
-          },
-        })
-        .sort({
-          createdAt: -1,
-        });
+      .populate({
+        path: "ngoRequests.requestedBy",
+        select: "organizationId phone address organizationName user",
+        populate: {
+          path: "user",
+          select: "name email",
+        },
+      })
+      .populate({
+        path: "selectedNgo",
+        select: "organizationId phone address organizationName user",
+        populate: {
+          path: "user",
+          select: "name email",
+        },
+      })
+      .sort({
+        createdAt: -1,
+      });
+
+    // ==================================================
+    // NGO RATING AVERAGE
+    // ONLY Donation.rating.score
+    // ==================================================
+
+    const ratedDonations = donations.filter(
+      (donation) => {
+        const score = Number(
+          donation.rating?.score
+        );
+
+        return (
+          donation.rating?.score !== null &&
+          donation.rating?.score !== undefined &&
+          Number.isFinite(score) &&
+          score >= 1 &&
+          score <= 5
+        );
+      }
+    );
+
+    const ratingCount = ratedDonations.length;
+
+    const ratingAverage =
+      ratingCount > 0
+        ? Number(
+          (
+            ratedDonations.reduce(
+              (totalRating, donation) =>
+                totalRating +
+                Number(donation.rating.score),
+              0
+            ) / ratingCount
+          ).toFixed(1)
+        )
+        : 0;
+
+    // ==================================================
+    // RATINGS BY NGO
+    // ==================================================
+
+    const ratingsByNgo = ratedDonations
+      .map((donation) => {
+        const ngo =
+          donation.ngoRequest?.requestedBy;
+
+        if (!ngo?._id) {
+          return null;
+        }
+
+        return {
+          _id: donation._id,
+
+          ngoId: ngo._id,
+
+          ngoName:
+            ngo.organizationName ||
+            ngo.user?.name ||
+            ngo.organizationId ||
+            "NGO",
+
+          donationId:
+            donation.donationId ||
+            donation._id.toString(),
+
+          foodName:
+            donation.foodName || "",
+
+          score:
+            Number(donation.rating.score),
+
+          comment:
+            donation.rating.comment || "",
+
+          ratedAt:
+            donation.rating.ratedAt || null,
+        };
+      })
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          new Date(b.ratedAt || 0) -
+          new Date(a.ratedAt || 0)
+      );
+
+    // ==================================================
+    // NGO FEEDBACK
+    // ==================================================
+
+    const feedbackDocuments = await Feedback.find({
+      $or: [
+        { donor: donorId },
+        { restaurant: donorId },
+      ],
+    })
+      .populate({
+        path: "ngo",
+        select:
+          "organizationName organizationId user",
+        populate: {
+          path: "user",
+          select: "name",
+        },
+      })
+      .populate({
+        path: "donation",
+        select: "donationId foodName",
+      })
+      .sort({
+        createdAt: -1,
+      });
+
+    const feedbackByNgo = feedbackDocuments.map(
+      (feedback) => {
+        const ngo = feedback.ngo;
+
+        return {
+          _id: feedback._id,
+
+          ngoName:
+            ngo?.organizationName ||
+            ngo?.user?.name ||
+            ngo?.organizationId ||
+            "NGO",
+
+          donationId:
+            feedback.donation?.donationId ||
+            feedback.donationId ||
+            "",
+
+          foodName:
+            feedback.donation?.foodName || "",
+
+          category:
+            feedback.category || "",
+
+          priority:
+            feedback.priority || "",
+
+          // Keep empty message empty.
+          message:
+            feedback.message || "",
+
+          status:
+            feedback.status || "",
+
+          submittedAt:
+            feedback.createdAt || null,
+        };
+      }
+    );
 
     // ==================================================
     // BASIC COUNTS
     // ==================================================
 
-    const total =
-      donations.length;
+    const total = donations.length;
 
-    const pending =
-      donations.filter(
-        (donation) =>
-          donation.pipelineStatus ===
-          "Pending"
-      ).length;
+    const pending = donations.filter(
+      (donation) =>
+        donation.pipelineStatus === "Pending"
+    ).length;
 
-    const accepted =
-      donations.filter(
-        (donation) =>
-          donation.pipelineStatus ===
-          "Accepted"
-      ).length;
+    const accepted = donations.filter(
+      (donation) =>
+        donation.pipelineStatus === "Accepted"
+    ).length;
 
-    const outForDelivery =
-      donations.filter(
-        (donation) =>
-          donation.pipelineStatus ===
-          "Out for Delivery"
-      ).length;
+    const outForDelivery = donations.filter(
+      (donation) =>
+        donation.pipelineStatus === "Out for Delivery"
+    ).length;
 
-    const completed =
-      donations.filter(
-        (donation) =>
-          donation.pipelineStatus ===
-          "Completed"
-      ).length;
+    const completed = donations.filter(
+      (donation) =>
+        donation.pipelineStatus === "Completed"
+    ).length;
 
-    const rejected =
-      donations.filter(
-        (donation) =>
-          donation.pipelineStatus ===
-          "Rejected"
-      ).length;
+    const rejected = donations.filter(
+      (donation) =>
+        donation.pipelineStatus === "Rejected"
+    ).length;
 
     // ==================================================
     // COMPLETED DONATIONS
-    //
-    // Environmental impact, meals served,
-    // food waste diverted and categories
-    // are calculated ONLY from completed donations.
     // ==================================================
 
-    const completedDonationList =
-      donations.filter(
-        (donation) =>
-          donation.pipelineStatus ===
-          "Completed"
-      );
+    const completedDonationList = donations.filter(
+      (donation) =>
+        donation.pipelineStatus === "Completed"
+    );
 
     // ==================================================
     // MEALS SERVED
     // ==================================================
 
-    const mealsServed =
-      completedDonationList.reduce(
-        (totalMeals, donation) => {
-          const meals =
-            Number(
-              donation.estimatedMeals
-            );
+    const mealsServed = completedDonationList.reduce(
+      (totalMeals, donation) => {
+        const meals = Number(
+          donation.estimatedMeals
+        );
 
-          if (
-            !Number.isNaN(meals) &&
-            meals >= 0
-          ) {
-            return (
-              totalMeals + meals
-            );
-          }
+        if (
+          !Number.isNaN(meals) &&
+          meals >= 0
+        ) {
+          return totalMeals + meals;
+        }
 
-          return (
-            totalMeals +
-            Math.floor(
-              (Number(
-                donation.quantity
-              ) || 0) * 4
-            )
-          );
-        },
-        0
-      );
+        return (
+          totalMeals +
+          Math.floor(
+            (Number(donation.quantity) || 0) * 4
+          )
+        );
+      },
+      0
+    );
 
     // ==================================================
     // FOOD WASTE DIVERTED
@@ -1422,9 +1597,7 @@ const getDonorDashboard = async (
       completedDonationList.reduce(
         (totalQuantity, donation) =>
           totalQuantity +
-          (Number(
-            donation.quantity
-          ) || 0),
+          (Number(donation.quantity) || 0),
         0
       );
 
@@ -1432,579 +1605,423 @@ const getDonorDashboard = async (
     // TODAY'S DONATIONS
     // ==================================================
 
-    const today =
-      new Date();
+    const today = new Date();
 
-    const startOfDay =
-      new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate()
-      );
+    const startOfDay = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
 
-    const endOfDay =
-      new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate() + 1
-      );
+    const endOfDay = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() + 1
+    );
 
-    const todayDonations =
-      donations.filter(
-        (donation) => {
-          const createdAt =
-            new Date(
-              donation.createdAt
-            );
+    const todayDonations = donations.filter(
+      (donation) => {
+        const createdAt = new Date(
+          donation.createdAt
+        );
 
-          return (
-            createdAt >=
-            startOfDay &&
-            createdAt <
-            endOfDay
-          );
-        }
-      ).length;
+        return (
+          createdAt >= startOfDay &&
+          createdAt < endOfDay
+        );
+      }
+    ).length;
 
     // ==================================================
     // ACTIVE DONATIONS
-    //
-    // Completed and Rejected donations are NOT active.
     // ==================================================
 
-    const activeDonations =
-      donations.filter(
-        (donation) =>
-          ![
-            "Completed",
-            "Rejected",
-          ].includes(
-            donation.pipelineStatus
-          )
-      ).length;
+    // ==================================================
+    // ACTIVE DONATIONS
+    // ==================================================
 
+    const activeCheckTime = new Date();
+
+    const activeDonations = donations.filter((donation) => {
+      const bestBefore = donation.bestBefore
+        ? new Date(donation.bestBefore)
+        : null;
+
+      // Exclude expired or invalid donations
+      if (
+        !bestBefore ||
+        Number.isNaN(bestBefore.getTime()) ||
+        bestBefore <= activeCheckTime
+      ) {
+        return false;
+      }
+
+      // Count only active statuses
+      return [
+        "Pending",
+        "Accepted",
+        "Out for Delivery",
+      ].includes(donation.pipelineStatus);
+    }).length;
     // ==================================================
     // RECENT DONATIONS
     // ==================================================
 
-    const recentDonations =
-      donations
-        .slice(0, 5)
-        .map((donation) => ({
-          _id:
-            donation._id,
+    const recentDonations = donations
+      .slice(0, 5)
+      .map((donation) => ({
+        _id: donation._id,
+        donationId: donation.donationId,
+        foodName: donation.foodName,
+        foodType: donation.foodType,
+        foodCategory: donation.foodCategory,
+        quantity: donation.quantity,
+        estimatedMeals: donation.estimatedMeals,
+        status: donation.status,
+        pipelineStatus: donation.pipelineStatus,
+        createdAt: donation.createdAt,
 
-          donationId:
-            donation.donationId,
+        // NGO request information
+        ngoRequest: donation.ngoRequest,
+        ngoRequests: donation.ngoRequests,
+        selectedNgo: donation.selectedNgo,
 
-          foodName:
-            donation.foodName,
-
-          foodType:
-            donation.foodType,
-
-          foodCategory:
-            donation.foodCategory,
-
-          quantity:
-            donation.quantity,
-
-          estimatedMeals:
-            donation.estimatedMeals,
-
-          status:
-            donation.status,
-
-          pipelineStatus:
-            donation.pipelineStatus,
-
-          createdAt:
-            donation.createdAt,
-
-          ngoRequest:
-            donation.ngoRequest,
-
-          deliveryMan:
-            donation.deliveryMan,
-        }));
+        deliveryMan: donation.deliveryMan,
+      }));
 
     // ==================================================
     // PICKUP TRACKER
-    //
-    // IMPORTANT:
-    // COMPLETED donations are immediately removed
-    // from the pickup tracker.
     // ==================================================
 
-    const pickupDonations =
-      donations.filter(
-        (donation) => {
-          const pipelineStatus =
-            donation.pipelineStatus;
+    const now = new Date();
 
-          const status =
-            donation.status;
+    const pickupDonations = donations.filter(
+      (donation) => {
+        const bestBefore = donation.bestBefore
+          ? new Date(donation.bestBefore)
+          : null;
 
-          return (
-            [
-              "Accepted",
-              "Out for Delivery",
-            ].includes(
-              pipelineStatus
-            ) ||
-            [
-              "Delivery Man Assigned",
-              "Food Picked Up",
-            ].includes(status)
-          );
+        // Expired donations Pickup Tracker-এ দেখাবে না
+        if (
+          !bestBefore ||
+          Number.isNaN(bestBefore.getTime()) ||
+          bestBefore <= now
+        ) {
+          return false;
         }
-      );
+
+        const pipelineStatus = donation.pipelineStatus;
+        const status = donation.status;
+
+        // NGO request আছে, কিন্তু donor এখনো select করেনি
+        const hasPendingNgoRequests =
+          pipelineStatus === "Pending" &&
+          !donation.selectedNgo &&
+          Array.isArray(donation.ngoRequests) &&
+          donation.ngoRequests.some(
+            (request) => request.status === "Pending"
+          );
+
+        // আগের active pickup functionality
+        const isActivePickup =
+          [
+            "Accepted",
+            "Out for Delivery",
+          ].includes(pipelineStatus) ||
+          [
+            "Delivery Man Assigned",
+            "Food Picked Up",
+          ].includes(status);
+
+        return (
+          hasPendingNgoRequests ||
+          isActivePickup
+        );
+      }
+    );
 
     // ==================================================
     // NGO PARTNERS
-    //
-    // Every NGO that has requested at least
-    // one donation from this donor.
-    //
-    // Same NGO is grouped together and all
-    // donation request history is stored
-    // inside history[].
     // ==================================================
 
-    const ngoMap =
-      new Map();
+    const ngoMap = new Map();
 
-    donations.forEach(
-      (donation) => {
-        const ngo =
-          donation.ngoRequest
-            ?.requestedBy;
+    donations.forEach((donation) => {
+      const ngo =
+        donation.ngoRequest?.requestedBy;
 
-        // Donation without an NGO request
-        // is not an NGO partner.
-        if (!ngo?._id) {
-          return;
-        }
+      if (!ngo?._id) {
+        return;
+      }
 
-        const ngoId =
-          ngo._id.toString();
+      const ngoId = ngo._id.toString();
 
-        // ----------------------------------------------
-        // CREATE NGO ENTRY
-        // ----------------------------------------------
+      if (!ngoMap.has(ngoId)) {
+        ngoMap.set(ngoId, {
+          id: ngo._id,
+          _id: ngo._id,
 
-        if (!ngoMap.has(ngoId)) {
-          ngoMap.set(ngoId, {
-            id: ngo._id,
+          name:
+            ngo.user?.name ||
+            ngo.organizationName ||
+            ngo.organizationId ||
+            "NGO Partner",
 
-            _id: ngo._id,
+          organizationName:
+            ngo.organizationName || "",
 
-            // NGO NAME
-            name:
-              ngo.user?.name ||
-              ngo.organizationName ||
-              ngo.organizationId ||
-              "NGO Partner",
+          organizationId:
+            ngo.organizationId || "",
 
-            organizationName:
-              ngo.organizationName ||
-              "",
+          phone: ngo.phone || "",
+          address: ngo.address || "",
+          status: "Active",
 
-            organizationId:
-              ngo.organizationId ||
-              "",
+          requestCount: 0,
+          meals: 0,
+          quantity: 0,
+          completed: 0,
 
-            phone:
-              ngo.phone || "",
+          lastRequest: null,
 
-            address:
-              ngo.address || "",
-
-            status: "Active",
-
-            // Statistics
-            requestCount: 0,
-
-            meals: 0,
-
-            quantity: 0,
-
-            completed: 0,
-
-            // Last request date
-            lastRequest: null,
-
-            // Complete history
-            history: [],
-          });
-        }
-
-        const partner =
-          ngoMap.get(ngoId);
-
-        // ----------------------------------------------
-        // REQUEST COUNT
-        // ----------------------------------------------
-
-        partner.requestCount +=
-          1;
-
-        // ----------------------------------------------
-        // QUANTITY
-        // ----------------------------------------------
-
-        // Quantity, meals and completed count
-        // are updated only after the donation
-        // is actually completed.
-        if (
-          donation.pipelineStatus ===
-          "Completed"
-        ) {
-          partner.quantity +=
-            Number(
-              donation.quantity
-            ) || 0;
-
-          // ----------------------------------------------
-          // MEALS
-          // ----------------------------------------------
-
-          const estimatedMeals =
-            Number(
-              donation.estimatedMeals
-            );
-
-          if (
-            !Number.isNaN(
-              estimatedMeals
-            ) &&
-            estimatedMeals >= 0
-          ) {
-            partner.meals +=
-              estimatedMeals;
-          } else {
-            partner.meals +=
-              Math.floor(
-                (Number(
-                  donation.quantity
-                ) || 0) * 4
-              );
-          }
-
-          partner.completed +=
-            1;
-        }
-
-        // ----------------------------------------------
-        // LAST REQUEST
-        //
-        // ngoRequest.requestedAt is preferred.
-        // createdAt is fallback.
-        // ----------------------------------------------
-
-        const requestDate =
-          donation.ngoRequest
-            ?.requestedAt ||
-          donation.createdAt;
-
-        if (
-          !partner.lastRequest ||
-          new Date(
-            requestDate
-          ) >
-          new Date(
-            partner.lastRequest
-          )
-        ) {
-          partner.lastRequest =
-            requestDate;
-        }
-
-        // ----------------------------------------------
-        // DONATION REQUEST HISTORY
-        // ----------------------------------------------
-
-        partner.history.push({
-          _id:
-            donation._id,
-
-          donationId:
-            donation.donationId,
-
-          foodName:
-            donation.foodName ||
-            "Food Donation",
-
-          foodType:
-            donation.foodType ||
-            "",
-
-          foodCategory:
-            donation.foodCategory ||
-            "",
-
-          quantity:
-            Number(
-              donation.quantity
-            ) || 0,
-
-          estimatedMeals:
-            Number(
-              donation.estimatedMeals
-            ) || 0,
-
-          status:
-            donation.status ||
-            "",
-
-          pipelineStatus:
-            donation.pipelineStatus ||
-            "",
-
-          requestedAt:
-            donation.ngoRequest
-              ?.requestedAt ||
-            null,
-
-          acceptedAt:
-            donation.ngoRequest
-              ?.acceptedAt ||
-            null,
-
-          createdAt:
-            donation.createdAt,
-
-          completedAt:
-            donation.pipelineStatus ===
-              "Completed"
-              ? donation.updatedAt
-              : null,
+          history: [],
         });
       }
-    );
+
+      const partner = ngoMap.get(ngoId);
+
+      partner.requestCount += 1;
+
+      if (
+        donation.pipelineStatus === "Completed"
+      ) {
+        partner.quantity +=
+          Number(donation.quantity) || 0;
+
+        const estimatedMeals = Number(
+          donation.estimatedMeals
+        );
+
+        if (
+          !Number.isNaN(estimatedMeals) &&
+          estimatedMeals >= 0
+        ) {
+          partner.meals += estimatedMeals;
+        } else {
+          partner.meals +=
+            Math.floor(
+              (Number(donation.quantity) || 0) * 4
+            );
+        }
+
+        partner.completed += 1;
+      }
+
+      const requestDate =
+        donation.ngoRequest?.requestedAt ||
+        donation.createdAt;
+
+      if (
+        !partner.lastRequest ||
+        new Date(requestDate) >
+        new Date(partner.lastRequest)
+      ) {
+        partner.lastRequest = requestDate;
+      }
+
+      partner.history.push({
+        _id: donation._id,
+        donationId: donation.donationId,
+
+        foodName:
+          donation.foodName || "Food Donation",
+
+        foodType:
+          donation.foodType || "",
+
+        foodCategory:
+          donation.foodCategory || "",
+
+        quantity:
+          Number(donation.quantity) || 0,
+
+        estimatedMeals:
+          Number(donation.estimatedMeals) || 0,
+
+        status:
+          donation.status || "",
+
+        pipelineStatus:
+          donation.pipelineStatus || "",
+
+        requestedAt:
+          donation.ngoRequest?.requestedAt || null,
+
+        acceptedAt:
+          donation.ngoRequest?.acceptedAt || null,
+
+        createdAt: donation.createdAt,
+
+        completedAt:
+          donation.pipelineStatus === "Completed"
+            ? donation.updatedAt
+            : null,
+      });
+    });
 
     // ==================================================
     // SORT NGO HISTORY
-    // Newest request first
     // ==================================================
 
-    const ngoPartners =
-      Array.from(
-        ngoMap.values()
-      ).map((partner) => {
-        partner.history.sort(
-          (a, b) => {
-            const dateA =
-              new Date(
-                a.requestedAt ||
-                a.createdAt
-              );
-
-            const dateB =
-              new Date(
-                b.requestedAt ||
-                b.createdAt
-              );
-
-            return (
-              dateB - dateA
-            );
-          }
+    const ngoPartners = Array.from(
+      ngoMap.values()
+    ).map((partner) => {
+      partner.history.sort((a, b) => {
+        const dateA = new Date(
+          a.requestedAt || a.createdAt
         );
 
-        return partner;
+        const dateB = new Date(
+          b.requestedAt || b.createdAt
+        );
+
+        return dateB - dateA;
       });
+
+      return partner;
+    });
 
     // ==================================================
     // FOOD CATEGORIES
-    //
-    // Use foodCategory primarily.
-    // Fallback to foodType.
-    // Only completed donations are counted.
     // ==================================================
 
-    const categoryMap =
-      new Map();
+    const categoryMap = new Map();
 
-    completedDonationList.forEach(
-      (donation) => {
-        const category =
-          (
-            donation.foodCategory ||
-            donation.foodType ||
-            "Other"
-          ).trim();
+    completedDonationList.forEach((donation) => {
+      const category = (
+        donation.foodCategory ||
+        donation.foodType ||
+        "Other"
+      ).trim();
 
-        if (
-          !categoryMap.has(
-            category
-          )
-        ) {
-          categoryMap.set(
-            category,
-            {
-              name: category,
-
-              count: 0,
-
-              meals: 0,
-
-              quantity: 0,
-            }
-          );
-        }
-
-        const categoryData =
-          categoryMap.get(
-            category
-          );
-
-        // Total donations
-        categoryData.count +=
-          1;
-
-        // Total quantity
-        categoryData.quantity +=
-          Number(
-            donation.quantity
-          ) || 0;
-
-        // Total meals
-        const estimatedMeals =
-          Number(
-            donation.estimatedMeals
-          );
-
-        if (
-          !Number.isNaN(
-            estimatedMeals
-          ) &&
-          estimatedMeals >= 0
-        ) {
-          categoryData.meals +=
-            estimatedMeals;
-        } else {
-          categoryData.meals +=
-            Math.floor(
-              (Number(
-                donation.quantity
-              ) || 0) * 4
-            );
-        }
+      if (!categoryMap.has(category)) {
+        categoryMap.set(category, {
+          name: category,
+          count: 0,
+          meals: 0,
+          quantity: 0,
+        });
       }
-    );
+
+      const categoryData =
+        categoryMap.get(category);
+
+      categoryData.count += 1;
+
+      categoryData.quantity +=
+        Number(donation.quantity) || 0;
+
+      const estimatedMeals = Number(
+        donation.estimatedMeals
+      );
+
+      if (
+        !Number.isNaN(estimatedMeals) &&
+        estimatedMeals >= 0
+      ) {
+        categoryData.meals += estimatedMeals;
+      } else {
+        categoryData.meals +=
+          Math.floor(
+            (Number(donation.quantity) || 0) * 4
+          );
+      }
+    });
 
     // ==================================================
     // TOTAL CATEGORY MEALS
     // ==================================================
 
-    const totalCategoryMeals =
-      Array.from(
-        categoryMap.values()
-      ).reduce(
-        (total, category) =>
-          total +
-          category.meals,
-        0
-      );
+    const totalCategoryMeals = Array.from(
+      categoryMap.values()
+    ).reduce(
+      (total, category) =>
+        total + category.meals,
+      0
+    );
 
     // ==================================================
     // FINAL CATEGORY DATA
     // ==================================================
 
-    const categories =
-      Array.from(
-        categoryMap.values()
+    const categories = Array.from(
+      categoryMap.values()
+    )
+      .map((category) => {
+        const percent =
+          totalCategoryMeals > 0
+            ? (
+              (category.meals /
+                totalCategoryMeals) *
+              100
+            ).toFixed(1)
+            : 0;
+
+        return {
+          name: category.name,
+          count: category.count,
+          meals: category.meals,
+
+          quantity: Number(
+            category.quantity.toFixed(2)
+          ),
+
+          percent: Number(percent),
+        };
+      })
+      .sort(
+        (a, b) => b.meals - a.meals
       )
-        .map((category) => {
-          const percent =
-            totalCategoryMeals >
-              0
-              ? (
-                (category.meals /
-                  totalCategoryMeals) *
-                100
-              ).toFixed(1)
-              : 0;
+      .slice(0, 5);
 
-          return {
-            name:
-              category.name,
-
-            count:
-              category.count,
-
-            meals:
-              category.meals,
-
-            quantity:
-              Number(
-                category.quantity.toFixed(
-                  2
-                )
-              ),
-
-            percent:
-              Number(percent),
-          };
-        })
-        .sort(
-          (a, b) =>
-            b.meals - a.meals
-        )
-        .slice(0, 5);
     // ==================================================
     // ENVIRONMENTAL IMPACT
-    //
-    // Based on COMPLETED donations.
     // ==================================================
 
-    const carbonPrevented =
-      Number(
-        (
-          foodWasteDiverted *
-          2.5
-        ).toFixed(2)
-      );
+    const carbonPrevented = Number(
+      (
+        foodWasteDiverted * 2.5
+      ).toFixed(2)
+    );
 
-    const treesEquivalent =
-      Number(
-        (
-          carbonPrevented /
-          21
-        ).toFixed(2)
-      );
+    const treesEquivalent = Number(
+      (
+        carbonPrevented / 21
+      ).toFixed(2)
+    );
 
-    const waterSaved =
-      Number(
-        (
-          foodWasteDiverted *
-          1000
-        ).toFixed(2)
-      );
+    const waterSaved = Number(
+      (
+        foodWasteDiverted * 1000
+      ).toFixed(2)
+    );
 
     // ==================================================
     // ANNUAL GOAL
-    //
-    // Goal is based on 1000 KG.
-    // Progress = completed food waste / 1000 KG.
-    // Maximum 100%.
     // ==================================================
 
     const annualTargetKg = 1000;
 
-    const annualGoal =
-      Math.min(
-        Math.max(
-          (
-            foodWasteDiverted /
-            annualTargetKg
-          ) *
-          100,
-          0
-        ),
-        100
-      );
+    const annualGoal = Math.min(
+      Math.max(
+        (
+          foodWasteDiverted /
+          annualTargetKg
+        ) * 100,
+        0
+      ),
+      100
+    );
 
     // ==================================================
     // RESPONSE
@@ -2014,93 +2031,71 @@ const getDonorDashboard = async (
       success: true,
 
       dashboard: {
-        // ----------------------------------------------
         // BASIC STATS
-        // ----------------------------------------------
 
-        totalDonations:
-          total,
+        totalDonations: total,
 
-        todayDonations:
-          todayDonations,
+        todayDonations: todayDonations,
 
-        mealsServed:
-          mealsServed,
+        mealsServed: mealsServed,
 
-        foodWasteDiverted:
-          Number(
-            foodWasteDiverted.toFixed(
-              2
-            )
-          ),
+        foodWasteDiverted: Number(
+          foodWasteDiverted.toFixed(2)
+        ),
 
-        activeDonations:
-          activeDonations,
+        activeDonations: activeDonations,
 
-        pendingDonations:
-          pending,
+        pendingDonations: pending,
 
-        acceptedDonations:
-          accepted,
+        acceptedDonations: accepted,
 
-        outForDelivery:
-          outForDelivery,
+        outForDelivery: outForDelivery,
 
-        completedDonations:
-          completed,
+        completedDonations: completed,
 
-        rejectedDonations:
-          rejected,
+        rejectedDonations: rejected,
 
-        // ----------------------------------------------
+        // NGO RATING
+
+        ratingAverage: ratingAverage,
+
+        ratingCount: ratingCount,
+
+        ratingsByNgo: ratingsByNgo,
+
+        // NGO FEEDBACK
+
+        feedbackByNgo: feedbackByNgo,
+
         // ENVIRONMENTAL IMPACT
-        // ----------------------------------------------
 
-        carbonPrevented:
-          carbonPrevented,
+        carbonPrevented: carbonPrevented,
 
-        treesEquivalent:
-          treesEquivalent,
+        treesEquivalent: treesEquivalent,
 
-        waterSaved:
-          waterSaved,
+        waterSaved: waterSaved,
 
-        annualGoal:
-          Number(
-            annualGoal.toFixed(1)
-          ),
+        annualGoal: Number(
+          annualGoal.toFixed(1)
+        ),
 
-        // ----------------------------------------------
         // RECENT DONATIONS
-        // ----------------------------------------------
 
-        recentDonations:
-          recentDonations,
+        recentDonations: recentDonations,
 
-        // ----------------------------------------------
         // PICKUP TRACKER
-        // ----------------------------------------------
 
-        pickupDonations:
-          pickupDonations,
+        pickupDonations: pickupDonations,
 
-        // ----------------------------------------------
         // NGO PARTNERS
-        // ----------------------------------------------
 
-        ngoPartners:
-          ngoPartners,
+        ngoPartners: ngoPartners,
 
-        // ----------------------------------------------
         // TOP FOOD CATEGORIES
-        // ----------------------------------------------
 
-        categories:
-          categories,
+        categories: categories,
 
-        // ----------------------------------------------
         // STATS OBJECT
-        // ----------------------------------------------
 
         stats: {
           total,
@@ -2120,61 +2115,52 @@ const getDonorDashboard = async (
 
     return res.status(500).json({
       success: false,
-
-      message:
-        "Failed to fetch dashboard.",
-
+      message: "Failed to fetch dashboard.",
       error: error.message,
     });
   }
 };
 
+
 // ======================================================
 // LIST AVAILABLE DONATIONS
 // ======================================================
-const listAvailableDonations = async (
-  req,
-  res
-) => {
-  try {
-    const {
-      latitude,
-      longitude,
-    } = req.query;
 
-    const donations =
-      await Donation.find({
-        pipelineStatus:
-          "Pending",
-      })
-        .populate(
-          "donor",
-          "name email role"
-        )
-        .sort({
-          createdAt: -1,
-        });
+const listAvailableDonations = async (req, res) => {
+  try {
+    const { latitude, longitude } = req.query;
+
+    // Current time
+    const now = new Date();
+
+    // Fetch only non-expired pending donations
+    const donations = await Donation.find({
+      pipelineStatus: "Pending",
+      $or: [
+        { bestBefore: { $gt: now } },
+        { bestBefore: { $exists: false } },
+        { bestBefore: null },
+      ],
+    })
+      .populate("donor", "name email role")
+      .sort({
+        createdAt: -1,
+      });
 
     const result = [];
 
     for (const donation of donations) {
-      const item =
-        donation.toObject();
+      const item = donation.toObject();
 
       try {
-        const restaurant =
-          await Restaurant.findOne({
-            user:
-              donation.donor?._id,
-          });
+        const restaurant = await Restaurant.findOne({
+          user: donation.donor?._id,
+        });
 
         if (restaurant) {
-          item.restaurant =
-            restaurant;
+          item.restaurant = restaurant;
         }
-      } catch (
-      restaurantError
-      ) {
+      } catch (restaurantError) {
         console.error(
           "Restaurant profile error:",
           restaurantError
@@ -2182,45 +2168,28 @@ const listAvailableDonations = async (
       }
 
       try {
-        const location =
-          await resolveDonationLocation(
-            donation
-          );
+        const location = await resolveDonationLocation(
+          donation
+        );
 
         if (location) {
-          item.location =
-            location;
+          item.location = location;
 
           if (
-            latitude !==
-            undefined &&
-            longitude !==
-            undefined &&
-            location.latitude !==
-            undefined &&
-            location.longitude !==
-            undefined
+            latitude !== undefined &&
+            longitude !== undefined &&
+            location.latitude !== undefined &&
+            location.longitude !== undefined
           ) {
-            item.distance =
-              haversineKm(
-                Number(
-                  latitude
-                ),
-                Number(
-                  longitude
-                ),
-                Number(
-                  location.latitude
-                ),
-                Number(
-                  location.longitude
-                )
-              );
+            item.distance = haversineKm(
+              Number(latitude),
+              Number(longitude),
+              Number(location.latitude),
+              Number(location.longitude)
+            );
           }
         }
-      } catch (
-      locationError
-      ) {
+      } catch (locationError) {
         console.error(
           "Donation location error:",
           locationError
@@ -2231,29 +2200,15 @@ const listAvailableDonations = async (
     }
 
     if (
-      latitude !==
-      undefined &&
-      longitude !==
-      undefined
+      latitude !== undefined &&
+      longitude !== undefined
     ) {
-      result.sort(
-        (a, b) => {
-          if (
-            a.distance == null
-          )
-            return 1;
+      result.sort((a, b) => {
+        if (a.distance == null) return 1;
+        if (b.distance == null) return -1;
 
-          if (
-            b.distance == null
-          )
-            return -1;
-
-          return (
-            a.distance -
-            b.distance
-          );
-        }
-      );
+        return a.distance - b.distance;
+      });
     }
 
     return res.json({
@@ -2268,20 +2223,23 @@ const listAvailableDonations = async (
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to fetch available donations.",
+      message: "Failed to fetch available donations.",
       error: error.message,
     });
   }
 };
 
+
 // ======================================================
 // ACCEPT DONATION
 // ======================================================
-const acceptDonation = async (
-  req,
-  res
-) => {
+// ======================================================
+// NGO REQUEST DONATION
+// ======================================================
+// ======================================================
+// NGO REQUEST DONATION
+// ======================================================
+const acceptDonation = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -2289,25 +2247,6 @@ const acceptDonation = async (
       return res.status(401).json({
         success: false,
         message: "Authentication required.",
-      });
-    }
-
-    const donation = await Donation.findById(id)
-      .populate("donor", "name email role");
-
-    if (!donation) {
-      return res.status(404).json({
-        success: false,
-        message: "Donation not found.",
-      });
-    }
-
-    if (donation.pipelineStatus !== "Pending") {
-      return res.status(409).json({
-        success: false,
-        message: `This donation is already ${
-          donation.pipelineStatus || ""
-        } and can no longer be accepted.`,
       });
     }
 
@@ -2320,129 +2259,100 @@ const acceptDonation = async (
       });
     }
 
-    console.log("ACCEPT NGO DETAILS:", {
-      mongoId: ngo._id?.toString(),
-      userId: ngo.user?.toString(),
-      organizationId: ngo.organizationId,
-    });
+    const donation = await Donation.findById(id);
 
-    const now = new Date();
+    if (!donation) {
+      return res.status(404).json({
+        success: false,
+        message: "Donation not found.",
+      });
+    }
 
-    donation.pipelineStatus = "Accepted";
-    donation.status = "NGO Requested";
+    if (donation.pipelineStatus !== "Pending") {
+      return res.status(409).json({
+        success: false,
+        message: "This donation is no longer available.",
+      });
+    }
 
-    donation.ngoRequest = {
-      requested: true,
+    if (donation.bestBefore <= new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "This donation has expired.",
+      });
+    }
+
+    if (
+      donation.selectedNgo &&
+      donation.selectedNgo.toString() !== ngo._id.toString()
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: "This donation has already been selected by the donor.",
+      });
+    }
+
+    const alreadyRequested = donation.ngoRequests.some(
+      (request) =>
+        request.requestedBy.toString() === ngo._id.toString()
+    );
+
+    if (alreadyRequested) {
+      return res.status(409).json({
+        success: false,
+        message: "You have already requested this donation.",
+      });
+    }
+
+    donation.ngoRequests.push({
       requestedBy: ngo._id,
-      requestedAt: now,
-      acceptedAt: now,
-    };
-
-    donation.statusHistory.push({
-      status: "Accepted",
-      changedAt: now,
-      changedBy: req.user._id,
-      note: `Accepted by ${ngo.organizationId}`,
+      status: "Pending",
+      requestedAt: new Date(),
     });
 
     await donation.save();
 
-    // =========================================
-    // PERSISTENT NOTIFICATION TO DONOR
-    // =========================================
+    // Notify donor with actual NGO name
+    const ngoName =
+      ngo.organizationName ||
+      ngo.organizationId ||
+      "NGO";
 
-    // Donor is populated, so use its actual MongoDB _id.
-    const donorId =
-      donation.donor?._id || donation.donor;
-
-    if (donorId) {
-      const createdNotification =
-        await createNotification({
-          recipient: donorId.toString(),
-          type: "DONATION_ACCEPTED",
-          title: "Donation Accepted",
-          message: `Your donation "${donation.foodName}" has been accepted by an NGO.`,
-          donation: donation._id,
-          data: {
-            role: "donor",
-            donationId: donation.donationId,
-            action: "view-donation",
-          },
-        });
-
-      if (createdNotification) {
-        console.log(
-          "DONOR NOTIFICATION SAVED:",
-          createdNotification._id?.toString()
-        );
-      } else {
-        console.error(
-          "DONOR NOTIFICATION FAILED:",
-          {
-            donorId: donorId.toString(),
-            donationId: donation._id.toString(),
-          }
-        );
-      }
-    } else {
-      console.error(
-        "DONOR NOTIFICATION SKIPPED: donor ID missing.",
-        donation._id.toString()
-      );
-    }
-
-    // =========================================
-    // GET UPDATED DONATION
-    // =========================================
+    await createNotification({
+      recipient: donation.donor.toString(),
+      type: "DONATION_REQUEST",
+      title: ngoName,
+      message: `Requested your donation: ${donation.foodName}.`,
+      donation: donation._id,
+      data: {
+        role: "donor",
+        donationId: donation.donationId,
+        donationObjectId: donation._id,
+        ngoId: ngo._id,
+        action: "view-donation",
+      },
+    });
 
     const updated = await Donation.findById(id)
       .populate("donor", "name email role")
       .populate({
-        path: "ngoRequest.requestedBy",
-        select: "organizationId phone address user",
+        path: "ngoRequests.requestedBy",
+        select: "organizationId phone address organizationName user",
         populate: {
           path: "user",
           select: "name email",
         },
       });
 
-    // =========================================
-    // REAL-TIME UPDATE TO DONOR
-    // =========================================
+    // Update donor dashboard
+    getIO()
+      .to(rooms.restaurant(donation.donor.toString()))
+      .emit("donation:updated", updated);
 
-    if (updated?.donor?._id) {
-      getIO()
-        .to(
-          rooms.restaurant(
-            updated.donor._id.toString()
-          )
-        )
-        .emit("donation:updated", updated);
-    }
-
-    // =========================================
-    // REAL-TIME UPDATE TO ALL NGOs
-    // =========================================
-
+    // Update all NGO dashboards
     getIO()
       .to(rooms.ngos())
       .emit("donation:updated", updated);
-
-    // =========================================
-    // REAL-TIME UPDATE TO CURRENT NGO
-    // =========================================
-
-    getIO()
-      .to(
-        rooms.ngo(
-          req.user._id.toString()
-        )
-      )
-      .emit("donation:updated", updated);
-
-    // =========================================
-    // REAL-TIME UPDATE TO ADMINS
-    // =========================================
 
     getIO()
       .to(rooms.admins())
@@ -2450,18 +2360,218 @@ const acceptDonation = async (
 
     return res.status(200).json({
       success: true,
-      message: "Donation accepted successfully.",
+      message: "Donation request submitted successfully. Waiting for donor approval.",
       donation: updated,
     });
   } catch (error) {
-    console.error(
-      "Accept Donation Error:",
-      error
-    );
+    console.error("NGO Request Donation Error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Failed to accept donation.",
+      message: "Failed to request donation.",
+      error: error.message,
+    });
+  }
+};
+
+
+// ======================================================
+// DONOR SELECT NGO FOR DONATION
+// ======================================================
+const selectNgoForDonation = async (req, res) => {
+  try {
+    const { id, ngoId } = req.params;
+
+    if (!req.user?._id) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    // Find donation belonging to this donor
+    const donation = await Donation.findOne({
+      _id: id,
+      donor: req.user._id,
+    });
+
+    if (!donation) {
+      return res.status(404).json({
+        success: false,
+        message: "Donation not found or unauthorized.",
+      });
+    }
+
+    if (donation.pipelineStatus !== "Pending") {
+      return res.status(409).json({
+        success: false,
+        message: "This donation can no longer be selected.",
+      });
+    }
+
+    if (donation.bestBefore <= new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "This donation has expired.",
+      });
+    }
+
+    if (donation.selectedNgo) {
+      return res.status(409).json({
+        success: false,
+        message: "An NGO has already been selected.",
+      });
+    }
+
+    const selectedRequest = donation.ngoRequests.find(
+      (request) =>
+        request.requestedBy.toString() === ngoId &&
+        request.status === "Pending"
+    );
+
+    if (!selectedRequest) {
+      return res.status(404).json({
+        success: false,
+        message: "This NGO has not requested this donation.",
+      });
+    }
+
+    // Lock the donation so another request cannot be selected
+    const lockedDonation = await Donation.findOneAndUpdate(
+      {
+        _id: id,
+        donor: req.user._id,
+        pipelineStatus: "Pending",
+        selectedNgo: null,
+      },
+      {
+        $set: {
+          selectedNgo: ngoId,
+        },
+      },
+      {
+        new: true,
+      }
+    );
+
+    if (!lockedDonation) {
+      return res.status(409).json({
+        success: false,
+        message: "Another NGO has already been selected.",
+      });
+    }
+
+    const now = new Date();
+
+    // Selected NGO request becomes Accepted
+    lockedDonation.ngoRequests.forEach((request) => {
+      request.status =
+        request.requestedBy.toString() === ngoId
+          ? "Accepted"
+          : "Rejected";
+
+      request.respondedAt = now;
+    });
+
+    // Keep old field compatible with existing functions
+    lockedDonation.ngoRequest = {
+      requested: true,
+      requestedBy: ngoId,
+      requestedAt: selectedRequest.requestedAt,
+      acceptedAt: now,
+    };
+
+    lockedDonation.pipelineStatus = "Accepted";
+    lockedDonation.status = "NGO Requested";
+
+    lockedDonation.statusHistory.push({
+      status: "Accepted",
+      changedAt: now,
+      changedBy: req.user._id,
+      note: "Donor selected an NGO for this donation.",
+    });
+
+    await lockedDonation.save();
+
+    // Populate NGO requests
+    const updated = await Donation.findById(id)
+      .populate("donor", "name email role")
+      .populate({
+        path: "ngoRequests.requestedBy",
+        select: "organizationId phone address organizationName user",
+        populate: {
+          path: "user",
+          select: "name email",
+        },
+      })
+      .populate({
+        path: "ngoRequest.requestedBy",
+        select: "organizationId phone address organizationName user",
+        populate: {
+          path: "user",
+          select: "name email",
+        },
+      });
+
+    // Notify every NGO that requested
+    for (const request of updated.ngoRequests) {
+      const requestedNgo = request.requestedBy;
+
+      if (!requestedNgo) continue;
+
+      const ngoUserId = requestedNgo.user?._id;
+
+      if (!ngoUserId) continue;
+
+      const isSelected =
+        requestedNgo._id.toString() === ngoId;
+
+      await createNotification({
+        recipient: ngoUserId.toString(),
+        type: isSelected ? "DONATION_ACCEPTED" : "DONATION_REJECTED",
+        title: isSelected
+          ? "Your Donation Request Was Selected"
+          : "Donation Request Not Selected",
+        message: isSelected
+          ? `The donor selected your organization for "${updated.foodName}". You can now assign a driver.`
+          : `The donor selected another NGO for "${updated.foodName}".`,
+        donation: updated._id,
+        data: {
+          role: "ngo",
+          donationId: updated.donationId,
+          action: "view-donation",
+        },
+      });
+
+      getIO()
+        .to(rooms.ngo(ngoUserId.toString()))
+        .emit("donation:updated", updated);
+    }
+
+    // Notify donor dashboard
+    getIO()
+      .to(rooms.restaurant(req.user._id.toString()))
+      .emit("donation:updated", updated);
+
+    getIO()
+      .to(rooms.ngos())
+      .emit("donation:updated", updated);
+
+    getIO()
+      .to(rooms.admins())
+      .emit("donation:updated", updated);
+
+    return res.status(200).json({
+      success: true,
+      message: "NGO selected successfully. Other NGO requests were rejected.",
+      donation: updated,
+    });
+  } catch (error) {
+    console.error("Select NGO Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to select NGO.",
       error: error.message,
     });
   }
@@ -2756,20 +2866,37 @@ const getNgoDonations = async (
     // ==================================================
     // ACTIVE DONATIONS
     //
-    // Completed and Rejected donations are archived.
+    // Hide expired donations regardless of NGO request.
+    // Completed and Rejected donations are also excluded.
     // ==================================================
 
-    const active =
-      donations.filter(
-        (donation) =>
-          ![
-            "Completed",
-            "Rejected",
-          ].includes(
-            donation.pipelineStatus
-          )
-      );
+    const now = new Date();
 
+    const active = donations.filter((donation) => {
+      // 1. Hide Completed and Rejected donations
+      if (
+        ["Completed", "Rejected"].includes(
+          donation.pipelineStatus
+        )
+      ) {
+        return false;
+      }
+
+      // 2. Check Best Before time
+      if (donation.bestBefore) {
+        const bestBefore = new Date(donation.bestBefore);
+
+        if (
+          !Number.isNaN(bestBefore.getTime()) &&
+          bestBefore <= now
+        ) {
+          return false;
+        }
+      }
+
+      // 3. Keep only non-expired donations
+      return true;
+    });
     // ==================================================
     // ARCHIVED DONATIONS
     // ==================================================
@@ -2830,12 +2957,7 @@ const getNgoDonations = async (
 const assignDeliveryDriver = async (req, res) => {
   try {
     const { id } = req.params;
-
-    const {
-      name,
-      phone,
-      vehicleNumber,
-    } = req.body;
+    const { name, phone, vehicleNumber } = req.body;
 
     if (!req.user?._id) {
       return res.status(401).json({
@@ -2844,10 +2966,7 @@ const assignDeliveryDriver = async (req, res) => {
       });
     }
 
-    // -----------------------------------------------
     // CURRENT NGO
-    // -----------------------------------------------
-
     const ngo = await getCurrentNgo(req.user._id);
 
     if (!ngo) {
@@ -2857,10 +2976,7 @@ const assignDeliveryDriver = async (req, res) => {
       });
     }
 
-    // -----------------------------------------------
     // VALIDATION
-    // -----------------------------------------------
-
     if (!name || !phone || !vehicleNumber) {
       return res.status(400).json({
         success: false,
@@ -2869,20 +2985,14 @@ const assignDeliveryDriver = async (req, res) => {
       });
     }
 
-    // -----------------------------------------------
     // NGO ID DEBUG
-    // -----------------------------------------------
-
     console.log("NGO ID DEBUG:", {
       mongoNgoId: ngo._id.toString(),
       organizationId: ngo.organizationId,
       userId: ngo.user?.toString(),
     });
 
-    // -----------------------------------------------
     // FIND DONATION
-    // -----------------------------------------------
-
     const donation = await Donation.findById(id);
 
     if (!donation) {
@@ -2892,11 +3002,7 @@ const assignDeliveryDriver = async (req, res) => {
       });
     }
 
-    // -----------------------------------------------
     // ONLY ACCEPTED DONATIONS
-    // CAN HAVE A DRIVER ASSIGNED
-    // -----------------------------------------------
-
     if (donation.pipelineStatus !== "Accepted") {
       return res.status(400).json({
         success: false,
@@ -2905,12 +3011,22 @@ const assignDeliveryDriver = async (req, res) => {
       });
     }
 
-    // -----------------------------------------------
-    // NGO OWNERSHIP
-    // -----------------------------------------------
+    // DONOR-SELECTED NGO CHECK
+    const selectedNgoId = donation.selectedNgo;
 
-    const requestedBy =
-      donation.ngoRequest?.requestedBy;
+    if (
+      !selectedNgoId ||
+      selectedNgoId.toString() !== ngo._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Only the donor-selected NGO can assign a delivery driver.",
+      });
+    }
+
+    // ADDITIONAL NGO OWNERSHIP CHECK
+    const requestedBy = donation.ngoRequest?.requestedBy;
 
     if (
       !requestedBy ||
@@ -2923,10 +3039,7 @@ const assignDeliveryDriver = async (req, res) => {
       });
     }
 
-    // -----------------------------------------------
     // ASSIGN DRIVER
-    // -----------------------------------------------
-
     donation.deliveryMan = {
       name,
       phone,
@@ -2945,10 +3058,7 @@ const assignDeliveryDriver = async (req, res) => {
 
     await donation.save();
 
-    // -----------------------------------------------
     // FETCH UPDATED DONATION
-    // -----------------------------------------------
-
     const updated = await Donation.findById(id)
       .populate("donor", "name email role")
       .populate({
@@ -2958,36 +3068,38 @@ const assignDeliveryDriver = async (req, res) => {
           path: "user",
           select: "name email",
         },
+      })
+      .populate({
+        path: "selectedNgo",
+        select: "organizationId phone address user",
+        populate: {
+          path: "user",
+          select: "name email",
+        },
       });
 
-    // -----------------------------------------------
-    // REAL-TIME UPDATE
-    // -----------------------------------------------
-
+    // REAL-TIME UPDATE TO DONOR
     if (updated.donor?._id) {
       getIO()
         .to(
-          rooms.restaurant(
-            updated.donor._id.toString()
-          )
+          rooms.restaurant(updated.donor._id.toString())
         )
         .emit("donation:updated", updated);
     }
 
+    // REAL-TIME UPDATE TO SELECTED NGO
     getIO()
-      .to(
-        rooms.ngo(req.user._id.toString())
-      )
+      .to(rooms.ngo(req.user._id.toString()))
       .emit("donation:updated", updated);
 
+    // REAL-TIME UPDATE TO ADMINS
     getIO()
       .to(rooms.admins())
       .emit("donation:updated", updated);
 
     return res.status(200).json({
       success: true,
-      message:
-        "Delivery driver assigned successfully.",
+      message: "Delivery driver assigned successfully.",
       donation: updated,
     });
 
@@ -3010,21 +3122,17 @@ const assignDeliveryDriver = async (req, res) => {
 // ======================================================
 module.exports = {
   createDonation,
-
   getDonationById,
   getDonationByDonationId,
-
   verifyDonation,
   rejectDonation,
-
+  declineNgoRequest,
   getDonorDonations,
   getDonorDashboard,
-
   listAvailableDonations,
   acceptDonation,
-
+  selectNgoForDonation,
   updateDonationStatus,
-
   getNgoDonations,
   assignDeliveryDriver,
 };

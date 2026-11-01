@@ -169,6 +169,69 @@ export const markFeedbackRead = async (feedbackId, viewer) => {
   return data;
 };
 
+
+//donor er jnno kuma add krtese
+
+
+export const submitDonorFeedback = async (payload) => {
+  const { data } = await client.post("/feedback/donor", payload);
+  return data;
+};
+
+export const fetchDonorNgoReviews = async () => {
+  const { data } = await client.get("/feedback/donor/ngo-reviews");
+  return data;
+};
+
+//kuma contact for home
+
+// =====================================================================
+// CONTACT MESSAGES
+// =====================================================================
+
+// Public contact form submission
+export const submitContactMessage = async (payload) => {
+  const { data } = await client.post("/contact", payload);
+  return data;
+};
+
+// Admin: Fetch all contact messages with optional search and status filter
+export const fetchAdminContactMessages = async (params = {}) => {
+  const { data } = await client.get("/admin/contact-messages", {
+    params,
+  });
+
+  return data.messages || [];
+};
+
+// Admin: Fetch unread contact message count
+export const fetchAdminUnreadContactCount = async () => {
+  const { data } = await client.get(
+    "/admin/contact-messages/unread-count"
+  );
+
+  return data.unreadCount || 0;
+};
+
+// Admin: Update message status
+export const updateContactMessageStatus = async (messageId, status) => {
+  const { data } = await client.patch(
+    `/admin/contact-messages/${messageId}/status`,
+    { status }
+  );
+
+  return data;
+};
+
+// Admin: Reply to visitor
+export const replyToContactMessage = async (messageId, message) => {
+  const { data } = await client.post(
+    `/admin/contact-messages/${messageId}/reply`,
+    { message }
+  );
+
+  return data;
+};
 // =====================================================================
 // ADMIN (Real Backend Connections)
 // =====================================================================

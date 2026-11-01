@@ -143,6 +143,7 @@ const LoginForm = ({ setIsSignup }) => {
         <div className="mt-3 text-right">
           <button
             type="button"
+            onClick={() => navigate("/forgot-password")}
             className="text-sm font-medium text-green-700 hover:text-green-800"
           >
             Forgot Password?

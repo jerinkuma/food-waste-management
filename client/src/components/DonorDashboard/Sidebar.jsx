@@ -1,3 +1,4 @@
+
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -6,12 +7,25 @@ import {
   BarChart3,
   User,
   LogOut,
+  MessageSquareText,
+  MessageCircle,
 } from "lucide-react";
 
 import "./Sidebar.css";
 
 const Sidebar = () => {
   const navigate = useNavigate();
+
+  // =====================================
+  // LOGOUT
+  // =====================================
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    navigate("/login", { replace: true });
+  };
 
   const menuItems = [
     {
@@ -35,6 +49,16 @@ const Sidebar = () => {
       path: "/restaurant/analytics",
     },
     {
+      title: "NGO Reviews",
+      icon: <MessageSquareText size={21} />,
+      path: "/restaurant/ngo-reviews",
+    },
+    {
+      title: "Feedback",
+      icon: <MessageCircle size={21} />,
+      path: "/restaurant/feedback",
+    },
+    {
       title: "Profile",
       icon: <User size={21} />,
       path: "/restaurant/profile",
@@ -43,36 +67,28 @@ const Sidebar = () => {
 
   return (
     <aside className="donor-sidebar">
-      {/* Logo */}
       <div className="donor-sidebar-logo">
-
-        {/* Small Screen Logo */}
         <div className="donor-logo-small">
           F<span>L</span>
         </div>
 
-        {/* Desktop Logo */}
         <div className="donor-logo-desktop">
           <h1>
             Feed<span>Link</span>
           </h1>
-
           <p>Restaurant Dashboard</p>
         </div>
-
       </div>
 
-      {/* Navigation */}
       <nav className="donor-sidebar-nav">
         <ul>
           {menuItems.map((item) => (
             <li key={item.title}>
               <NavLink
                 to={item.path}
+                end
                 className={({ isActive }) =>
-                  `donor-nav-link ${
-                    isActive ? "active" : ""
-                  }`
+                  `donor-nav-link ${isActive ? "active" : ""}`
                 }
               >
                 <span className="donor-nav-icon">
@@ -88,13 +104,9 @@ const Sidebar = () => {
         </ul>
       </nav>
 
-      {/* Logout */}
       <div className="donor-sidebar-logout">
-        <button
-          onClick={() => navigate("/")}
-        >
+        <button onClick={handleLogout}>
           <LogOut size={21} />
-
           <span className="donor-logout-text">
             Logout
           </span>

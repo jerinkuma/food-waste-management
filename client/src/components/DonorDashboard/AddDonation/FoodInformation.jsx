@@ -8,25 +8,8 @@ import {
 } from "lucide-react";
 
 const FoodInformation = ({ donationData, updateDonationData }) => {
-  const quantity = donationData.quantity;
-
-  const estimatedMeals =
-    quantity && Number(quantity) > 0
-      ? Math.floor(Number(quantity) / 0.25)
-      : 0;
-
   const handleChange = (field, value) => {
     updateDonationData(field, value);
-
-    // Quantity change হলে estimated meals automatically update হবে
-    if (field === "quantity") {
-      const meals =
-        value && Number(value) > 0
-          ? Math.floor(Number(value) / 0.25)
-          : 0;
-
-      updateDonationData("estimatedMeals", meals);
-    }
   };
 
   return (
@@ -42,7 +25,6 @@ const FoodInformation = ({ donationData, updateDonationData }) => {
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-
         {/* Food Name */}
         <div>
           <label className="mb-2 flex items-center gap-2 font-medium text-gray-700">
@@ -98,18 +80,6 @@ const FoodInformation = ({ donationData, updateDonationData }) => {
           />
         </div>
 
-        {/* Estimated Meals */}
-        <div>
-          <label className="mb-2 flex items-center gap-2 font-medium text-gray-700">
-            <Utensils size={18} />
-            Estimated Meals
-          </label>
-
-          <div className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 text-gray-700">
-            {estimatedMeals}
-          </div>
-        </div>
-
         {/* Cooking Time */}
         <div>
           <label className="mb-2 flex items-center gap-2 font-medium text-gray-700">
@@ -143,11 +113,9 @@ const FoodInformation = ({ donationData, updateDonationData }) => {
             className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none transition focus:border-green-500"
           />
         </div>
-
       </div>
     </div>
   );
 };
 
 export default FoodInformation;
-

@@ -71,7 +71,6 @@ const DonationPreview = ({ donationData }) => {
 
   return (
     <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
-
       {/* Header */}
       <div className="flex flex-col gap-3 border-b border-gray-100 px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
         <div>
@@ -101,18 +100,13 @@ const DonationPreview = ({ donationData }) => {
 
       {/* Main Content */}
       <div className="p-6 sm:p-8">
-
         {/* FOOD SECTION */}
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.5fr_1fr]">
-
           {/* Food Information */}
           <div>
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
-                <Utensils
-                  size={20}
-                  className="text-green-600"
-                />
+                <Utensils size={20} className="text-green-600" />
               </div>
 
               <div>
@@ -141,7 +135,7 @@ const DonationPreview = ({ donationData }) => {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
               <Detail
                 icon={Scale}
                 label="Quantity"
@@ -150,12 +144,6 @@ const DonationPreview = ({ donationData }) => {
                     ? `${donationData.quantity} KG`
                     : "Not provided"
                 }
-              />
-
-              <Detail
-                icon={Utensils}
-                label="Estimated Meals"
-                value={`${donationData.estimatedMeals || 0} meals`}
               />
 
               <Detail
@@ -176,10 +164,7 @@ const DonationPreview = ({ donationData }) => {
           <div className="border-t border-gray-100 pt-7 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100">
-                <Package
-                  size={20}
-                  className="text-orange-600"
-                />
+                <Package size={20} className="text-orange-600" />
               </div>
 
               <div>
@@ -194,7 +179,6 @@ const DonationPreview = ({ donationData }) => {
             </div>
 
             <div className="space-y-5">
-
               <div>
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">
                   Condition
@@ -218,9 +202,6 @@ const DonationPreview = ({ donationData }) => {
                   </span>
                 </div>
               </div>
-
-              
-
             </div>
           </div>
         </div>
@@ -232,10 +213,7 @@ const DonationPreview = ({ donationData }) => {
         <div>
           <div className="mb-5 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100">
-              <MapPin
-                size={20}
-                className="text-red-500"
-              />
+              <MapPin size={20} className="text-red-500" />
             </div>
 
             <div>
@@ -252,10 +230,7 @@ const DonationPreview = ({ donationData }) => {
           {/* Address */}
           <div className="mb-6 rounded-2xl bg-gray-50 p-4">
             <div className="flex items-start gap-3">
-              <MapPin
-                size={18}
-                className="mt-0.5 shrink-0 text-red-500"
-              />
+              <MapPin size={18} className="mt-0.5 shrink-0 text-red-500" />
 
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
@@ -263,8 +238,7 @@ const DonationPreview = ({ donationData }) => {
                 </p>
 
                 <p className="mt-1 text-sm font-semibold leading-6 text-gray-800">
-                  {donationData.pickupAddress ||
-                    "Not provided"}
+                  {donationData.pickupAddress || "Not provided"}
                 </p>
               </div>
             </div>
@@ -300,10 +274,7 @@ const DonationPreview = ({ donationData }) => {
           {/* Instructions */}
           {donationData.specialInstructions && (
             <div className="mt-6 flex items-start gap-3">
-              <FileText
-                size={18}
-                className="mt-0.5 shrink-0 text-gray-400"
-              />
+              <FileText size={18} className="mt-0.5 shrink-0 text-gray-400" />
 
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
@@ -361,11 +332,9 @@ const DonationPreview = ({ donationData }) => {
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
 };
 
 export default DonationPreview;
-

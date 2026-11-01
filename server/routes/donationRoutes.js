@@ -16,17 +16,27 @@ const {
 
   listAvailableDonations,
   acceptDonation,
+  selectNgoForDonation,
 
   updateDonationStatus,
 
   getNgoDonations,
   assignDeliveryDriver,
+  declineNgoRequest,
 } = require("../controllers/donationController");
+
+const {
+  getImpactStats,
+} = require("../controllers/impactController");
 
 const {
   protect,
   restrictTo,
 } = require("../middleware/authMiddleware");
+
+// PUBLIC HOMEPAGE IMPACT STATISTICS
+// ======================================================
+router.get("/impact-stats", getImpactStats);
 
 // ======================================================
 // CREATE DONATION
@@ -51,7 +61,7 @@ router.get(
 );
 
 // ======================================================
-// ACCEPT DONATION
+// ACCEPT / REQUEST DONATION
 // NGO ONLY
 // ======================================================
 router.put(
@@ -130,6 +140,24 @@ router.post(
 );
 
 // ======================================================
+// DONOR SELECTS ONE NGO
+// DONOR ONLY
+// ======================================================
+router.patch(
+  "/:id/select-ngo/:ngoId",
+  protect,
+  restrictTo("donor"),
+  selectNgoForDonation
+);
+
+router.patch(
+  "/:id/decline-ngo/:ngoId",
+  protect,
+  restrictTo("donor"),
+  declineNgoRequest
+);
+
+// ======================================================
 // GET SINGLE DONATION
 // Keep this LAST because it uses /:id
 // ======================================================
@@ -138,5 +166,8 @@ router.get(
   getDonationById
 );
 
-module.exports = router;
 
+// ======================================================
+
+
+module.exports = router;

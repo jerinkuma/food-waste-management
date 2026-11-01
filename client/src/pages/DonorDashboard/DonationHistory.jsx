@@ -7,29 +7,19 @@ import HistoryStats from "../../components/DonorDashboard/DonationHistory/Histor
 import SearchFilter from "../../components/DonorDashboard/DonationHistory/SearchFilter";
 import DonationTable from "../../components/DonorDashboard/DonationHistory/DonationTable";
 
-
 const DonationHistory = () => {
-
   const [donations, setDonations] = useState([]);
-
   const [filteredDonations, setFilteredDonations] =
     useState([]);
-
   const [loading, setLoading] = useState(true);
-
   const [search, setSearch] = useState("");
-
   const [statusFilter, setStatusFilter] =
     useState("All");
 
-
   // Load donor donations
   useEffect(() => {
-
     const loadDonations = async () => {
-
       try {
-
         const user = JSON.parse(
           localStorage.getItem("user")
         );
@@ -40,14 +30,11 @@ const DonationHistory = () => {
           return;
         }
 
-
         const response = await fetch(
           `http://localhost:5000/api/donations/donor/${user.id}`
         );
 
-
         const data = await response.json();
-
 
         if (!response.ok) {
           throw new Error(
@@ -56,137 +43,87 @@ const DonationHistory = () => {
           );
         }
 
-
-        setDonations(data.donations);
-
+        setDonations(data.donations || []);
       } catch (error) {
-
         console.error(
           "Donation history error:",
           error
         );
-
       } finally {
-
         setLoading(false);
-
       }
     };
 
-
     loadDonations();
-
   }, []);
-
 
   // Search + Status Filter
   useEffect(() => {
-
     let result = [...donations];
-
 
     // Search by food name
     if (search.trim()) {
-
       result = result.filter((donation) =>
         donation.foodName
           ?.toLowerCase()
           .includes(search.toLowerCase())
       );
-
     }
-
 
     // Status filter
     if (statusFilter !== "All") {
-
       result = result.filter((donation) => {
-
-        if (
-          statusFilter === "Pending"
-        ) {
+        if (statusFilter === "Pending") {
           return (
             donation.status ===
-            "Waiting for NGO Acceptance"
+              "Waiting for NGO Acceptance" ||
+            donation.status === "NGO Requested"
           );
         }
 
-
-        if (
-          statusFilter === "Accepted"
-        ) {
+        if (statusFilter === "Accepted") {
           return (
-            donation.status ===
-            "NGO Accepted"
+            donation.status === "NGO Accepted"
           );
         }
 
-
-        if (
-          statusFilter === "Picked Up"
-        ) {
+        if (statusFilter === "Picked Up") {
           return (
-            donation.status ===
-            "Food Picked Up"
+            donation.status === "Food Picked Up"
           );
         }
 
-
-        return (
-          donation.status ===
-          statusFilter
-        );
-
+        return donation.status === statusFilter;
       });
-
     }
 
-
     setFilteredDonations(result);
-
-  }, [
-    donations,
-    search,
-    statusFilter,
-  ]);
-
+  }, [donations, search, statusFilter]);
 
   return (
     <DashboardLayout>
-
       {/* Statistics */}
-      <HistoryStats
-        donations={donations}
-      />
-
+      <HistoryStats donations={donations} />
 
       {/* Search + Filter */}
       <div className="mt-8">
-
         <SearchFilter
           search={search}
           setSearch={setSearch}
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
         />
-
       </div>
-
 
       {/* Donation Table */}
       <div className="mt-8">
-
         <DonationTable
           donations={filteredDonations}
           loading={loading}
         />
-
       </div>
-
     </DashboardLayout>
   );
 };
 
-
 export default DonationHistory;
-

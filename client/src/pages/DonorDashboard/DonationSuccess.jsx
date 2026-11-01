@@ -250,23 +250,6 @@ const qrValue = `${window.location.origin}/delivery/safety/${donation.donationId
 
               <div>
                 <p className="text-xs text-gray-400">
-                  Estimated Meals
-                </p>
-
-                <div className="mt-1 flex items-center gap-2">
-                  <Users
-                    size={16}
-                    className="text-blue-600"
-                  />
-
-                  <p className="text-sm font-semibold text-gray-800">
-                    {donation.estimatedMeals}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-400">
                   Condition
                 </p>
 

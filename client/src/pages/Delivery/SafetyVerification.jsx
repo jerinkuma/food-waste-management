@@ -99,8 +99,8 @@ const SafetyVerification = () => {
             headers: {
               ...(token
                 ? {
-                    Authorization: `Bearer ${token}`,
-                  }
+                  Authorization: `Bearer ${token}`,
+                }
                 : {}),
             },
           }
@@ -120,13 +120,13 @@ const SafetyVerification = () => {
         ) {
           throw new Error(
             data.message ||
-              "Failed to load donation."
+            "Failed to load donation."
           );
         }
 
         setDonation(
           data.donation ||
-            data.data
+          data.data
         );
       } catch (err) {
         console.error(
@@ -136,7 +136,7 @@ const SafetyVerification = () => {
 
         setError(
           err.message ||
-            "Failed to load donation details."
+          "Failed to load donation details."
         );
       } finally {
         setLoadingDonation(false);
@@ -234,44 +234,29 @@ const SafetyVerification = () => {
         "================================="
       );
 
-      const response =
-        await fetch(
-          `http://localhost:5000/api/donations/${encodeURIComponent(
-            donationId
-          )}/verify`,
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-
-              ...(token
-                ? {
-                    Authorization: `Bearer ${token}`,
-                  }
-                : {}),
+      const response = await fetch(
+        `http://localhost:5000/api/donations/${encodeURIComponent(
+          donation._id
+        )}/verify`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token
+              ? { Authorization: `Bearer ${token}` }
+              : {}),
+          },
+          body: JSON.stringify({
+            approved: true,
+            checks: {
+              foodCondition: true,
+              packaging: true,
+              temperature: true,
+              expiry: true,
             },
-
-            body: JSON.stringify({
-              approved: true,
-
-              checks: {
-                foodCondition:
-                  true,
-
-                packaging:
-                  true,
-
-                temperature:
-                  true,
-
-                expiry:
-                  true,
-              },
-            }),
-          }
-        );
+          }),
+        }
+      );
 
       const data =
         await response.json();
@@ -287,7 +272,7 @@ const SafetyVerification = () => {
       ) {
         throw new Error(
           data.message ||
-            "Donation verification failed."
+          "Donation verification failed."
         );
       }
 
@@ -307,7 +292,7 @@ const SafetyVerification = () => {
 
       setError(
         err.message ||
-          "Something went wrong during verification."
+        "Something went wrong during verification."
       );
     } finally {
       setVerifying(false);
@@ -323,110 +308,62 @@ const SafetyVerification = () => {
   // ==================================================
 
   const handleReject = async () => {
-    if (!donationId) {
-      setError(
-        "Donation ID is missing."
-      );
-      return;
-    }
+  if (!donation?._id) {
+    setError("Donation information is missing.");
+    return;
+  }
 
-    // Prevent double click
-    if (
-      verifying ||
-      rejecting
-    ) {
-      return;
-    }
+  if (verifying || rejecting) return;
 
-    try {
-      setRejecting(true);
+  try {
+    setRejecting(true);
+    setError("");
+    setSuccessMessage("");
 
-      setError("");
-      setSuccessMessage("");
-
-      console.log(
-        "================================="
-      );
-
-      console.log(
-        "REJECT DONATION:"
-      );
-
-      console.log(
-        "Donation ID:",
-        donationId
-      );
-
-      console.log(
-        "================================="
-      );
-
-      const response =
-        await fetch(
-          `http://localhost:5000/api/donations/${encodeURIComponent(
-            donationId
-          )}/reject`,
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-
-              ...(token
-                ? {
-                    Authorization: `Bearer ${token}`,
-                  }
-                : {}),
-            },
-
-            body: JSON.stringify({
-              reason:
-                "Food failed the safety verification.",
-            }),
-          }
-        );
-
-      const data =
-        await response.json();
-
-      console.log(
-        "REJECT RESPONSE:",
-        data
-      );
-
-      if (
-        !response.ok ||
-        !data.success
-      ) {
-        throw new Error(
-          data.message ||
-            "Donation rejection failed."
-        );
+    const response = await fetch(
+      `http://localhost:5000/api/donations/${encodeURIComponent(
+        donation._id
+      )}/verify`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token
+            ? { Authorization: `Bearer ${token}` }
+            : {}),
+        },
+        body: JSON.stringify({
+          approved: false,
+          checks,
+        }),
       }
+    );
 
-      setSuccessMessage(
-        "Donation rejected successfully."
-      );
+    const data = await response.json();
 
-      setTimeout(() => {
-        navigate(-1);
-      }, 1200);
-    } catch (err) {
-      console.error(
-        "Rejection error:",
-        err
-      );
+    console.log("SAFETY REJECTION RESPONSE:", data);
 
-      setError(
-        err.message ||
-          "Something went wrong while rejecting donation."
+    if (!response.ok || !data.success) {
+      throw new Error(
+        data.message || "Donation rejection failed."
       );
-    } finally {
-      setRejecting(false);
     }
-  };
 
+    setSuccessMessage("Donation rejected successfully.");
+
+    setTimeout(() => {
+      navigate(-1);
+    }, 1200);
+  } catch (err) {
+    console.error("Safety rejection error:", err);
+
+    setError(
+      err.message || "Something went wrong while rejecting donation."
+    );
+  } finally {
+    setRejecting(false);
+  }
+};
   // ==================================================
   // CHECK ITEMS
   // ==================================================
@@ -824,19 +761,17 @@ const SafetyVerification = () => {
                       verifying ||
                       rejecting
                     }
-                    className={`flex w-full items-center gap-4 rounded-xl border p-4 text-left transition ${
-                      checked
+                    className={`flex w-full items-center gap-4 rounded-xl border p-4 text-left transition ${checked
                         ? "border-emerald-300 bg-emerald-50"
                         : "border-slate-200 bg-white hover:border-slate-300"
-                    }`}
+                      }`}
                   >
 
                     <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-                        checked
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${checked
                           ? "bg-emerald-600 text-white"
                           : "bg-slate-100 text-slate-500"
-                      }`}
+                        }`}
                     >
                       <Icon size={21} />
                     </div>
@@ -854,11 +789,10 @@ const SafetyVerification = () => {
                     </div>
 
                     <div
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
-                        checked
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${checked
                           ? "border-emerald-600 bg-emerald-600 text-white"
                           : "border-slate-300 bg-white"
-                      }`}
+                        }`}
                     >
                       {checked && (
                         <CheckCircle2
@@ -879,11 +813,10 @@ const SafetyVerification = () => {
           ================================================== */}
 
           <div
-            className={`mt-5 rounded-xl border px-4 py-3 text-sm font-medium ${
-              allChecked
+            className={`mt-5 rounded-xl border px-4 py-3 text-sm font-medium ${allChecked
                 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                 : "border-amber-200 bg-amber-50 text-amber-700"
-            }`}
+              }`}
           >
             {allChecked
               ? "All safety checks passed. The donation is ready for verification."

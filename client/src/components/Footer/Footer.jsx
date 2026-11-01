@@ -1,7 +1,11 @@
+
 import { Mail, Phone, MapPin } from "lucide-react";
-
-
-import { FaFacebookF,FaInstagram, FaLinkedinIn, FaGithub } from "react-icons/fa";
+import {
+  FaFacebookF,
+  FaInstagram,
+  FaLinkedinIn,
+  FaGithub,
+} from "react-icons/fa";
 
 const Footer = () => {
   return (
@@ -11,158 +15,114 @@ const Footer = () => {
     >
       <div className="max-w-7xl mx-auto px-6">
 
-        {/* Top */}
+        {/* Main Footer */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 lg:gap-16">
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
-
-          {/* Logo */}
-
-          <div>
-
+          {/* Logo & Description */}
+          <div className="flex flex-col items-start">
             <h2 className="text-3xl font-bold text-green-500">
               FeedLink
             </h2>
 
-            <p className="mt-5 text-gray-400 leading-7">
+            <p className="mt-5 text-gray-400 leading-7 max-w-sm">
               FeedLink is a smart food waste management platform that
               connects food donors, NGOs and volunteers to reduce
               hunger and minimize food waste.
             </p>
-
-          </div>
-
-          {/* Quick Links */}
-
-          <div>
-
-            <h3 className="text-xl font-semibold mb-5">
-              Quick Links
-            </h3>
-
-            <ul className="space-y-3 text-gray-400">
-
-              <li>
-                <a href="#home" className="hover:text-green-400 transition">
-                  Home
-                </a>
-              </li>
-
-              <li>
-                <a href="#about" className="hover:text-green-400 transition">
-                  About
-                </a>
-              </li>
-
-              <li>
-                <a
-                  href="#how-it-works"
-                  className="hover:text-green-400 transition"
-                >
-                  How It Works
-                </a>
-              </li>
-
-              <li>
-                <a
-                  href="#services"
-                  className="hover:text-green-400 transition"
-                >
-                  Services
-                </a>
-              </li>
-
-              <li>
-                <a
-                  href="#contact"
-                  className="hover:text-green-400 transition"
-                >
-                  Contact
-                </a>
-              </li>
-
-            </ul>
-
           </div>
 
           {/* Contact */}
-
-          <div>
-
-            <h3 className="text-xl font-semibold mb-5">
+          <div className="flex flex-col items-start">
+            <h3 className="text-xl font-semibold mb-6">
               Contact
             </h3>
 
-            <div className="space-y-4 text-gray-400">
+            <div className="space-y-5 text-gray-400 w-full">
 
-              <div className="flex items-center gap-3">
-                <MapPin size={18} />
+              <div className="flex items-start gap-3">
+                <MapPin
+                  size={19}
+                  className="text-green-500 shrink-0 mt-1"
+                />
                 <span>Dhaka, Bangladesh</span>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Phone size={18} />
+              <div className="flex items-start gap-3">
+                <Phone
+                  size={19}
+                  className="text-green-500 shrink-0 mt-1"
+                />
                 <span>+880 1234-567890</span>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Mail size={18} />
-                <span>contact@feedlink.com</span>
+              <div className="flex items-start gap-3">
+                <Mail
+                  size={19}
+                  className="text-green-500 shrink-0 mt-1"
+                />
+                <span className="break-all">
+                  feedlink.support@gmail.com
+                </span>
               </div>
 
             </div>
-
           </div>
 
-          {/* Social */}
-
-          <div>
-
-            <h3 className="text-xl font-semibold mb-5">
+          {/* Social Links */}
+          <div className="flex flex-col items-start">
+            <h3 className="text-xl font-semibold mb-6">
               Follow Us
             </h3>
 
-            <div className="flex gap-4">
+            <p className="text-gray-400 mb-6 leading-7">
+              Stay connected with FeedLink and be part of our mission
+              to reduce food waste.
+            </p>
+
+            <div className="flex flex-wrap gap-4">
 
               <a
                 href="#"
-                className="w-11 h-11 rounded-full bg-gray-800 hover:bg-green-600 transition flex items-center justify-center"
+                aria-label="Facebook"
+                className="w-11 h-11 rounded-full bg-gray-800 hover:bg-green-600 transition-all duration-300 flex items-center justify-center hover:-translate-y-1"
               >
                 <FaFacebookF size={18} />
               </a>
 
               <a
                 href="#"
-                className="w-11 h-11 rounded-full bg-gray-800 hover:bg-green-600 transition flex items-center justify-center"
+                aria-label="Instagram"
+                className="w-11 h-11 rounded-full bg-gray-800 hover:bg-green-600 transition-all duration-300 flex items-center justify-center hover:-translate-y-1"
               >
                 <FaInstagram size={18} />
               </a>
 
               <a
                 href="#"
-                className="w-11 h-11 rounded-full bg-gray-800 hover:bg-green-600 transition flex items-center justify-center"
+                aria-label="LinkedIn"
+                className="w-11 h-11 rounded-full bg-gray-800 hover:bg-green-600 transition-all duration-300 flex items-center justify-center hover:-translate-y-1"
               >
                 <FaLinkedinIn size={18} />
               </a>
 
               <a
                 href="#"
-                className="w-11 h-11 rounded-full bg-gray-800 hover:bg-green-600 transition flex items-center justify-center"
+                aria-label="GitHub"
+                className="w-11 h-11 rounded-full bg-gray-800 hover:bg-green-600 transition-all duration-300 flex items-center justify-center hover:-translate-y-1"
               >
                 <FaGithub size={18} />
               </a>
 
             </div>
-
           </div>
 
         </div>
 
-        {/* Bottom */}
-
-        <div className="border-t border-gray-700 mt-12 pt-6 text-center text-gray-500">
-
-          © {new Date().getFullYear()} FeedLink. All Rights Reserved.
-
+        {/* Bottom Footer */}
+        <div className="border-t border-gray-700 mt-14 pt-7">
+          <p className="text-center text-sm text-gray-500 leading-6">
+            © {new Date().getFullYear()} FeedLink. All Rights Reserved.
+          </p>
         </div>
 
       </div>

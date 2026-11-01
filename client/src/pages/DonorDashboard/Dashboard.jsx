@@ -179,7 +179,7 @@ const Dashboard = () => {
 
       setError(
         error.message ||
-          "Failed to load dashboard."
+        "Failed to load dashboard."
       );
     } finally {
       setLoading(false);
@@ -287,8 +287,8 @@ const Dashboard = () => {
 
         const notificationKey = [
           notification.donationId ||
-            notification.customDonationId ||
-            "",
+          notification.customDonationId ||
+          "",
 
           notification.urgency || "",
 
@@ -469,19 +469,18 @@ const Dashboard = () => {
 
                 {freshnessNotification.remainingMinutes !==
                   undefined && (
-                  <p className="mt-1 text-xs font-medium text-red-700">
-                    {freshnessNotification.remainingMinutes <=
-                    0
-                      ? "Expired"
-                      : `Time remaining: ${Math.floor(
+                    <p className="mt-1 text-xs font-medium text-red-700">
+                      {freshnessNotification.remainingMinutes <=
+                        0
+                        ? "Expired"
+                        : `Time remaining: ${Math.floor(
                           freshnessNotification.remainingMinutes /
-                            60
-                        )}h ${
-                          freshnessNotification.remainingMinutes %
                           60
+                        )}h ${freshnessNotification.remainingMinutes %
+                        60
                         }m`}
-                  </p>
-                )}
+                    </p>
+                  )}
 
               </div>
 
@@ -543,24 +542,27 @@ const Dashboard = () => {
           change={`+${dashboard.todayDonations || 0} Today`}
         />
 
-        {/* MEALS SERVED */}
+        {/* ACTIVE DONATIONS */}
 
         <StatCard
-          title="Meals Served"
+          title="Active Donations"
           value={Number(
-            dashboard.mealsServed || 0
+            dashboard.activeDonations || 0
           ).toLocaleString()}
           color="bg-blue-500"
-          change={`+${dashboard.activeDonations || 0} Active`}
+          change="Currently Active"
         />
-
         {/* RESTAURANT RATING */}
 
         <StatCard
           title="Restaurant Rating"
-          value="N/A"
+          value={`${Number(dashboard.ratingAverage || 0).toFixed(1)} / 5`}
           color="bg-yellow-500"
-          change="No Reviews Yet"
+          change={
+            dashboard.ratingCount > 0
+              ? `${dashboard.ratingCount} NGO Rating${dashboard.ratingCount === 1 ? "" : "s"}`
+              : "No Ratings Yet"
+          }
         />
 
         {/* FOOD WASTE DIVERTED */}
@@ -583,9 +585,8 @@ const Dashboard = () => {
       <div className="mt-6">
 
         <DonationTracker
-          donations={
-            dashboard?.pickupDonations || []
-          }
+          donations={dashboard?.pickupDonations || []}
+          onRefresh={loadDashboard}
         />
 
       </div>

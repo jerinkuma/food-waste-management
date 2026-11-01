@@ -14,8 +14,8 @@ const ActionButtons = ({
 
   // Cancel
   const handleCancel = () => {
-  resetDonationForm();
-};
+    resetDonationForm();
+  };
 
   // Publish Donation
   const handlePublish = async () => {
@@ -50,7 +50,6 @@ const ActionButtons = ({
       ["foodName", "Food Name"],
       ["foodType", "Food Type"],
       ["quantity", "Quantity"],
-      ["estimatedMeals", "Estimated Meals"],
       ["cookingTime", "Cooking Time"],
       ["bestBefore", "Best Before"],
       ["condition", "Food Condition"],
@@ -99,9 +98,6 @@ const ActionButtons = ({
             foodType: donationData.foodType,
 
             quantity: Number(donationData.quantity),
-            estimatedMeals: Number(
-              donationData.estimatedMeals
-            ),
 
             cookingTime: donationData.cookingTime,
             bestBefore: donationData.bestBefore,
@@ -159,7 +155,6 @@ const ActionButtons = ({
 
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-
       {/* Error Message */}
       {error && (
         <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
@@ -168,7 +163,6 @@ const ActionButtons = ({
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-
         {/* Cancel */}
         <button
           type="button"
@@ -202,11 +196,9 @@ const ActionButtons = ({
             </>
           )}
         </button>
-
       </div>
     </div>
   );
 };
 
 export default ActionButtons;
-

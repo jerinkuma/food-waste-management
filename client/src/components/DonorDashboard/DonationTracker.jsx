@@ -1,22 +1,36 @@
+
+import { useState } from "react";
 import {
   Truck,
   User,
   Phone,
-  MapPin,
-  Clock3,
-  CheckCircle2,
-  Navigation,
   Building2,
   PackageCheck,
+  Check,
+  X,
 } from "lucide-react";
+
+const API_BASE = "http://localhost:5000/api";
+
+const getToken = () => {
+  try {
+    return (
+      localStorage.getItem("token") ||
+      JSON.parse(localStorage.getItem("user") || "{}")?.token ||
+      ""
+    );
+  } catch {
+    return localStorage.getItem("token") || "";
+  }
+};
 
 const DonationTracker = ({
   donation,
   donations = [],
+  onRefresh,
 }) => {
-  // Support both:
-  // donations={[]}
-  // and older donation={object}
+  const [processing, setProcessing] = useState("");
+
   const allDonations =
     donations.length > 0
       ? donations
@@ -28,13 +42,12 @@ const DonationTracker = ({
   // STATUS HELPERS
   // =====================================================
 
-  const getStatus = (item) => {
-    return String(
+  const getStatus = (item) =>
+    String(
       item?.pipelineStatus ||
       item?.status ||
       ""
     ).trim();
-  };
 
   const isHistoryStatus = (item) => {
     const status = getStatus(item).toLowerCase();
@@ -46,25 +59,44 @@ const DonationTracker = ({
   };
 
   const isActivePickup = (item) => {
-    const pipelineStatus = String(
-      item?.pipelineStatus || ""
-    ).trim();
-
-    const displayStatus = String(
-      item?.status || ""
-    ).trim();
-
     return (
       [
         "Accepted",
         "Out for Delivery",
-      ].includes(pipelineStatus) ||
+      ].includes(
+        String(item?.pipelineStatus || "").trim()
+      ) ||
       [
         "Delivery Man Assigned",
         "Food Picked Up",
-      ].includes(displayStatus)
+      ].includes(
+        String(item?.status || "").trim()
+      )
     );
   };
+
+  // =====================================================
+  // PENDING NGO REQUEST DONATIONS
+  // =====================================================
+
+  const requestDonations = allDonations.filter((item) => {
+    const hasPendingRequests =
+      Array.isArray(item?.ngoRequests) &&
+      item.ngoRequests.some(
+        (request) => request.status === "Pending"
+      );
+
+    return (
+      item?.pipelineStatus === "Pending" &&
+      !item?.selectedNgo &&
+      hasPendingRequests &&
+      !isHistoryStatus(item)
+    );
+  });
+
+  // =====================================================
+  // ACTIVE PICKUPS
+  // =====================================================
 
   const activeDonations = allDonations.filter(
     (item) =>
@@ -73,252 +105,153 @@ const DonationTracker = ({
   );
 
   // =====================================================
-  // DISTANCE CALCULATION
+  // COMMON HELPERS
   // =====================================================
 
-  const calculateDistance = (
-    lat1,
-    lon1,
-    lat2,
-    lon2
-  ) => {
-    const earthRadius = 6371;
+  const getDonationName = (item) =>
+    item?.foodName ||
+    item?.foodType ||
+    "Food Donation";
 
-    const toRadians = (value) =>
-      (value * Math.PI) / 180;
+  // Donor যে NGO-কে Accept করেছে, তার নাম দেখাবে
+  const getNgoName = (item) => {
+    const selectedNgo =
+      item?.selectedNgo;
 
-    const dLat = toRadians(lat2 - lat1);
-    const dLon = toRadians(lon2 - lon1);
+    const acceptedNgo =
+      item?.ngoRequest?.requestedBy;
 
-    const a =
-      Math.sin(dLat / 2) *
-      Math.sin(dLat / 2) +
-      Math.cos(toRadians(lat1)) *
-      Math.cos(toRadians(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    const ngo =
+      item?.ngo;
 
-    const c =
-      2 *
-      Math.atan2(
-        Math.sqrt(a),
-        Math.sqrt(1 - a)
-      );
+    // selectedNgo populated থাকলে সেটিই ব্যবহার হবে।
+    // selectedNgo ID হলে populated ngoRequest fallback হবে।
+    const ngoInfo =
+      selectedNgo &&
+        typeof selectedNgo === "object"
+        ? selectedNgo
+        : acceptedNgo &&
+          typeof acceptedNgo === "object"
+          ? acceptedNgo
+          : ngo &&
+            typeof ngo === "object"
+            ? ngo
+            : null;
 
-    return earthRadius * c;
-  };
-
-  // =====================================================
-  // FOOD NAME
-  // =====================================================
-
-  const getDonationName = (item) => {
     return (
-      item?.foodName ||
-      item?.foodType ||
-      "Food Donation"
+      ngoInfo?.user?.name ||
+      ngoInfo?.name ||
+      ngoInfo?.organizationName ||
+      ngoInfo?.organizationId ||
+      "NGO Partner"
     );
   };
 
-  // =====================================================
-  // NGO NAME
-  // =====================================================
+  const getRequestNgoName = (request) => {
+    const ngo = request?.requestedBy;
 
-  const getNgoName = (item) => {
     return (
-      item?.ngo?.name ||
-      item?.ngo?.organizationName ||
-      item?.ngo?.organizationId ||
+      ngo?.user?.name ||
+      ngo?.organizationName ||
+      ngo?.organizationId ||
       "NGO Partner"
     );
   };
 
   // =====================================================
-  // STATUS LABEL
+  // ACCEPT / DECLINE NGO REQUEST
   // =====================================================
 
-  const getStatusLabel = (item) => {
-    return (
-      item?.pipelineStatus ||
-      item?.status ||
-      "In Progress"
+  const handleNgoRequest = async (
+    item,
+    ngoId,
+    action
+  ) => {
+    const donationId = item?._id;
+
+    if (!donationId || !ngoId) {
+      alert("Donation or NGO information is missing.");
+      return;
+    }
+
+    if (processing) return;
+
+    const confirmed = window.confirm(
+      action === "accept"
+        ? "Are you sure you want to select this NGO? Other pending NGO requests will be rejected automatically."
+        : "Are you sure you want to decline this NGO request?"
     );
-  };
 
-  // =====================================================
-  // STATUS COLOR
-  // =====================================================
+    if (!confirmed) return;
 
-  const getStatusColor = (item) => {
-    const status = getStatus(item);
+    try {
+      const actionKey = `${donationId}-${ngoId}`;
 
-    if (
-      status === "Out for Delivery" ||
-      status === "Food Picked Up"
-    ) {
-      return "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300";
-    }
+      setProcessing(actionKey);
 
-    if (
-      status === "Delivery Man Assigned" ||
-      status === "Accepted"
-    ) {
-      return "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-300";
-    }
+      const token = getToken();
 
-    return "bg-gray-100 text-gray-700 dark:bg-gray-700/60 dark:text-gray-300";
-  };
-
-  // =====================================================
-  // ACTIVE DONATION CARD
-  // =====================================================
-
-  const renderActiveDonation = (item) => {
-    const driver =
-      item?.deliveryMan || null;
-
-    // Driver live location
-    const driverLatitude =
-      item?.liveLocation?.latitude;
-
-    const driverLongitude =
-      item?.liveLocation?.longitude;
-
-    // Restaurant / donor location
-    const restaurantLatitude =
-      item?.donor?.location?.latitude;
-
-    const restaurantLongitude =
-      item?.donor?.location?.longitude;
-
-    const hasDriverLocation =
-      typeof driverLatitude === "number" &&
-      typeof driverLongitude === "number";
-
-    const hasRestaurantLocation =
-      typeof restaurantLatitude === "number" &&
-      typeof restaurantLongitude === "number";
-
-    // =================================================
-    // DISTANCE
-    // =================================================
-
-    let distanceKm = null;
-
-    if (
-      hasDriverLocation &&
-      hasRestaurantLocation
-    ) {
-      distanceKm = calculateDistance(
-        driverLatitude,
-        driverLongitude,
-        restaurantLatitude,
-        restaurantLongitude
-      );
-    }
-
-    // =================================================
-    // ESTIMATED ARRIVAL
-    // =================================================
-
-    let estimatedArrival = null;
-
-    if (distanceKm !== null) {
-      estimatedArrival = Math.max(
-        1,
-        Math.ceil(
-          (distanceKm / 25) * 60
-        )
-      );
-    }
-
-    // =================================================
-    // PICKUP STATUS / PROGRESS
-    // =================================================
-
-    const status = getStatus(item);
-
-    let progress = 30;
-
-    if (status === "Accepted") {
-      progress = 30;
-    }
-
-    if (
-      status === "Delivery Man Assigned"
-    ) {
-      progress = 50;
-    }
-
-    if (
-      status === "Out for Delivery"
-    ) {
-      progress = 75;
-    }
-
-    if (
-      status === "Food Picked Up"
-    ) {
-      progress = 90;
-    }
-
-    // =================================================
-    // CALL DRIVER
-    // =================================================
-
-    const handleCallDriver = () => {
-      if (!driver?.phone) {
-        return;
+      if (!token) {
+        throw new Error(
+          "Authentication token not found. Please log in again."
+        );
       }
 
-      window.location.href =
-        `tel:${driver.phone}`;
-    };
+      const endpoint =
+        action === "accept"
+          ? `${API_BASE}/donations/${donationId}/select-ngo/${ngoId}`
+          : `${API_BASE}/donations/${donationId}/decline-ngo/${ngoId}`;
 
-    // =================================================
-    // TRACK DRIVER
-    // =================================================
+      const response = await fetch(endpoint, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    const handleTrackDriver = () => {
-      if (!hasDriverLocation) {
-        alert(
-          "Driver location is not available yet."
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message ||
+          `Failed to ${action} NGO request.`
         );
-
-        return;
       }
 
       alert(
-        `Driver is approximately ${distanceKm !== null
-          ? distanceKm.toFixed(1)
-          : "?"
-        } KM away from the restaurant.`
+        action === "accept"
+          ? "NGO selected successfully!"
+          : "NGO request declined successfully!"
       );
-    };
+
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error) {
+      console.error("NGO request action error:", error);
+      alert(error.message || "Something went wrong.");
+    } finally {
+      setProcessing("");
+    }
+  };
+
+  // =====================================================
+  // NGO REQUEST CARD
+  // =====================================================
+
+  const renderRequestDonation = (item) => {
+    const pendingRequests =
+      (item?.ngoRequests || []).filter(
+        (request) => request.status === "Pending"
+      );
 
     return (
       <div
-        key={
-          item?._id ||
-          item?.donationId ||
-          "active-donation"
-        }
-        className="
-          rounded-2xl
-          border border-green-100
-          bg-green-50/40
-          p-4
-          transition-colors
-          dark:border-gray-700
-          dark:bg-[#18241f]
-          sm:p-5
-        "
+        key={item._id}
+        className="rounded-2xl border border-orange-200 bg-orange-50/40 p-4 dark:border-orange-900/50 dark:bg-[#241f18] sm:p-5"
       >
-        {/* ============================================
-            HEADER
-        ============================================ */}
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
               Food Donation
@@ -329,32 +262,180 @@ const DonationTracker = ({
             </h4>
 
             {item?.donationId && (
-              <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+              <p className="mt-1 text-[11px] text-gray-400">
                 ID: {item.donationId}
               </p>
             )}
           </div>
 
-          <span
-            className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(
-              item
-            )}`}
-          >
-            {getStatusLabel(item)}
+          <span className="w-fit rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700 dark:bg-orange-500/15 dark:text-orange-300">
+            {pendingRequests.length} NGO Request
+            {pendingRequests.length !== 1 ? "s" : ""}
           </span>
         </div>
 
-        {/* ============================================
-            NGO / DRIVER INFORMATION
-        ============================================ */}
+        <div className="mt-5 space-y-3">
+          {pendingRequests.map((request) => {
+            const ngoId =
+              request?.requestedBy?._id ||
+              request?.requestedBy;
+
+            const actionKey = `${item._id}-${ngoId}`;
+            const isProcessing =
+              processing === actionKey;
+
+            return (
+              <div
+                key={actionKey}
+                className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-[#202d28]"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-xl bg-green-100 p-2 dark:bg-green-500/15">
+                      <Building2
+                        size={19}
+                        className="text-green-600 dark:text-green-400"
+                      />
+                    </div>
+
+                    <div>
+                      <p className="font-semibold text-gray-800 dark:text-gray-100">
+                        {getRequestNgoName(request)}
+                      </p>
+
+                      {request?.requestedBy?.organizationId && (
+                        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                          ID: {request.requestedBy.organizationId}
+                        </p>
+                      )}
+
+                      {request?.requestedAt && (
+                        <p className="mt-1 text-xs text-gray-400">
+                          Requested:{" "}
+                          {new Date(
+                            request.requestedAt
+                          ).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <span className="w-fit rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-300">
+                    Pending
+                  </span>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    disabled={Boolean(processing)}
+                    onClick={() =>
+                      handleNgoRequest(
+                        item,
+                        ngoId,
+                        "accept"
+                      )
+                    }
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Check size={16} />
+                    {isProcessing
+                      ? "Processing..."
+                      : "Accept NGO"}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={Boolean(processing)}
+                    onClick={() =>
+                      handleNgoRequest(
+                        item,
+                        ngoId,
+                        "decline"
+                      )
+                    }
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/50 dark:bg-[#202d28] dark:text-red-400 dark:hover:bg-red-950/30"
+                  >
+                    <X size={16} />
+                    Decline
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // =====================================================
+  // ACTIVE DONATION CARD
+  // =====================================================
+
+  const renderActiveDonation = (item) => {
+    const driver = item?.deliveryMan || null;
+
+    const status = getStatus(item);
+
+    let progress = 30;
+
+    if (status === "Delivery Man Assigned") {
+      progress = 50;
+    }
+
+    if (status === "Out for Delivery") {
+      progress = 75;
+    }
+
+    if (status === "Food Picked Up") {
+      progress = 90;
+    }
+
+    const handleCallDriver = () => {
+      if (!driver?.phone) {
+        alert("Driver phone number not available.");
+        return;
+      }
+
+      // Bangladesh number হলে 01XXXXXXXXX থেকে 8801XXXXXXXXX করবে
+      let phone = driver.phone.replace(/\D/g, "");
+
+      if (phone.startsWith("01")) {
+        phone = `88${phone}`;
+      } else if (phone.startsWith("1")) {
+        phone = `880${phone}`;
+      }
+
+      window.open(`https://wa.me/${phone}`, "_blank");
+    };
+
+    return (
+      <div
+        key={item?._id || item?.donationId}
+        className="rounded-2xl border border-green-100 bg-green-50/40 p-4 transition-colors dark:border-gray-700 dark:bg-[#18241f] sm:p-5"
+      >
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+            Food Donation
+          </p>
+
+          <h4 className="mt-1 text-lg font-bold text-gray-800 dark:text-gray-100">
+            {getDonationName(item)}
+          </h4>
+
+          {item?.donationId && (
+            <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+              ID: {item.donationId}
+            </p>
+          )}
+        </div>
+
+        {/* NGO AND DRIVER INFORMATION */}
 
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-          {/* NGO */}
-
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              NGO
+              NGO Partner
             </p>
 
             <div className="mt-1 flex items-center gap-2">
@@ -369,8 +450,6 @@ const DonationTracker = ({
             </div>
           </div>
 
-          {/* DRIVER */}
-
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Driver
@@ -383,13 +462,10 @@ const DonationTracker = ({
               />
 
               <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                {driver?.name ||
-                  "Information unavailable"}
+                {driver?.name || "Information unavailable"}
               </span>
             </div>
           </div>
-
-          {/* PHONE */}
 
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -403,13 +479,10 @@ const DonationTracker = ({
               />
 
               <span className="text-sm text-gray-700 dark:text-gray-300">
-                {driver?.phone ||
-                  "Not available"}
+                {driver?.phone || "Not available"}
               </span>
             </div>
           </div>
-
-          {/* VEHICLE */}
 
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -417,110 +490,12 @@ const DonationTracker = ({
             </p>
 
             <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-gray-200">
-              {driver?.vehicleNumber ||
-                "Not available"}
+              {driver?.vehicleNumber || "Not available"}
             </p>
           </div>
         </div>
 
-        {/* ============================================
-            PICKUP INFORMATION
-        ============================================ */}
-
-        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-
-          {/* ESTIMATED ARRIVAL */}
-
-          <div className="rounded-xl bg-white p-3 dark:bg-[#202d28]">
-            <div className="flex items-center gap-2">
-              <Clock3
-                size={16}
-                className="text-orange-500"
-              />
-
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                Estimated Arrival
-              </span>
-            </div>
-
-            <p className="mt-1 text-sm font-bold text-orange-600 dark:text-orange-400">
-              {estimatedArrival !== null
-                ? `${estimatedArrival} min`
-                : "Waiting"}
-            </p>
-          </div>
-
-          {/* DISTANCE */}
-
-          <div className="rounded-xl bg-white p-3 dark:bg-[#202d28]">
-            <div className="flex items-center gap-2">
-              <MapPin
-                size={16}
-                className="text-red-500"
-              />
-
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                Distance
-              </span>
-            </div>
-
-            <p className="mt-1 text-sm font-bold text-gray-800 dark:text-gray-200">
-              {distanceKm !== null
-                ? `${distanceKm.toFixed(
-                  1
-                )} KM`
-                : "Unavailable"}
-            </p>
-          </div>
-
-          {/* STATUS */}
-
-          <div className="rounded-xl bg-white p-3 dark:bg-[#202d28]">
-            <div className="flex items-center gap-2">
-              <CheckCircle2
-                size={16}
-                className="text-green-600 dark:text-green-400"
-              />
-
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                Status
-              </span>
-            </div>
-
-            <p className="mt-1 text-sm font-bold text-green-700 dark:text-green-400">
-              {getStatusLabel(item)}
-            </p>
-          </div>
-        </div>
-
-        {/* ============================================
-            DRIVER LOCATION
-        ============================================ */}
-
-        <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3 dark:border-blue-900/50 dark:bg-blue-950/30">
-          <div className="flex items-start gap-2">
-            <Navigation
-              size={17}
-              className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400"
-            />
-
-            <div>
-              <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">
-                Driver Location
-              </p>
-
-              <p className="mt-0.5 text-xs text-blue-700 dark:text-blue-400">
-                {hasDriverLocation
-                  ? "Driver location is available."
-                  : "Waiting for driver to share live location."}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* ============================================
-            PICKUP PROGRESS
-        ============================================ */}
+        {/* PICKUP PROGRESS */}
 
         <div className="mt-5">
           <div className="mb-2 flex justify-between text-xs">
@@ -536,60 +511,32 @@ const DonationTracker = ({
           <div className="h-2.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
             <div
               className="h-2.5 rounded-full bg-green-500 transition-all dark:bg-green-600"
-              style={{
-                width: `${progress}%`,
-              }}
+              style={{ width: `${progress}%` }}
             />
           </div>
         </div>
 
-        {/* ============================================
-            ACTION BUTTONS
-        ============================================ */}
+        {/* CALL DRIVER BUTTON */}
 
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-
-          {/* CALL DRIVER */}
-
+        <div className="mt-5 flex justify-center">
           <button
+            type="button"
             onClick={handleCallDriver}
             disabled={!driver?.phone}
-            className={`flex-1 rounded-xl py-2.5 text-sm font-semibold text-white transition ${driver?.phone
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "cursor-not-allowed bg-gray-300 dark:bg-gray-700"
-              }`}
+            className={`
+      !flex !w-full !max-w-[320px]
+      !items-center !justify-center !gap-2
+      !rounded-xl !px-5 !py-3
+      !text-sm !font-semibold !text-white
+      !shadow-md
+      ${driver?.phone
+                ? "!bg-green-600 hover:!bg-green-700"
+                : "!bg-gray-400 cursor-not-allowed"
+              }
+    `}
           >
+            <Phone size={17} />
             Call Driver
-          </button>
-
-          {/* TRACK DRIVER */}
-
-          <button
-            onClick={handleTrackDriver}
-            className="
-              flex
-              items-center
-              justify-center
-              gap-2
-              rounded-xl
-              border
-              border-gray-300
-              bg-white
-              px-5
-              py-2.5
-              text-sm
-              font-semibold
-              text-gray-700
-              transition
-              hover:bg-gray-50
-              dark:border-gray-600
-              dark:bg-[#202d28]
-              dark:text-gray-200
-              dark:hover:bg-[#263630]
-            "
-          >
-            <Navigation size={16} />
-            Track Driver
           </button>
         </div>
       </div>
@@ -601,23 +548,7 @@ const DonationTracker = ({
   // =====================================================
 
   return (
-    <div
-      className="
-        rounded-3xl
-        border
-        border-gray-200
-        bg-white
-        p-5
-        shadow-sm
-        dark:border-gray-700
-        dark:bg-[#111916]
-        sm:p-6
-      "
-    >
-      {/* ================================================
-          HEADER
-      ================================================ */}
-
+    <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-[#111916] sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="rounded-2xl bg-blue-100 p-3 dark:bg-blue-500/15">
@@ -633,7 +564,7 @@ const DonationTracker = ({
             </h2>
 
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Track your food donation pickups
+              Manage NGO requests and food donation pickups
             </p>
           </div>
         </div>
@@ -641,20 +572,40 @@ const DonationTracker = ({
         {activeDonations.length > 0 && (
           <span className="w-fit rounded-full bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700 dark:bg-green-500/15 dark:text-green-400">
             {activeDonations.length} Active Pickup
-            {activeDonations.length > 1
-              ? "s"
-              : ""}
+            {activeDonations.length > 1 ? "s" : ""}
           </span>
         )}
       </div>
 
-      {/* ================================================
-          ACTIVE PICKUPS
-      ================================================ */}
+      {/* NGO REQUESTS */}
+
+      {requestDonations.length > 0 && (
+        <div className="mt-6 space-y-5">
+          <div className="flex items-center gap-2">
+            <Building2
+              size={19}
+              className="text-orange-600 dark:text-orange-400"
+            />
+
+            <h3 className="text-base font-bold text-gray-800 dark:text-gray-100">
+              NGO Requests
+            </h3>
+
+            <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700 dark:bg-orange-500/15 dark:text-orange-300">
+              {requestDonations.length}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5">
+            {requestDonations.map(renderRequestDonation)}
+          </div>
+        </div>
+      )}
+
+      {/* ACTIVE PICKUPS */}
 
       {activeDonations.length > 0 && (
-        <div className="mt-6 space-y-5">
-
+        <div className="mt-7 space-y-5">
           <div className="flex items-center gap-2">
             <PackageCheck
               size={19}
@@ -666,36 +617,37 @@ const DonationTracker = ({
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            {activeDonations.map(
-              renderActiveDonation
-            )}
+          <div
+            className={`grid grid-cols-1 gap-5 ${activeDonations.length >= 2
+              ? "md:grid-cols-2"
+              : ""
+              }`}
+          >
+            {activeDonations.map(renderActiveDonation)}
           </div>
         </div>
       )}
 
-      {/* ================================================
-          NO ACTIVE PICKUP
-      ================================================ */}
+      {/* EMPTY STATE */}
 
-      {activeDonations.length === 0 && (
-        <div className="mt-6 rounded-2xl bg-gray-50 p-7 text-center dark:bg-[#18221f]">
-          <Truck
-            size={38}
-            className="mx-auto text-gray-400 dark:text-gray-500"
-          />
+      {requestDonations.length === 0 &&
+        activeDonations.length === 0 && (
+          <div className="mt-6 rounded-2xl bg-gray-50 p-7 text-center dark:bg-[#18221f]">
+            <Truck
+              size={38}
+              className="mx-auto text-gray-400 dark:text-gray-500"
+            />
 
-          <p className="mt-3 font-semibold text-gray-700 dark:text-gray-200">
-            No active pickup
-          </p>
+            <p className="mt-3 font-semibold text-gray-700 dark:text-gray-200">
+              No active pickup
+            </p>
 
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Your donation pickup information will
-            appear here once an NGO assigns a
-            driver.
-          </p>
-        </div>
-      )}
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              NGO requests and donation pickup information
+              will appear here when available.
+            </p>
+          </div>
+        )}
     </div>
   );
 };

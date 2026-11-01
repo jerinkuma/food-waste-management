@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 
 import Sidebar from "./Sidebar";
@@ -23,14 +24,21 @@ const DashboardLayout = ({ children }) => {
         isDark ? "dark" : ""
       }`}
     >
-      <Sidebar />
+      {/* Sidebar - Hidden in PDF */}
+      <div className="print:hidden">
+        <Sidebar />
+      </div>
 
       <main className="donor-dashboard-main">
-        <Topbar
-          isDark={isDark}
-          setIsDark={setIsDark}
-        />
+        {/* Topbar - Hidden in PDF */}
+        <div className="print:hidden">
+          <Topbar
+            isDark={isDark}
+            setIsDark={setIsDark}
+          />
+        </div>
 
+        {/* Main Dashboard Content */}
         <div className="donor-dashboard-content">
           {children}
         </div>

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 
 import DashboardLayout from "../../components/DonorDashboard/DashboardLayout";
@@ -14,7 +15,6 @@ const initialDonationData = {
   foodName: "",
   foodType: "",
   quantity: "",
-  estimatedMeals: 0,
   cookingTime: "",
   bestBefore: "",
 
@@ -53,7 +53,6 @@ const AddDonation = () => {
   return (
     <DashboardLayout>
       <div className="space-y-5 sm:space-y-6 lg:space-y-8">
-
         <DonationByCard />
 
         <FoodInformation
@@ -76,15 +75,12 @@ const AddDonation = () => {
           updateDonationData={updateDonationData}
         />
 
-        <DonationPreview
-          donationData={donationData}
-        />
+        <DonationPreview donationData={donationData} />
 
         <ActionButtons
           donationData={donationData}
           resetDonationForm={resetDonationForm}
         />
-
       </div>
     </DashboardLayout>
   );

@@ -1,3 +1,4 @@
+
 import StatusBadge from "./StatusBadge";
 
 const DonationTable = ({
@@ -9,7 +10,10 @@ const DonationTable = ({
       return "Pending";
     }
 
-    if (status === "NGO Accepted") {
+    if (
+      status === "NGO Accepted" ||
+      status === "NGO Requested"
+    ) {
       return "Accepted";
     }
 
@@ -19,6 +23,24 @@ const DonationTable = ({
 
     return status;
   };
+
+  // Donor যে NGO-কে accept করেছে তার নাম
+ const getNgoName = (donation) => {
+  const ngo =
+    donation?.selectedNgo ||
+    donation?.ngoRequest?.requestedBy;
+
+  if (!ngo || typeof ngo !== "object") {
+    return "N/A";
+  }
+
+  return (
+    ngo?.user?.name ||
+    ngo?.organizationName ||
+    ngo?.organizationId ||
+    "N/A"
+  );
+};
 
   const formatDate = (date) => {
     if (!date) return "N/A";
@@ -55,13 +77,10 @@ const DonationTable = ({
 
   return (
     <div className="w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      
       <div className="w-full overflow-x-auto">
-        <table className="w-full min-w-[650px]">
-          
+        <table className="w-full min-w-[700px]">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
-              
               <th className="px-4 py-4 text-left text-sm font-semibold text-gray-700 sm:px-6">
                 Food
               </th>
@@ -71,7 +90,7 @@ const DonationTable = ({
               </th>
 
               <th className="px-4 py-4 text-left text-sm font-semibold text-gray-700 sm:px-6">
-                Estimated Meals
+                NGO Name
               </th>
 
               <th className="px-4 py-4 text-left text-sm font-semibold text-gray-700 sm:px-6">
@@ -81,7 +100,6 @@ const DonationTable = ({
               <th className="px-4 py-4 text-left text-sm font-semibold text-gray-700 sm:px-6">
                 Status
               </th>
-
             </tr>
           </thead>
 
@@ -91,7 +109,6 @@ const DonationTable = ({
                 key={donation._id}
                 className="border-b border-gray-100 transition hover:bg-gray-50"
               >
-                
                 {/* Food */}
                 <td className="px-4 py-4 sm:px-6">
                   <div>
@@ -110,9 +127,9 @@ const DonationTable = ({
                   {donation.quantity} KG
                 </td>
 
-                {/* Estimated Meals */}
-                <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-700 sm:px-6">
-                  {donation.estimatedMeals}
+                {/* NGO Name */}
+                <td className="px-4 py-4 text-sm font-medium text-gray-700 sm:px-6">
+                  {getNgoName(donation)}
                 </td>
 
                 {/* Date */}
@@ -128,14 +145,11 @@ const DonationTable = ({
                     )}
                   />
                 </td>
-
               </tr>
             ))}
           </tbody>
-
         </table>
       </div>
-
     </div>
   );
 };
