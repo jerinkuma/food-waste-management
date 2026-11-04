@@ -9,6 +9,7 @@ import {
   Truck,
   Star,
   AlertCircle,
+  AlertTriangle,
   RefreshCw,
 } from "lucide-react";
 
@@ -36,6 +37,9 @@ const getNotificationIcon = (type) => {
       return Star;
     case "DONATION_REJECTED":
       return AlertCircle;
+    case "ADMIN_FEEDBACK":
+    case "ADMIN_STATUS":
+      return AlertTriangle; // 👉 অ্যাডমিন ওয়ার্নিংয়ের জন্য বিশেষ আইকন
     default:
       return Package;
   }
@@ -133,6 +137,20 @@ export default function Notifications() {
       }
     }
 
+    // অ্যাডমিন ফিডব্যাক বা ওয়ার্নিং হলে কোথাও রিডাইরেক্ট করার প্রয়োজন নেই
+    if (notification.type === "ADMIN_FEEDBACK" || notification.type === "ADMIN_STATUS") {
+      return;
+    }
+
+    if (
+      notification.type === "DONATION_ACCEPTED" ||
+      notification.title?.includes("Distribution Proof") ||
+      notification.message?.includes("proof")
+    ) {
+      navigate("/restaurant/ratings"); 
+      return;
+    }
+
     const donationId =
       notification.data?.donationId ||
       (typeof notification.donation === "object"
@@ -194,7 +212,7 @@ export default function Notifications() {
                 Notifications
               </h1>
               <p className="mt-1 text-sm text-slate-500">
-                Stay updated on your donations.
+                Stay updated on your donations and admin updates.
               </p>
               <p className="mt-1 text-xs font-medium text-emerald-700">
                 {unreadCount} unread notification
@@ -254,41 +272,68 @@ export default function Notifications() {
                 No notifications yet
               </h3>
               <p className="mt-1 text-sm text-slate-500">
-                Updates about your donations will appear here.
+                Updates about your donations and alerts will appear here.
               </p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
               {notifications.map((notification) => {
                 const Icon = getNotificationIcon(notification.type);
+                const isAdminWarning =
+                  notification.type === "ADMIN_FEEDBACK" ||
+                  notification.type === "ADMIN_STATUS";
 
                 return (
                   <button
                     type="button"
                     key={notification._id}
                     onClick={() => handleNotificationClick(notification)}
-                    className={`flex w-full items-start gap-3 px-4 py-5 text-left transition hover:bg-slate-50 sm:gap-4 sm:px-6 ${
-                      !notification.read ? "bg-emerald-50/50" : "bg-white"
+                    className={`flex w-full items-start gap-3 px-4 py-5 text-left transition sm:gap-4 sm:px-6 ${
+                      isAdminWarning
+                        ? "bg-red-50/80 hover:bg-red-100/60 border-l-4 border-l-red-600"
+                        : !notification.read
+                        ? "bg-emerald-50/50 hover:bg-slate-50"
+                        : "bg-white hover:bg-slate-50"
                     }`}
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-emerald-700">
+                    <div
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                        isAdminWarning
+                          ? "bg-red-100 text-red-700"
+                          : "bg-slate-100 text-emerald-700"
+                      }`}
+                    >
                       <Icon size={21} />
                     </div>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-sm font-semibold text-slate-900">
+                        <h3
+                          className={`text-sm font-semibold ${
+                            isAdminWarning ? "text-red-900 font-bold" : "text-slate-900"
+                          }`}
+                        >
                           {notification.title}
                         </h3>
 
-                        {!notification.read && (
+                        {isAdminWarning && (
+                          <span className="rounded-full bg-red-200 px-2 py-0.5 text-[10px] font-bold text-red-900">
+                            WARNING
+                          </span>
+                        )}
+
+                        {!notification.read && !isAdminWarning && (
                           <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
                             NEW
                           </span>
                         )}
                       </div>
 
-                      <p className="mt-1 text-sm leading-6 text-slate-600">
+                      <p
+                        className={`mt-1 text-sm leading-6 ${
+                          isAdminWarning ? "text-red-800 font-medium" : "text-slate-600"
+                        }`}
+                      >
                         {notification.message}
                       </p>
 
@@ -300,7 +345,9 @@ export default function Notifications() {
 
                     {!notification.read && (
                       <span
-                        className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-600"
+                        className={`mt-2 h-2.5 w-2.5 shrink-0 rounded-full ${
+                          isAdminWarning ? "bg-red-600" : "bg-emerald-600"
+                        }`}
                         aria-label="Unread"
                       />
                     )}

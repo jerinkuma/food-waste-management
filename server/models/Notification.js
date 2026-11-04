@@ -16,7 +16,7 @@ const notificationSchema = new mongoose.Schema(
       required: true,
       enum: [
         "NEW_DONATION",
-        "PRIORITY_DONATION", // ← এটি এখানে যোগ করা হলো
+        "PRIORITY_DONATION",
         "DONATION_REQUEST",
         "DONATION_ACCEPTED",
         "DONATION_REJECTED",
@@ -28,6 +28,8 @@ const notificationSchema = new mongoose.Schema(
         "FEEDBACK_RECEIVED",
         "FEEDBACK_RESPONSE",
         "SYSTEM",
+        "ADMIN_STATUS",   // 👉 এডমিন ব্লক/একটিভ করার জন্য যুক্ত করা হলো
+        "ADMIN_FEEDBACK", // 👉 এডমিন ওয়ার্নিং ও ফিডব্যাকের জন্য যুক্ত করা হলো
       ],
       default: "SYSTEM",
     },

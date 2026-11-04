@@ -5,7 +5,6 @@ const User = require("../models/User");
 const Ngo = require("../models/Ngo");
 const Restaurant = require("../models/Restaurant");
 
-
 //forgetpass
 const crypto = require("crypto");
 const sendEmail = require("../utils/email").sendEmail;
@@ -156,6 +155,14 @@ const login = async (req, res) => {
       });
     }
 
+    // 👉 ব্লক করা থাকলে লগইন সাথে সাথে আটকে দেবে (সঠিক জায়গায় যুক্ত করা হলো)
+    if (user.isBlocked === true || user.status === "Blocked") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been blocked by the admin. You cannot log in.",
+      });
+    }
+
     const isPasswordCorrect = await bcrypt.compare(
       password,
       user.password
@@ -171,7 +178,7 @@ const login = async (req, res) => {
     let ngoDetails = null;
     let restaurantDetails = null;
 
-    // 👉 রোল অনুযায়ী সঠিক টেবিল থেকে অর্গানাইজেশন বা এনজিওর নাম ফেচ করা হলো
+    // 👉 রোল অনুযায়ী সঠিক টেবিল থেকে অর্গানাইজেশন বা এনজিওর নাম ফেচ করা হলো
     if (user.role === "ngo") {
       ngoDetails = await Ngo.findOne({ user: user._id });
     } else if (user.role === "donor") {
@@ -316,6 +323,8 @@ const changePassword = async (req, res) => {
     });
   }
 };
+
+
 // ===============================
 // FORGOT PASSWORD
 // ===============================
@@ -455,7 +464,7 @@ const resetPassword = async (req, res) => {
       .update(token)
       .digest("hex");
 
-    // Valid এবং unexpired token দিয়ে user খোঁজা
+    // Valid এবং unexpired token দিয়ে user খোঁজা
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
       resetPasswordExpires: { $gt: Date.now() },
@@ -471,7 +480,7 @@ const resetPassword = async (req, res) => {
     // নতুন password hash
     user.password = await bcrypt.hash(newPassword, 10);
 
-    // Token একবার ব্যবহার হওয়ার পর মুছে যাবে
+    // Token একবার ব্যবহার হওয়ার পর মুছে যাবে
     user.resetPasswordToken = null;
     user.resetPasswordExpires = null;
 

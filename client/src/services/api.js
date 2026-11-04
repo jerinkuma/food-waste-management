@@ -101,10 +101,6 @@ export const fetchRestaurantProfile = async (userId) => {
 // =====================================================================
 // FOLLOW / PARTNER SYSTEM
 // =====================================================================
-
-// =====================================================================
-// FOLLOW / PARTNER SYSTEM
-// =====================================================================
 export const fetchSuggestedPartners = async (userId, role) => {
   const { data } = await client.get(`/partners/suggestions/${userId}`, { params: { role } });
   return data.suggestions || [];
@@ -158,7 +154,7 @@ export const respondToFeedback = async (feedbackId, message) => {
   return data;
 };
 
-// 👉 নতুন যোগ করা হলো: অ্যাডমিন ফিডব্যাক স্ট্যাটাস পরিবর্তন করার জন্য (Approve / Decline)
+// 👉 অ্যাডমিন ফিডব্যাক স্ট্যাটাস পরিবর্তন করার জন্য (Approve / Decline)
 export const updateFeedbackStatus = async (feedbackId, status) => {
   const { data } = await client.patch(`/feedback/${feedbackId}/status`, { status });
   return data;
@@ -169,10 +165,6 @@ export const markFeedbackRead = async (feedbackId, viewer) => {
   return data;
 };
 
-
-//donor er jnno kuma add krtese
-
-
 export const submitDonorFeedback = async (payload) => {
   const { data } = await client.post("/feedback/donor", payload);
   return data;
@@ -182,8 +174,6 @@ export const fetchDonorNgoReviews = async () => {
   const { data } = await client.get("/feedback/donor/ngo-reviews");
   return data;
 };
-
-//kuma contact for home
 
 // =====================================================================
 // CONTACT MESSAGES
@@ -232,6 +222,7 @@ export const replyToContactMessage = async (messageId, message) => {
 
   return data;
 };
+
 // =====================================================================
 // ADMIN (Real Backend Connections)
 // =====================================================================
@@ -267,6 +258,12 @@ export const fetchFeedback = async () => {
 
 export const fetchInventory = async () => {
   const { data } = await client.get("/admin/donations");
+  return data;
+};
+
+// 👉 Step 2: এডমিন থেকে রেস্টুরেন্টের কাছে ওয়ার্নিং পাঠানোর API কল
+export const sendAdminFeedback = async (payload) => {
+  const { data } = await client.post("/admin/feedback/send-warning", payload);
   return data;
 };
 

@@ -28,6 +28,17 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
 
+    // 👉 নতুন যোগ করা হলো: স্ট্যাটাস এবং ব্লক ট্র্যাকিং ফিল্ড
+    status: {
+      type: String,
+      default: "Active",
+    },
+
+    isBlocked: {
+      type: Boolean,
+      default: false,
+    },
+
     resetPasswordToken: {
       type: String,
       default: null,

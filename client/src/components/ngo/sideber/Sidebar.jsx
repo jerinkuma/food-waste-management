@@ -15,6 +15,8 @@ import {
   ChevronRight,
   UtensilsCrossed,
   Handshake,
+  PackageCheck,
+  TrendingUp, // অ্যানালিটিক্স এবং রিপোর্টসের জন্য নতুন আইকন
 } from "lucide-react";
 
 // -------------------------------------------------------------
@@ -29,9 +31,11 @@ export function Sidebar({ handleLogout }) {
     { path: "/ngo/dashboard", name: "HOME", icon: Home },
     { path: "/ngo/donation-map", name: "DONATION MAP", icon: MapPin },
     { path: "/ngo/active-requests", name: "ACTIVE REQUESTS", icon: Clock },
+    { path: "/ngo/distribution", name: "DISTRIBUTION PROOF", icon: PackageCheck },
+    { path: "/ngo/reports", name: "ANALYTICS & REPORTS", icon: TrendingUp }, // অ্যানালিটিক্স রিপোর্ট অপশন যুক্ত করা হলো
     { path: "/ngo/partners", name: "PARTNERS", icon: Handshake },
     { path: "/ngo/history", name: "HISTORY & LOGS", icon: History },
-    { path: "/ngo/rating", name: "RATINGS", icon: Star }, // ট্রাস্ট স্কোর থেকে রেটিং এ আপডেট করা হয়েছে
+    { path: "/ngo/rating", name: "RATINGS", icon: Star },
     { path: "/ngo/feedback", name: "FEEDBACK", icon: MessageSquare },
     { path: "/ngo/settings", name: "SETTINGS", icon: Settings },
   ];

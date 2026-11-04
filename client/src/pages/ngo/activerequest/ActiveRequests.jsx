@@ -5,7 +5,7 @@ import React, {
 } from "react";
 
 import { useNavigate } from "react-router-dom";
-
+import { Map as PigeonMap, Marker, Overlay } from 'pigeon-maps';
 import {
   Phone,
   Eye,
@@ -19,11 +19,6 @@ import {
   Car,
   X,
 } from "lucide-react";
-
-import {
-  Map as PigeonMap,
-  Marker,
-} from "pigeon-maps";
 
 import { getCurrentUser } from "../../../services/auth";
 import { getSocket } from "../../../services/socket";
@@ -76,6 +71,9 @@ export default function ActiveRequests() {
   const [ngoId, setNgoId] =
     useState(null);
 
+  const [ngoProfile, setNgoProfile] =
+    useState(null);
+
   const [available, setAvailable] =
     useState([]);
 
@@ -100,6 +98,9 @@ export default function ActiveRequests() {
   const [showAllAvailable, setShowAllAvailable] =
     useState(false);
 
+  const [selectedId, setSelectedId] =
+    useState(null);
+
   // ==============================
   // DRIVER MODAL
   // ==============================
@@ -121,10 +122,6 @@ export default function ActiveRequests() {
 
   const [assigningDriver, setAssigningDriver] =
     useState(false);
-
-
-
-    
 
   // ==============================
   // ALERT
@@ -148,11 +145,6 @@ export default function ActiveRequests() {
 
   // =====================================================
   // MERGE ACTIVE DONATION
-  //
-  // Prevent duplicate donations when both:
-  // - API response
-  // - Socket.IO event
-  // return the same donation.
   // =====================================================
 
   const addOrUpdateActivePickup =
@@ -262,34 +254,17 @@ export default function ActiveRequests() {
       try {
         setLoading(true);
 
-        // -----------------------------------------------
-        // NGO PROFILE
-        // -----------------------------------------------
-
         let profile = null;
 
         try {
           profile =
             await fetchNgoProfile();
-
-          console.log(
-            "NGO PROFILE:",
-            profile
-          );
         } catch (error) {
           console.error(
             "NGO profile loading error:",
             error
           );
         }
-
-        /*
-          NGO profile can expose different ID fields
-          depending on backend response.
-
-          Prefer NGO profile _id.
-          Fall back to id / ngoId if needed.
-        */
 
         const currentNgoId =
           profile?._id ||
@@ -298,21 +273,9 @@ export default function ActiveRequests() {
           null;
 
         setNgoId(currentNgoId);
-
-        console.log(
-          "CURRENT NGO PROFILE ID:",
-          currentNgoId
-        );
-
-        // -----------------------------------------------
-        // AVAILABLE DONATIONS
-        // -----------------------------------------------
+        setNgoProfile(profile);
 
         await loadAvailableDonations();
-
-        // -----------------------------------------------
-        // NGO ACTIVE DONATIONS
-        // -----------------------------------------------
 
         if (currentNgoId) {
           try {
@@ -320,11 +283,6 @@ export default function ActiveRequests() {
               await fetchNgoDonations(
                 currentNgoId
               );
-
-            console.log(
-              "NGO DONATIONS RESULT:",
-              result
-            );
 
             const active =
               Array.isArray(
@@ -339,11 +297,6 @@ export default function ActiveRequests() {
               "NGO active donation error:",
               error
             );
-
-            /*
-              Don't destroy existing active
-              pickups if the refresh API fails.
-            */
           }
         }
       } catch (error) {
@@ -365,9 +318,13 @@ export default function ActiveRequests() {
 
     const socket = getSocket();
 
-    // -----------------------------------------------
-    // NEW DONATION
-    // -----------------------------------------------
+    // ফলো করা রেস্টুরেন্ট পোস্ট করলে ১ মিনিট আগে এই সকেট ইভেন্ট দিয়ে আপনার কাছে স্পেশাল নোটিফিকেশন আসবে
+    const onPriorityNew = (donation) => {
+      pushAlert(
+        `⭐ Your following restaurant (${donation.donor?.name || "Restaurant"}) posted food: ${donation.foodName} (${donation.quantity}kg)`
+      );
+      loadAvailableDonations();
+    };
 
     const onNew = (donation) => {
       pushAlert(
@@ -379,19 +336,10 @@ export default function ActiveRequests() {
       loadAvailableDonations();
     };
 
-    // -----------------------------------------------
-    // DONATION UPDATED
-    // -----------------------------------------------
-
     const onUpdated = (donation) => {
       if (!donation?._id) {
         return;
       }
-
-      console.log(
-        "SOCKET DONATION UPDATED:",
-        donation
-      );
 
       pushAlert(
         `🔄 ${
@@ -403,11 +351,6 @@ export default function ActiveRequests() {
           "Updated"
         }"`
       );
-
-      /*
-        If the donation belongs to this NGO,
-        immediately update Active Pickups.
-      */
 
       const requestedBy =
         donation?.ngoRequest
@@ -440,12 +383,13 @@ export default function ActiveRequests() {
         }
       }
 
-      /*
-        Refresh available list too.
-      */
-
       loadAvailableDonations();
     };
+
+    socket.on(
+      "donation:priority-new",
+      onPriorityNew
+    );
 
     socket.on(
       "donation:new",
@@ -458,6 +402,11 @@ export default function ActiveRequests() {
     );
 
     return () => {
+      socket.off(
+        "donation:priority-new",
+        onPriorityNew
+      );
+
       socket.off(
         "donation:new",
         onNew
@@ -495,28 +444,14 @@ export default function ActiveRequests() {
     setBusyId(donationId);
 
     try {
-      /*
-        Backend uses the logged-in NGO profile.
-        ngoId is still passed for compatibility.
-      */
-
       const response =
         await acceptDonation(
           donationId,
           ngoId
         );
 
-      console.log(
-        "ACCEPT RESPONSE:",
-        response
-      );
-
       const acceptedDonation =
         response?.donation;
-
-      // -----------------------------------------------
-      // REMOVE FROM AVAILABLE
-      // -----------------------------------------------
 
       setAvailable((prev) =>
         prev.filter(
@@ -524,10 +459,6 @@ export default function ActiveRequests() {
             item._id !== donationId
         )
       );
-
-      // -----------------------------------------------
-      // IMMEDIATELY ADD TO ACTIVE PICKUPS
-      // -----------------------------------------------
 
       if (acceptedDonation) {
         addOrUpdateActivePickup(
@@ -538,11 +469,6 @@ export default function ActiveRequests() {
       pushAlert(
         "✅ Donation accepted — moved to your Active Pickups."
       );
-
-      /*
-        Refresh backend data after the immediate UI
-        update. This keeps the UI synchronized.
-      */
 
       try {
         const result =
@@ -556,15 +482,6 @@ export default function ActiveRequests() {
           )
             ? result.active
             : [];
-
-        /*
-          If backend returns the accepted donation,
-          use the backend list.
-
-          If for any reason it does not return it yet,
-          keep the donation already inserted from
-          acceptDonation response.
-        */
 
         if (active.length > 0) {
           setActivePickups((prev) => {
@@ -698,6 +615,18 @@ export default function ActiveRequests() {
     setVehicleNumber("");
   };
 
+  const handleSelect = (e, d) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+    }
+    if (d && d._id) {
+      setSelectedId(d._id);
+    }
+  };
+
   // =====================================================
   // ASSIGN DRIVER
   // =====================================================
@@ -731,18 +660,8 @@ export default function ActiveRequests() {
             vehicleNumber.trim()
           );
 
-        console.log(
-          "ASSIGN DRIVER RESPONSE:",
-          response
-        );
-
         const updatedDonation =
           response?.donation;
-
-        /*
-          Immediately update Active Pickups
-          with the backend response.
-        */
 
         if (updatedDonation) {
           addOrUpdateActivePickup(
@@ -761,10 +680,6 @@ export default function ActiveRequests() {
         );
 
         closeDriverModal();
-
-        /*
-          Small refresh after successful assignment.
-        */
 
         try {
           const result =
@@ -863,11 +778,6 @@ export default function ActiveRequests() {
             user?.id
           );
 
-        console.log(
-          "COMPLETE RESPONSE:",
-          response
-        );
-
         pushAlert(
           `📦 ${
             donation.foodName
@@ -932,21 +842,17 @@ export default function ActiveRequests() {
   return (
     <div className="ar-container">
 
-      {/* ==========================
-          TOP BANNER
-      ========================== */}
-
       <div className="ar-top-banner">
         <div>
           <h2 className="ar-banner-title">
             ACTIVE PICKUPS: Live Restaurant
-            &rarr; NGO Pipeline
+            → NGO Pipeline
           </h2>
 
           <p className="text-xs text-slate-500 mt-1">
             {available.length} donation(s)
             waiting to be claimed
-            &middot;{" "}
+            ·{" "}
             {activePickups.length} in your
             active pipeline
           </p>
@@ -955,15 +861,8 @@ export default function ActiveRequests() {
 
       <div className="ar-main-grid">
 
-        {/* ==========================
-            LEFT COLUMN
-        ========================== */}
-
+        {/* LEFT COLUMN */}
         <div className="ar-pickup-list-col">
-
-          {/* ==========================
-              AVAILABLE DONATIONS
-          ========================== */}
 
           <h3 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-2">
             Available Donations Near You
@@ -984,9 +883,9 @@ export default function ActiveRequests() {
                   key={donation._id}
                   className="ar-pickup-card"
                 >
-                  <div className="ar-card-grid">
+                  <div className="ar-card-grid" style={{ width: '100%', display: 'block' }}>
 
-                    <div className="ar-card-info">
+                    <div className="ar-card-info" style={{ width: '100%' }}>
 
                       <div className="ar-id-row">
                         <span className="ar-id-text">
@@ -1002,7 +901,7 @@ export default function ActiveRequests() {
                         </span>
                       </div>
 
-                      <p className="text-slate-700">
+                      <p className="text-slate-700 mt-2">
                         <span className="font-bold text-slate-900">
                           RESTAURANT:
                         </span>{" "}
@@ -1025,7 +924,7 @@ export default function ActiveRequests() {
                         )}
                       </p>
 
-                      <div className="ar-food-box">
+                      <div className="ar-food-box mt-2">
                         <p className="font-bold text-slate-800 text-[11px]">
                           FOOD:
                         </p>
@@ -1043,19 +942,19 @@ export default function ActiveRequests() {
                         </p>
                       </div>
 
-                      <div className="flex items-center justify-between text-[11px] pt-1">
+                      <div className="flex items-center justify-between text-[11px] pt-2">
                         <span className="font-bold text-slate-900">
                           PICKUP ADDRESS:
                         </span>
 
-                        <span className="text-emerald-600 font-extrabold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 truncate max-w-[160px]">
+                        <span className="text-emerald-600 font-extrabold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 truncate max-w-[200px]">
                           {
                             donation.pickupAddress
                           }
                         </span>
                       </div>
 
-                      <div className="ar-action-btns">
+                      <div className="ar-action-btns mt-3">
 
                         <button
                           className="ar-btn-view"
@@ -1111,67 +1010,6 @@ export default function ActiveRequests() {
                       </div>
                     </div>
 
-                    {/* MAP */}
-
-                    <div className="ar-card-map-col">
-
-                      <div className="flex justify-between items-center mb-1">
-
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          Pickup Location
-                        </span>
-
-                        <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-
-                          {donation
-                            .resolvedLocation
-                              ?.source ||
-                            "unresolved"}
-                        </span>
-
-                      </div>
-
-                      <div className="ar-map-wrapper">
-
-                        <PigeonMap
-                          defaultCenter={
-                            donation.resolvedLocation
-                              ? [
-                                  donation
-                                    .resolvedLocation
-                                    .lat,
-
-                                  donation
-                                    .resolvedLocation
-                                    .lng,
-                                ]
-                              : DEFAULT_CENTER
-                          }
-                          defaultZoom={13}
-                        >
-
-                          {donation.resolvedLocation && (
-                            <Marker
-                              width={30}
-                              anchor={[
-                                donation
-                                  .resolvedLocation
-                                  .lat,
-
-                                donation
-                                  .resolvedLocation
-                                  .lng,
-                              ]}
-                              color="#059669"
-                            />
-                          )}
-
-                        </PigeonMap>
-
-                      </div>
-                    </div>
-
                   </div>
                 </div>
               )
@@ -1191,7 +1029,8 @@ export default function ActiveRequests() {
                 {showAllAvailable
                   ? "SHOW LESS"
                   : `SEE MORE (${
-                      available.length - 2
+                      available.length -
+                      2
                     } MORE)`}
               </span>
 
@@ -1205,9 +1044,7 @@ export default function ActiveRequests() {
             </button>
           )}
 
-          {/* ==========================
-              ACTIVE PICKUPS
-          ========================== */}
+          {/* ACTIVE PICKUPS */}
 
           <h3 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider mt-6 mb-2">
             My Active Pickups
@@ -1250,15 +1087,21 @@ export default function ActiveRequests() {
 
                     </div>
 
-                    <p className="text-slate-700">
-                      <span className="font-bold text-slate-900">
-                        RESTAURANT:
-                      </span>{" "}
-                      {pickup.donor?.name ||
-                        "Unknown"}
-                    </p>
+                    <div className="flex justify-between items-center mt-2">
+                      <p className="text-slate-700">
+                        <span className="font-bold text-slate-900">
+                          RESTAURANT:
+                        </span>{" "}
+                        {pickup.donor?.name || "Unknown"}
+                        {pickup.distance !== undefined && pickup.distance !== null && (
+                          <span className="text-xs text-slate-500 ml-2 font-medium">
+                            ({Math.round(pickup.distance * 3)} min, {pickup.distance} km)
+                          </span>
+                        )}
+                      </p>
+                    </div>
 
-                    <div className="ar-food-box">
+                    <div className="ar-food-box mt-2">
 
                       <p className="font-bold text-slate-800 text-[11px]">
                         FOOD:
@@ -1337,8 +1180,6 @@ export default function ActiveRequests() {
 
                     <div className="ar-action-btns mt-3">
 
-                      {/* DETAILS */}
-
                       <button
                         className="ar-btn-view"
                         onClick={() =>
@@ -1351,8 +1192,6 @@ export default function ActiveRequests() {
                         VIEW DETAILS
                       </button>
 
-                      {/* CALL RESTAURANT */}
-
                       <a
                         href={`tel:${pickup.contactNumber}`}
                         className="ar-btn-contact"
@@ -1360,8 +1199,6 @@ export default function ActiveRequests() {
                         <Phone className="w-3.5 h-3.5" />
                         CALL RESTAURANT
                       </a>
-
-                      {/* DRIVER */}
 
                       {[
                         "NGO Requested",
@@ -1391,8 +1228,6 @@ export default function ActiveRequests() {
                         </button>
                       )}
 
-                      {/* QR VERIFICATION */}
-
                       {pickup.status ===
                         "Delivery Man Assigned" && (
                         <button
@@ -1411,8 +1246,6 @@ export default function ActiveRequests() {
                           VERIFY PICKUP
                         </button>
                       )}
-
-                      {/* COMPLETE */}
 
                       {NEXT_STATUS[
                         pickup.status
@@ -1449,8 +1282,6 @@ export default function ActiveRequests() {
                             : 'MARK "COMPLETED"'}
                         </button>
                       )}
-
-                      {/* COMPLETED */}
 
                       {pickup.status ===
                         "Completed" && (
@@ -1513,10 +1344,7 @@ export default function ActiveRequests() {
 
         </div>
 
-        {/* ==========================
-            RIGHT COLUMN
-        ========================== */}
-
+        {/* RIGHT COLUMN */}
         <div className="ar-alerts-col">
 
           <div className="flex items-center gap-2 mb-4 border-b border-slate-700 pb-3">
@@ -1587,10 +1415,7 @@ export default function ActiveRequests() {
         </div>
       </div>
 
-      {/* ==========================
-          VIEW DETAILS MODAL
-      ========================== */}
-
+      {/* VIEW DETAILS MODAL */}
       {viewDetails && (
         <div className="ar-modal-backdrop">
 
@@ -1778,10 +1603,7 @@ export default function ActiveRequests() {
         </div>
       )}
 
-      {/* ==========================
-          DRIVER ASSIGN MODAL
-      ========================== */}
-
+      {/* DRIVER ASSIGN MODAL */}
       {showDriverModal &&
         driverDonation && (
           <div className="ar-modal-backdrop">

@@ -6,9 +6,6 @@ const path = require("path");
 const http = require("http");
 require("dotenv").config();
 
-
-
-
 const { initSocket } = require("./utils/socket");
 const { startFreshnessMonitor } = require("./utils/freshnessNotifier");
 
@@ -41,11 +38,10 @@ const followRoutes = require("./routes/followRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const searchRoutes = require("./routes/searchRoutes");
-
-
 const contactRoutes = require("./routes/contactRoutes");
 const contactAdminRoutes = require("./routes/contactAdminRoutes");
 
+const reportsRoutes = require("./routes/analyticsRoutes");
 // =====================================
 // API ROUTES INTEGRATION
 // =====================================
@@ -53,8 +49,7 @@ const contactAdminRoutes = require("./routes/contactAdminRoutes");
 // Authentication
 app.use("/api/auth", authRoutes);
 
-
-//contact
+// Contact & Admin Messages
 app.use("/api/contact", contactRoutes);
 app.use("/api/admin/contact-messages", contactAdminRoutes);
 
@@ -63,6 +58,9 @@ app.use("/api/restaurants", restaurantRoutes);
 
 // Donations
 app.use("/api/donations", donationRoutes);
+
+// Reports & Analytics API (এখানে সঠিকভাবে রেজিস্টার করা হলো)
+app.use("/api/reports", reportsRoutes);
 
 // Notifications & Global Search
 app.use("/api/notifications", notificationRoutes);

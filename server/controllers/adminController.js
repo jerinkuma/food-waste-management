@@ -3,16 +3,14 @@ const Restaurant = require("../models/Restaurant");
 const Ngo = require("../models/Ngo");
 const Donation = require("../models/Donation");
 const Feedback = require("../models/Feedback");
+const Notification = require("../models/Notification"); // 👉 নোটিফিকেশন মডেল ইমপোর্ট করা হলো
 const { getIO, rooms } = require("../utils/socket");
 
 // =====================================
 // GET ALL USERS (merged Restaurant + NGO + plain User profiles)
-// Replaces the previously hardcoded fetchUsers() mock array.
 // =====================================
-
 const getAllUsers = async (req, res) => {
   try {
-    // Only donor accounts; exclude NGO and admin
     const users = await User.find({ role: "donor" })
       .select("-password")
       .sort({ createdAt: -1 })
@@ -20,7 +18,6 @@ const getAllUsers = async (req, res) => {
 
     const userIds = users.map((user) => user._id);
 
-    // Fetch restaurant profiles belonging to these donors
     const restaurants = await Restaurant.find({
       user: { $in: userIds },
     }).lean();
@@ -40,7 +37,8 @@ const getAllUsers = async (req, res) => {
         name: user.name || "N/A",
         email: user.email || "N/A",
         role: user.role,
-        status: user.status || "Active",
+        status: user.isBlocked ? "Blocked" : (user.status || "Active"),
+        isBlocked: user.isBlocked || false,
         createdAt: user.createdAt || null,
         location: restaurant?.address || "Not provided",
         phone: restaurant?.phone || "Not provided",
@@ -55,7 +53,6 @@ const getAllUsers = async (req, res) => {
     });
   } catch (error) {
     console.error("Get all donors error:", error);
-
     return res.status(500).json({
       success: false,
       message: "Failed to load donor information.",
@@ -63,14 +60,13 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-// get all ngos
-
-
-
+// =====================================
+// GET ALL NGOS
+// =====================================
 const getAllNgos = async (req, res) => {
   try {
     const ngos = await Ngo.find()
-      .populate("user", "name email role status createdAt")
+      .populate("user", "name email role status isBlocked createdAt")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -82,10 +78,12 @@ const getAllNgos = async (req, res) => {
 
       return {
         id: String(ngo._id),
+        userId: user._id ? String(user._id) : null,
         name: user.name || ngo.name || "N/A",
         email: user.email || ngo.email || "N/A",
         role: user.role || "ngo",
-        status: user.status || "Active",
+        status: user.isBlocked ? "Blocked" : (user.status || "Active"),
+        isBlocked: user.isBlocked || false,
         createdAt: user.createdAt || ngo.createdAt || null,
         phone: ngo.phone || "Not provided",
         address: ngo.address || "Not provided",
@@ -101,7 +99,6 @@ const getAllNgos = async (req, res) => {
     });
   } catch (error) {
     console.error("Get all NGOs error:", error);
-
     return res.status(500).json({
       success: false,
       message: "Failed to load NGO information.",
@@ -110,30 +107,105 @@ const getAllNgos = async (req, res) => {
 };
 
 // =====================================
-// UPDATE A USER'S STATUS (Active / Suspended / Verified / Pending)
-// Wires up the Admin "Suspend / Verify" buttons.
+// UPDATE A USER'S STATUS / BLOCK STATUS
 // =====================================
 const updateUserStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status } = req.body; // "Active" বা "Blocked"
 
-    const user = await User.findByIdAndUpdate(id, { status }, { new: true });
+    let user = await User.findById(id);
+    
+    if (!user) {
+      const ngoRecord = await Ngo.findById(id);
+      if (ngoRecord) user = await User.findById(ngoRecord.user);
+      
+      const restRecord = await Restaurant.findById(id);
+      if (restRecord) user = await User.findById(restRecord.user);
+    }
+
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found." });
     }
 
-    getIO().to(rooms.admins()).emit("user:updated", user);
+    const isBlocked = status.toLowerCase() === "blocked";
+    user.isBlocked = isBlocked;
+    user.status = isBlocked ? "Blocked" : "Active";
+    await user.save();
 
-    return res.status(200).json({ success: true, user });
+    // নোটিফিকেশন তৈরি করা
+    try {
+      await Notification.create({
+        recipient: user._id,
+        title: user.isBlocked ? "🚫 Account Blocked" : "✨ Account Activated",
+        message: user.isBlocked 
+          ? "Your account has been blocked by the admin. You are restricted from logging in." 
+          : "Your account has been activated by the admin.",
+        type: "ADMIN_STATUS", 
+      });
+    } catch (notifErr) {
+      console.error("Notification creation warning:", notifErr.message);
+    }
+
+    // রিয়েল-টাইম সকেট আপডেট পাঠানো
+    const io = getIO();
+    if (io && rooms && rooms.admin) {
+      io.to(rooms.admin()).emit("user:updated", user);
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      message: `User status updated to ${user.status}`,
+      user 
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, message: "Failed to update user.", error: error.message });
+    console.error("Update User Status Error:", error);
+    return res.status(500).json({ success: false, message: "Failed to update user status.", error: error.message });
+  }
+};
+
+// =====================================
+// ADMIN TO RESTAURANT/NGO FEEDBACK & WARNING NOTIFICATION
+// =====================================
+const sendAdminFeedback = async (req, res) => {
+  try {
+    const { recipientId, status, message } = req.body;
+
+    const targetUser = await User.findById(recipientId);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: "Target user not found." });
+    }
+
+    // ডাটাবেজে নোটিফিকেশন সেভ করা
+    await Notification.create({
+      recipient: targetUser._id,
+      title: status === "Approved" ? "✅ Admin Feedback: Approved" : "⚠️ Admin Warning / Notice",
+      message: message || `Your account status has been reviewed by the admin.`,
+      type: "ADMIN_FEEDBACK",
+    });
+
+    // রিয়েল-টাইম সকেট নোটিফিকেশন পাঠানো
+    const io = getIO();
+    if (io && rooms && rooms.user) {
+      io.to(rooms.user(targetUser._id.toString())).emit("admin:feedback", {
+        status,
+        message,
+        createdAt: new Date(),
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Feedback and warning notification sent successfully.",
+    });
+  } catch (error) {
+    console.error("Send Admin Feedback Error:", error);
+    return res.status(500).json({ success: false, message: "Failed to send feedback." });
   }
 };
 
 // =====================================
 // GET ALL DONATIONS (ADMIN VIEW)
-// Replaces the hardcoded fetchDonations() mock array.
 // =====================================
 const getAllDonations = async (req, res) => {
   try {
@@ -149,9 +221,7 @@ const getAllDonations = async (req, res) => {
 };
 
 // =====================================
-/// =====================================
 // DASHBOARD OVERVIEW STATS
-// Real statistics from MongoDB
 // =====================================
 const getDashboardStats = async (req, res) => {
   try {
@@ -162,23 +232,14 @@ const getDashboardStats = async (req, res) => {
       feedbackCount,
       deliveredDonations,
     ] = await Promise.all([
-      // Count donors and NGOs only. Exclude admins.
       User.countDocuments({
         role: { $in: ["donor", "ngo"] },
       }),
-
-      // Count all donations
       Donation.countDocuments(),
-
-      // Count pending donations
       Donation.countDocuments({
         pipelineStatus: "Pending",
       }),
-
-      // Count all feedback records
       Feedback.countDocuments(),
-
-      // Completed donations for the available-food calculation
       Donation.find({
         pipelineStatus: "Completed",
       }).select("quantity"),
@@ -190,7 +251,6 @@ const getDashboardStats = async (req, res) => {
       0
     );
 
-    // Recent donation activity
     const recentDonations = await Donation.find()
       .sort({ createdAt: -1 })
       .limit(6)
@@ -217,7 +277,6 @@ const getDashboardStats = async (req, res) => {
     });
   } catch (error) {
     console.error("Get dashboard stats error:", error);
-
     return res.status(500).json({
       success: false,
       message: "Failed to load dashboard statistics.",
@@ -231,4 +290,5 @@ module.exports = {
   getAllDonations,
   getDashboardStats,
   getAllNgos,
+  sendAdminFeedback,
 };

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { fetchUsers } from "../../services/api";
+import React, { useEffect, useState, useMemo } from "react";
+import { fetchUsers, updateUserStatus } from "../../services/api"; // 👉 সঠিক ফাংশনটি এখানে ইমপোর্ট করা হলো
 import "./Users.css";
 
 const Users = () => {
@@ -8,75 +8,76 @@ const Users = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const response = await fetchUsers();
+      const list = Array.isArray(response)
+        ? response
+        : response?.users || [];
+
+      setUsers(list);
+    } catch (err) {
+      console.error("Failed to load users:", err);
+      setError(err.response?.data?.message || "Users information load করা যায়নি।");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let isMounted = true;
-
-    const loadDonors = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const data = await fetchUsers();
-
-        if (isMounted) {
-          // API response object অথবা সরাসরি array—দুই ক্ষেত্রেই support করবে
-          const donorList = Array.isArray(data)
-            ? data
-            : data?.users || [];
-
-          setUsers(donorList);
-        }
-      } catch (err) {
-        console.error("Failed to load donors:", err);
-
-        if (isMounted) {
-          setError(
-            err.response?.data?.message ||
-            "Donor information load করা যায়নি। Backend/API check করো।"
-          );
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadDonors();
-
-    return () => {
-      isMounted = false;
-    };
+    loadUsers();
   }, []);
 
+  // ইউজার স্ট্যাটাস পরিবর্তন (Active / Blocked) করার ফাংশন
+  const handleStatusChange = async (userId, newStatus) => {
+    try {
+      // ব্যাকএন্ডে API কল করে ডাটাবেজে পার্মানেন্টলি সেভ করা
+      await updateUserStatus(userId, newStatus);
 
-  const filtered = users.filter((user) => {
-    const searchText = search.trim().toLowerCase();
+      // ফ্রন্টএন্ডের স্টেট ইনস্ট্যান্ট আপডেট করা
+      setUsers((prevUsers) =>
+        prevUsers.map((user) => {
+          const id = user.id || user._id;
+          if (id === userId) {
+            return {
+              ...user,
+              status: newStatus,
+              isBlocked: newStatus === "Blocked",
+            };
+          }
+          return user;
+        })
+      );
 
-    if (!searchText) return true;
+      alert(`User status successfully changed to ${newStatus}`);
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      alert("Failed to update status on server.");
+    }
+  };
 
-    const searchableFields = [
-      user.name,
-      user.email,
-      user.phone,
-      user.location,
-      user.tradeLicense,
-      user.status,
-    ];
+  const filteredUsers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return users;
 
-    return searchableFields.some((field) =>
-      String(field ?? "").toLowerCase().includes(searchText)
+    return users.filter((user) =>
+      [
+        user.name,
+        user.email,
+        user.phone,
+        user.role,
+        user.status,
+        user.location,
+      ].some((value) => String(value ?? "").toLowerCase().includes(query))
     );
-  });
-
+  }, [users, search]);
 
   const formatDate = (date) => {
     if (!date) return "N/A";
-
     const parsedDate = new Date(date);
-
     if (Number.isNaN(parsedDate.getTime())) return "N/A";
-
     return parsedDate.toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "short",
@@ -87,87 +88,129 @@ const Users = () => {
   return (
     <div className="page">
       <h1>
-        <span className="page-icon">👥</span> Donor Management
+        <span className="page-icon">👥</span> User Management (Donors)
       </h1>
 
-      <div className="user-toolbar">
+      <div className="user-summary">
+        <div className="user-summary-card">
+          <span>Total Donors</span>
+          <strong>{loading ? "..." : users.length}</strong>
+          <small>Donors registered in the database</small>
+        </div>
+      </div>
 
+      <div className="user-toolbar">
         <input
           type="text"
-          placeholder="Search by name, email, phone, location..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
           className="search-input"
+          placeholder="Search donor name, email, phone, location..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
         />
-
       </div>
 
       <div className="table-wrap">
         {loading ? (
-          <p className="donor-message">Loading donor information...</p>
+          <p className="user-message">Loading users from database...</p>
         ) : error ? (
-          <div className="donor-error">
+          <div className="user-error">
             <p>{error}</p>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-            >
+            <button type="button" onClick={loadUsers}>
               Try Again
             </button>
           </div>
         ) : (
           <>
-            <p className="donor-count">
-              Total Donors: <strong>{users.length}</strong>
-              {search.trim() && (
-                <span> · Matching: {filtered.length}</span>
-              )}
+            <p className="user-results">
+              Showing <strong>{filteredUsers.length}</strong> of{" "}
+              <strong>{users.length}</strong> Donors
             </p>
 
             <table>
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Donor Name</th>
+                  <th>Name</th>
                   <th>Email</th>
+                  <th>Role</th>
                   <th>Phone</th>
                   <th>Location</th>
-                  <th>Trade License</th>
                   <th>Status</th>
                   <th>Joined Date</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
 
               <tbody>
-                {filtered.length > 0 ? (
-                  filtered.map((user, index) => (
-                    <tr key={user.id || user._id || user.email}>
-                      <td>{index + 1}</td>
-                      <td>
-                        <strong>{user.name || "N/A"}</strong>
-                      </td>
-                      <td>{user.email || "N/A"}</td>
-                      <td>{user.phone || "Not provided"}</td>
-                      <td>{user.location || "Not provided"}</td>
-                      <td>{user.tradeLicense || "Not provided"}</td>
-                      <td>
-                        <span
-                          className={`badge ${String(
-                            user.status || "Active"
-                          ).toLowerCase()}`}
-                        >
-                          {user.status || "Active"}
-                        </span>
-                      </td>
-                      <td>{formatDate(user.createdAt)}</td>
-                    </tr>
-                  ))
+                {filteredUsers.length > 0 ? (
+                  filteredUsers.map((user, index) => {
+                    const targetId = user.id || user._id;
+                    const currentStatus = user.status || (user.isBlocked ? "Blocked" : "Active");
+                    const isBlocked = currentStatus.toLowerCase() === "blocked";
+
+                    return (
+                      <tr key={targetId || user.email || index}>
+                        <td>{index + 1}</td>
+                        <td>
+                          <strong>{user.name || "N/A"}</strong>
+                        </td>
+                        <td>{user.email || "N/A"}</td>
+                        <td>
+                          <span className="badge role">{user.role || "donor"}</span>
+                        </td>
+                        <td>{user.phone || "Not provided"}</td>
+                        <td>{user.location || "Not provided"}</td>
+                        <td>
+                          <span className={`badge ${currentStatus.toLowerCase()}`}>
+                            {currentStatus}
+                          </span>
+                        </td>
+                        <td>{formatDate(user.createdAt)}</td>
+                        <td>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(targetId, "Active")}
+                              style={{
+                                padding: "4px 10px",
+                                fontSize: "12px",
+                                fontWeight: "600",
+                                borderRadius: "4px",
+                                border: "none",
+                                cursor: "pointer",
+                                backgroundColor: !isBlocked ? "#059669" : "#e2e8f0",
+                                color: !isBlocked ? "#ffffff" : "#64748b",
+                              }}
+                            >
+                              Active
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(targetId, "Blocked")}
+                              style={{
+                                padding: "4px 10px",
+                                fontSize: "12px",
+                                fontWeight: "600",
+                                borderRadius: "4px",
+                                border: "none",
+                                cursor: "pointer",
+                                backgroundColor: isBlocked ? "#dc2626" : "#e2e8f0",
+                                color: isBlocked ? "#ffffff" : "#64748b",
+                              }}
+                            >
+                              Block
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan="8" className="donor-empty">
+                    <td colSpan="9" className="user-empty">
                       {search.trim()
-                        ? "No donors match your search."
-                        : "No donor information found in the database."}
+                        ? "No users match your search."
+                        : "No users found in the database."}
                     </td>
                   </tr>
                 )}

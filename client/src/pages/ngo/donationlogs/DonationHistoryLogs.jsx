@@ -135,32 +135,80 @@ export default function DonationHistoryLogs() {
     return "bg-emerald-50 text-emerald-700 border border-emerald-100";
   };
 
+  // পিডিএফ রিপোর্ট জেনারেট এবং প্রিন্ট করার ফাংশন
   const exportReport = () => {
-    const rows = [
-      ["Food", "Restaurant", "Quantity", "Estimated Meals", "Date", "Status"],
-      ...filteredLogs.map((log) => [
-        log.foodName || log.foodCategory || "N/A",
-        getRestaurantName(log),
-        `${log.quantity ?? "N/A"} KG`,
-        log.estimatedMeals ?? "N/A",
-        formatDate(log.pickupDate || log.createdAt),
-        getStatusText(log),
-      ]),
-    ];
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Please allow popups for this website to export PDF.");
+      return;
+    }
 
-    const csv = rows
-      .map((row) =>
-        row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")
-      )
-      .join("\r\n");
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>NGO Donation Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+            h2 { text-align: center; margin-bottom: 20px; color: #065f46; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: left; font-size: 13px; }
+            th { background-color: #f1f5f9; color: #1e293b; font-weight: bold; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+            .footer { margin-top: 30px; text-align: right; font-size: 12px; color: #64748b; }
+          </style>
+        </head>
+        <body>
+          <h2>FeedLink - NGO Donation History Report</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Food</th>
+                <th>Restaurant</th>
+                <th>Quantity</th>
+                <th>Estimated Meals</th>
+                <th>Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredLogs
+                .map((log) => {
+                  const foodTitle = log.foodName || log.foodCategory || "N/A";
+                  const restaurantName = getRestaurantName(log);
+                  const qty = log.quantity ? `${log.quantity} KG` : "N/A";
+                  const meals = log.estimatedMeals ?? "N/A";
+                  const dateFormatted = formatDate(log.pickupDate || log.createdAt);
+                  const statusText = getStatusText(log);
 
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "ngo-donation-logs.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+                  return `
+                    <tr>
+                      <td>${foodTitle}</td>
+                      <td>${restaurantName}</td>
+                      <td>${qty}</td>
+                      <td>${meals}</td>
+                      <td>${dateFormatted}</td>
+                      <td>${statusText}</td>
+                    </tr>
+                  `;
+                })
+                .join("")}
+            </tbody>
+          </table>
+          <div class="footer">
+            <p>Generated on: ${new Date().toLocaleDateString()} | FeedLink Platform</p>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   return (
@@ -186,7 +234,7 @@ export default function DonationHistoryLogs() {
           className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
         >
           <FileDown size={16} />
-          EXPORT REPORT
+          EXPORT PDF REPORT
         </button>
       </div>
 

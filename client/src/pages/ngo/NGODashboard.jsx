@@ -11,6 +11,7 @@ import {
   Check,
   X,
   ArrowRight,
+  Send,
 } from "lucide-react";
 
 import { Map as PigeonMap, Marker } from "pigeon-maps";
@@ -23,6 +24,7 @@ import {
   acceptDonation,
   updateDonationStatus,
 } from "../../services/api";
+import axios from "axios";
 
 export default function NGODashboard() {
   const navigate = useNavigate();
@@ -41,6 +43,14 @@ export default function NGODashboard() {
   const [ngoId, setNgoId] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
+  // ডিস্ট্রিবিউশন ফর্মের জন্য নতুন স্টেট
+  const [showDistributionModal, setShowDistributionModal] = useState(false);
+  const [selectedDonationForDist, setSelectedDonationForDist] = useState(null);
+  const [description, setDescription] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [distLoading, setDistLoading] = useState(false);
+  const [distMessage, setDistMessage] = useState("");
+
   const loadDashboard = useCallback(async () => {
     try {
       const [statsRes, profileRes] = await Promise.all([
@@ -48,7 +58,6 @@ export default function NGODashboard() {
         fetchNgoProfile().catch(() => null),
       ]);
 
-      // ব্যাকএন্ড থেকে আসা stats অবজেক্ট বা রেসপন্স হ্যান্ডেল করা
       if (statsRes) {
         const statsData = statsRes.stats || statsRes;
         setStats({
@@ -62,7 +71,6 @@ export default function NGODashboard() {
         });
       }
 
-      // profile রেসপন্স থেকে ngoId বা _id সেট করা
       const profileData = profileRes?.ngo || profileRes;
       setNgoId(profileData?._id || profileData?.id || null);
 
@@ -85,7 +93,6 @@ export default function NGODashboard() {
   useEffect(() => {
     loadDashboard();
 
-    // Real-time: new donations & status changes refresh this view instantly
     const socket = getSocket();
     if (socket) {
       socket.on("donation:new", loadDashboard);
@@ -123,6 +130,38 @@ export default function NGODashboard() {
       console.error("Failed to reject request", err);
     } finally {
       setBusyId(null);
+    }
+  };
+
+  // ডিস্ট্রিবিউশন প্রুফ সাবমিট করার হ্যান্ডলার
+  const handleDistributionSubmit = async (e) => {
+    e.preventDefault();
+    if (!ngoId) {
+      alert("NGO Profile ID not found.");
+      return;
+    }
+
+    setDistLoading(true);
+    try {
+      await axios.post('/api/ngo/submit-distribution', {
+        ngoId,
+        restaurantId: selectedDonationForDist?.donor?._id || selectedDonationForDist?.restaurantId,
+        donationId: selectedDonationForDist?._id,
+        description,
+        imageUrl,
+        ngoName: user?.name || user?.fullName || "NGO Partner"
+      });
+      setDistMessage("📦 Distribution proof submitted successfully and restaurant notified!");
+      setDescription("");
+      setImageUrl("");
+      setTimeout(() => {
+        setShowDistributionModal(false);
+        setDistMessage("");
+      }, 2000);
+    } catch (err) {
+      setDistMessage("❌ Failed to submit. Please check inputs.");
+    } finally {
+      setDistLoading(false);
     }
   };
 
@@ -207,6 +246,27 @@ export default function NGODashboard() {
             <span className="text-slate-400">Live</span>
           </div>
         </div>
+      </div>
+
+      {/* ================= QUICK ACTION FOR DISTRIBUTION PROOF ================= */}
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-5 rounded-2xl text-white flex justify-between items-center shadow-md">
+        <div>
+          <h3 className="font-bold text-lg">🚚 Completed Food Distribution?</h3>
+          <p className="text-xs text-emerald-100 mt-1">Submit proof photos & details so restaurants can view and rate your performance.</p>
+        </div>
+        <button
+          onClick={() => {
+            if (requests.length > 0) {
+              setSelectedDonationForDist(requests[0]);
+              setShowDistributionModal(true);
+            } else {
+              alert("No active donation available to submit proof for.");
+            }
+          }}
+          className="bg-white text-emerald-800 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-emerald-50 transition cursor-pointer flex items-center gap-2 shadow"
+        >
+          <Send className="w-4 h-4" /> Submit Proof
+        </button>
       </div>
 
       {/* ================= MAP + ACTIVE REQUESTS ================= */}
@@ -308,6 +368,63 @@ export default function NGODashboard() {
           </button>
         </div>
       </div>
+
+      {/* ================= DISTRIBUTION PROOF MODAL ================= */}
+      {showDistributionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 relative shadow-2xl space-y-4">
+            <button
+              onClick={() => setShowDistributionModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 font-bold text-lg"
+            >
+              ✕
+            </button>
+            <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              📦 Submit Distribution Proof
+            </h3>
+
+            {distMessage && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-semibold">
+                {distMessage}
+              </div>
+            )}
+
+            <form onSubmit={handleDistributionSubmit} className="space-y-4">
+              <div>
+                <label className="block text-slate-700 text-xs font-bold mb-1">Distribution Description</label>
+                <textarea
+                  className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-emerald-500 text-xs text-slate-800"
+                  rows="3"
+                  placeholder="Describe the food distribution process..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 text-xs font-bold mb-1">Image URL / Proof Link</label>
+                <input
+                  type="text"
+                  className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-emerald-500 text-xs text-slate-800"
+                  placeholder="Paste image URL here..."
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={distLoading}
+                className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition text-xs shadow-md cursor-pointer"
+              >
+                {distLoading ? "Submitting & Notifying..." : "🚀 Submit Proof & Notify Restaurant"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

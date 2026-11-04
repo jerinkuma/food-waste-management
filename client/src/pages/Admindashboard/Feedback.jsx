@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { fetchFeedback, updateFeedbackStatus } from "../../services/api";
+import React, { useEffect, useState, useMemo } from "react";
+import { fetchFeedback, updateFeedbackStatus, sendAdminFeedback } from "../../services/api";
 import "./Feedback.css";
 
 const Feedback = () => {
@@ -21,7 +21,7 @@ const Feedback = () => {
       setFeedbacks(Array.isArray(list) ? list : []);
     } catch (err) {
       console.error("Failed to load feedback:", err);
-      setError("Feedback load করা যায়নি।");
+      setError("Feedback load করা যায়নি।");
     } finally {
       setLoading(false);
     }
@@ -54,6 +54,7 @@ const Feedback = () => {
     return (
       feedback.donorName ||
       feedback.restaurantName ||
+      feedback.restaurant?.name ||
       (typeof feedback.restaurant === "object" && feedback.restaurant?.name) ||
       "Unknown Restaurant"
     );
@@ -115,14 +116,15 @@ const Feedback = () => {
             filteredFeedbacks.map((feedback, index) => {
               const currentStatus = feedback.status || "Awaiting Response";
               const restaurantName = getRestaurantName(feedback);
+              const feedbackId = feedback._id || feedback.id || index;
 
               return (
-                <div className="feedback-item" key={feedback._id || feedback.id || index} style={{ background: "#fff", padding: "16px", borderRadius: "8px", marginBottom: "12px", border: "1px solid #e5e7eb" }}>
+                <div className="feedback-item" key={feedbackId} style={{ background: "#fff", padding: "16px", borderRadius: "8px", marginBottom: "12px", border: "1px solid #e5e7eb" }}>
                   <div className="feedback-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <strong style={{ fontSize: "16px", color: "#111827" }}>{restaurantName}</strong>
                       <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>
-                        ID: {feedback.donationId || "N/A"} • Category: {feedback.category || "General"}
+                        ID: {feedback.donationId || "N/A"} | Category: {feedback.category || "General"}
                       </div>
                     </div>
                   </div>
@@ -158,6 +160,71 @@ const Feedback = () => {
                       </button>
                     </div>
                   </div>
+
+                  {/* 👉 নতুন যোগ করা হলো: এডমিন থেকে রেস্টুরেন্টের কাছে ওয়ার্নিং মেসেজ পাঠানোর সেকশন */}
+                  <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px dashed #e5e7eb", display: "flex", gap: "8px", alignItems: "center" }}>
+                    <input
+                      type="text"
+                      placeholder="Write warning message for restaurant..."
+                      id={`warning-msg-${feedbackId}`}
+                      style={{
+                        flex: 1,
+                        padding: "6px 10px",
+                        borderRadius: "4px",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "13px"
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const messageInput = document.getElementById(`warning-msg-${feedbackId}`);
+                        const warningMessage = messageInput.value.trim();
+                        
+                        if (!warningMessage) {
+                          alert("দয়া করে আগে ওয়ার্নিং মেসেজটি লিখুন!");
+                          return;
+                        }
+
+                        try {
+                          const recipientUserId = feedback.restaurantUser?._id || feedback.restaurant?._id || feedback.restaurant || feedback.donor;
+                          
+                          if (!recipientUserId) {
+                            alert("দুঃখিত, এই ফিডব্যাকের সাথে কোনো রেস্টুরেন্ট ইউজার আইডি পাওয়া যায়নি।");
+                            return;
+                          }
+
+                          const response = await sendAdminFeedback({
+                            recipientId: recipientUserId,
+                            status: feedback.status || "Approved",
+                            message: warningMessage
+                          });
+
+                          if (response.success) {
+                            alert("সফলভাবে রেস্টুরেন্টের কাছে ওয়ার্নিং মেসেজ পাঠানো হয়েছে!");
+                            messageInput.value = "";
+                          }
+                        } catch (err) {
+                          console.error("Failed to send warning:", err);
+                          alert("মেসেজ পাঠাতে ব্যর্থ হয়েছে।");
+                        }
+                      }}
+                      style={{
+                        backgroundColor: "#dc2626",
+                        color: "#ffffff",
+                        border: "none",
+                        padding: "6px 12px",
+                        borderRadius: "4px",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        fontWeight: "bold",
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      Send Warning ⚠️
+                    </button>
+                  </div>
+
                 </div>
               );
             })

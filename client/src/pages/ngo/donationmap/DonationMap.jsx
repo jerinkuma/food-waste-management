@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Map as PigeonMap, Marker, Overlay } from 'pigeon-maps';
-import { Check, X, MapPin, Truck, ChevronRight, Eye, LocateFixed } from 'lucide-react';
+import { Check, X, MapPin, Truck, ChevronRight, Eye, LocateFixed, Search } from 'lucide-react';
 import { getSocket } from '../../../services/socket';
 import { fetchAvailableDonations, fetchNgoProfile, acceptDonation, updateDonationStatus } from '../../../services/api';
 import './DonationMap.css';
 
-const DEFAULT_CENTER = [22.3567, 91.8197];
+const DEFAULT_CENTER = [22.3567, 91.8197]; // সদরঘাট/চট্টগ্রাম ডিফল্ট কোঅর্ডিনেট
 
 export default function DonationMap() {
   const [donations, setDonations] = useState([]);
@@ -15,16 +15,22 @@ export default function DonationMap() {
   const [selectedId, setSelectedId] = useState(null);
   const [showAllModal, setShowAllModal] = useState(false);
   const [ngoId, setNgoId] = useState(null);
-  const [myLocation, setMyLocation] = useState(null);
+  const [myLocation, setMyLocation] = useState(DEFAULT_CENTER); // NGO Location
   const [busyId, setBusyId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const myLocationRef = useRef(DEFAULT_CENTER);
 
   const loadDonations = useCallback(async (lat, lng) => {
-    setLoading(true);
     try {
-      const list = await fetchAvailableDonations(lat, lng);
-      setDonations(list);
+      const currentLat = lat || DEFAULT_CENTER[0];
+      const currentLng = lng || DEFAULT_CENTER[1];
+      
+      const list = await fetchAvailableDonations(currentLat, currentLng);
+      setDonations(Array.isArray(list) ? list : (list.donations || []));
     } catch (error) {
       console.error('Error fetching donations for the map:', error);
+      setDonations([]);
     } finally {
       setLoading(false);
     }
@@ -34,38 +40,85 @@ export default function DonationMap() {
     navigator.geolocation?.getCurrentPosition(
       (pos) => {
         const loc = [pos.coords.latitude, pos.coords.longitude];
+        myLocationRef.current = loc;
         setMyLocation(loc);
         setCenter(loc);
         loadDonations(pos.coords.latitude, pos.coords.longitude);
       },
-      () => loadDonations(),
+      () => {
+        myLocationRef.current = DEFAULT_CENTER;
+        setMyLocation(DEFAULT_CENTER);
+        loadDonations(DEFAULT_CENTER[0], DEFAULT_CENTER[1]);
+      },
       { timeout: 5000 }
     );
   }, [loadDonations]);
 
+  const handleLocationSearch = async (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery + ', Chittagong')}`);
+      const data = await response.json();
+      if (data && data.length > 0) {
+        const lat = parseFloat(data[0].lat);
+        const lon = parseFloat(data[0].lon);
+        setCenter([lat, lon]);
+        setZoom(16);
+      } else {
+        alert('Location not found in Chittagong. Try a more specific landmark.');
+      }
+    } catch (err) {
+      console.error('Search location error:', err);
+    }
+  };
+
   useEffect(() => {
+    let isMounted = true;
+
     fetchNgoProfile()
-      .then((profile) => setNgoId(profile?._id || null))
-      .catch(() => setNgoId(null));
+      .then((profile) => {
+        if (isMounted) setNgoId(profile?._id || null);
+      })
+      .catch(() => {
+        if (isMounted) setNgoId(null);
+      });
 
     locateMe();
 
     const socket = getSocket();
-    const refresh = () => (myLocation ? loadDonations(myLocation[0], myLocation[1]) : loadDonations());
+    const refresh = () => {
+      const loc = myLocationRef.current || DEFAULT_CENTER;
+      loadDonations(loc[0], loc[1]);
+    };
+
     socket.on('donation:new', refresh);
     socket.on('donation:updated', refresh);
+
     return () => {
+      isMounted = false;
       socket.off('donation:new', refresh);
       socket.off('donation:updated', refresh);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadDonations, locateMe]);
 
-  const coordsOf = (d) => (d.resolvedLocation ? [d.resolvedLocation.lat, d.resolvedLocation.lng] : null);
+  const coordsOf = (d) => {
+    const lat = d.resolvedLocation?.lat || d.latitude;
+    const lng = d.resolvedLocation?.lng || d.longitude;
+    if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+      return [Number(lat), Number(lng)];
+    }
+    return null;
+  };
 
   const handleSelect = (e, d) => {
-    e?.preventDefault();
-    e?.stopPropagation();
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+    }
     setSelectedId(d._id);
     const c = coordsOf(d);
     if (c) {
@@ -107,18 +160,33 @@ export default function DonationMap() {
   };
 
   const selectedDonation = donations.find((d) => d._id === selectedId);
+  const selectedCoords = selectedDonation ? coordsOf(selectedDonation) : null;
 
   return (
     <div className="dm-container">
       <div className="dm-map-column">
-        <div className="dm-map-header">
+        <div className="dm-map-header flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2 m-0">
             <MapPin className="w-5 h-5 text-emerald-600" /> DONATION LOCATIONS MAP
           </h3>
+
+          <form onSubmit={handleLocationSearch} className="flex gap-1 w-full sm:w-auto">
+            <input
+              type="text"
+              placeholder="Search area (e.g. Sadarghat)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="px-3 py-1 text-xs border border-slate-300 rounded-lg outline-none focus:border-emerald-500 bg-white text-slate-800"
+            />
+            <button type="submit" className="bg-emerald-600 text-white px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer border-none flex items-center">
+              <Search className="w-3.5 h-3.5" />
+            </button>
+          </form>
+
           <div className="flex gap-2">
             <button type="button" onClick={locateMe} className="dm-reset-btn">
               <LocateFixed className="w-3.5 h-3.5" style={{ display: 'inline', marginRight: 4 }} />
-              Use My Location
+              My Location
             </button>
             {selectedId && (
               <button
@@ -132,7 +200,7 @@ export default function DonationMap() {
           </div>
         </div>
 
-        <div className="dm-pigeon-wrapper">
+        <div className="dm-pigeon-wrapper" style={{ position: 'relative' }}>
           <PigeonMap
             center={center}
             zoom={zoom}
@@ -141,8 +209,12 @@ export default function DonationMap() {
               setZoom(zoom);
             }}
           >
-            {myLocation && <Marker width={26} anchor={myLocation} color="#2563eb" />}
+            {/* NGO (সদরঘাট/আপনার লোকেশন) নীল মার্কার */}
+            {myLocation && (
+              <Marker width={32} anchor={myLocation} color="#0284c7" onClick={() => alert("NGO Location (Sadarghat)")} />
+            )}
 
+            {/* ডোনেশন মার্কারসমূহ */}
             {donations.map((d) => {
               const c = coordsOf(d);
               if (!c) return null;
@@ -150,21 +222,59 @@ export default function DonationMap() {
               return (
                 <Marker
                   key={d._id}
-                  width={isSelected ? 36 : 28}
+                  width={isSelected ? 38 : 28}
                   anchor={c}
-                  color={isSelected ? '#E11D48' : '#059669'}
+                  color={isSelected ? '#e11d48' : '#059669'}
                   onClick={(e) => handleSelect(e, d)}
                 />
               );
             })}
 
-            {selectedDonation && coordsOf(selectedDonation) && (
-              <Overlay anchor={coordsOf(selectedDonation)} offset={[0, -35]}>
-                <div className="dm-overlay-box">
-                  <p className="font-bold text-emerald-400 m-0">{selectedDonation.donor?.name}</p>
-                  <p className="text-[10px] text-slate-300 m-0">{selectedDonation.pickupAddress}</p>
-                  <p className="text-[10px] text-slate-400 border-t border-slate-700 pt-1 mt-1 m-0">
-                    {selectedDonation.foodName} &middot; {selectedDonation.quantity}kg
+            {/* ম্যাপের ওপর আকাশী রঙের রুট লাইন */}
+            {selectedCoords && myLocation && (
+              <Overlay anchor={myLocation} offset={[0, 0]}>
+                <svg
+                  style={{
+                    position: 'absolute',
+                    top: -500,
+                    left: -500,
+                    width: 1000,
+                    height: 1000,
+                    pointerEvents: 'none',
+                    overflow: 'visible'
+                  }}
+                >
+                  <line
+                    x1="500"
+                    y1="500"
+                    x2={500 + (selectedCoords[1] - myLocation[1]) * 10000}
+                    y2={500 - (selectedCoords[0] - myLocation[0]) * 10000}
+                    stroke="#0284c7"
+                    strokeWidth="5"
+                    strokeDasharray="6, 6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </Overlay>
+            )}
+
+            {/* সিলেক্টেড রেস্টুরেন্টের ডিটেইলস পপআপ */}
+            {selectedDonation && selectedCoords && (
+              <Overlay anchor={selectedCoords} offset={[0, -38]}>
+                <div className="dm-overlay-box" style={{ background: '#0f172a', padding: '10px 14px', borderRadius: '10px', border: '1px solid #38bdf8', color: '#fff', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                    <p className="font-bold text-sky-400 m-0" style={{ fontSize: '13px' }}>
+                      {selectedDonation.donor?.restaurantName || selectedDonation.donor?.businessName || selectedDonation.donor?.name || "Partner Restaurant"}
+                    </p>
+                    {selectedDonation.distanceKm && (
+                      <span style={{ background: '#0284c7', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>
+                        {selectedDonation.distanceKm} km
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-300 m-0" style={{ marginTop: '4px' }}>📍 {selectedDonation.pickupAddress}</p>
+                  <p className="text-[11px] text-emerald-400 border-t border-slate-700 pt-1 mt-1.5 m-0 font-medium">
+                    🍲 {selectedDonation.foodName} · {selectedDonation.quantity}kg
                   </p>
                 </div>
               </Overlay>
@@ -173,8 +283,7 @@ export default function DonationMap() {
 
           <div className="dm-map-badge">
             <span className="dm-pulse-dot"></span>
-            Showing {donations.filter((d) => coordsOf(d)).length} Pending Pins
-            {donations.some((d) => !coordsOf(d)) && ` (+${donations.filter((d) => !coordsOf(d)).length} without resolvable location)`}
+            Showing {donations.filter((d) => coordsOf(d)).length} Mapped Pins
           </div>
         </div>
       </div>
@@ -200,12 +309,13 @@ export default function DonationMap() {
           ) : (
             donations.slice(0, 2).map((d) => {
               const isSelected = selectedId === d._id;
+              const restaurantTitle = d.donor?.restaurantName || d.donor?.businessName || d.donor?.name || "Partner Restaurant";
               return (
-                <div key={d._id} onClick={(e) => handleSelect(e, d)} className={`dm-request-card ${isSelected ? 'selected' : 'unselected'}`}>
+                <div key={d._id} onClick={(e) => handleSelect(e, d)} className={`dm-request-card ${isSelected ? 'selected' : 'unselected'}`} style={{ cursor: 'pointer' }}>
                   <div className="flex justify-between items-start mb-1">
-                    <h4 className="font-bold text-slate-900 text-sm m-0">{d.donor?.name}</h4>
-                    <span className="text-[11px] text-slate-400 font-medium">
-                      {d.distanceKm != null ? `${d.distanceKm} km` : 'distance n/a'}
+                    <h4 className="font-bold text-slate-900 text-sm m-0">{restaurantTitle}</h4>
+                    <span className="text-[11px] text-sky-600 font-bold bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                      {d.distanceKm != null ? `${d.distanceKm} km away` : 'distance n/a'}
                     </span>
                   </div>
 
@@ -215,7 +325,7 @@ export default function DonationMap() {
 
                   <div className="bg-white p-2.5 rounded-xl border border-slate-200/90 mb-3">
                     <p className="text-xs text-slate-600 font-medium line-clamp-1 m-0">
-                      {d.foodName} &middot; {d.quantity}kg
+                      {d.foodName} · {d.quantity}kg · <span className="text-emerald-700 font-bold">{d.pickupAddress}</span>
                     </p>
                   </div>
 
@@ -254,23 +364,26 @@ export default function DonationMap() {
             </div>
 
             <div className="overflow-y-auto space-y-3 pr-1 flex-1">
-              {donations.map((d) => (
-                <div key={d._id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center">
-                  <div className="space-y-1">
-                    <h4 className="font-bold text-slate-900 text-sm m-0">{d.donor?.name}</h4>
-                    <p className="text-xs text-slate-500 m-0">{d.foodName} &middot; {d.quantity}kg</p>
-                    <p className="text-[10px] text-emerald-600 font-bold m-0">{d.pickupAddress}</p>
+              {donations.map((d) => {
+                const restTitle = d.donor?.restaurantName || d.donor?.businessName || d.donor?.name || "Partner Restaurant";
+                return (
+                  <div key={d._id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center">
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-slate-900 text-sm m-0">{restTitle}</h4>
+                      <p className="text-xs text-slate-500 m-0">{d.foodName} · {d.quantity}kg</p>
+                      <p className="text-[10px] text-emerald-600 font-bold m-0">{d.pickupAddress}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={(e) => { handleSelect(e, d); setShowAllModal(false); }} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 border-none cursor-pointer">
+                        <Eye className="w-3.5 h-3.5" /> Map
+                      </button>
+                      <button type="button" onClick={(e) => handleAccept(e, d)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold border-none cursor-pointer">
+                        Accept
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={(e) => { handleSelect(e, d); setShowAllModal(false); }} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 border-none cursor-pointer">
-                      <Eye className="w-3.5 h-3.5" /> Map
-                    </button>
-                    <button type="button" onClick={(e) => handleAccept(e, d)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold border-none cursor-pointer">
-                      Accept
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

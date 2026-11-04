@@ -11,9 +11,6 @@ import Auth from "./pages/Auth/Auth";
 import ForgotPassword from "./pages/Auth/ForgotPassword";
 import ResetPassword from "./pages/Auth/ResetPassword";
 
-
-
-
 // Restaurant / Donor
 import Dashboard from "./pages/DonorDashboard/Dashboard";
 import AddDonation from "./pages/DonorDashboard/AddDonation";
@@ -23,7 +20,6 @@ import Analytics from "./pages/DonorDashboard/Analytics";
 import NGOReviews from "./pages/DonorDashboard/NGOReviews";
 import Profile from "./pages/DonorDashboard/Profile";
 import Notifications from "./pages/DonorDashboard/Notifications";
-
 import DonorFeedback from "./pages/DonorDashboard/Feedback";
 
 // Delivery
@@ -36,11 +32,13 @@ import Header from "./components/ngo/header/Header";
 import DonationMap from "./pages/ngo/donationmap/DonationMap";
 import ActiveRequests from "./pages/ngo/activerequest/ActiveRequests";
 import DonationHistoryLogs from "./pages/ngo/donationlogs/DonationHistoryLogs";
-import Rating from "./pages/ngo/Rating/Rating.jsx"; // আপডেটেড রেটিং কম্পোনেন্ট
+import Rating from "./pages/ngo/Rating/Rating.jsx";
 import Feedback from "./pages/ngo/feedback/Feedback";
 import Partners from "./pages/ngo/partners/Partners";
 import Settings from "./pages/ngo/setting/Settings";
 import NGODashboard from "./pages/ngo/NGODashboard";
+import DistributionForm from "./pages/ngo/DistributionForm/DistributionForm";
+import Reports from "./pages/ngo/report/Reports"; // অ্যানালিটিক্স ও রিপোর্টস পেজটি ইমপোর্ট করা হলো
 
 // Admin
 import AdminNavbar from "./components/Admindashboard/Navbar";
@@ -55,7 +53,6 @@ import AdminFeedback from "./pages/Admindashboard/Feedback";
 import AdminReports from "./pages/Admindashboard/Reports";
 import AdminInventory from "./pages/Admindashboard/Inventory";
 import AdminSettings from "./pages/Admindashboard/Settings";
-
 import AdminContactMessages from "./pages/Admindashboard/ContactMessages";
 
 import "./App.css";
@@ -116,10 +113,11 @@ function NGOLayout({
 }) {
   return (
     <div
-      className={`flex h-screen font-sans transition-colors duration-300 ${themeMode === "dark"
-        ? "bg-[#0f172a] text-slate-100"
-        : "bg-[#F8FAFC] text-slate-800"
-        }`}
+      className={`flex h-screen font-sans transition-colors duration-300 ${
+        themeMode === "dark"
+          ? "bg-[#0f172a] text-slate-100"
+          : "bg-[#F8FAFC] text-slate-800"
+      }`}
     >
       <NGOSidebar />
 
@@ -155,6 +153,22 @@ function NGOLayout({
               element={<ActiveRequests requests={requests} />}
             />
 
+            {/* ডিস্ট্রিবিউশন প্রুফ রাউট */}
+            <Route
+              path="distribution"
+              element={
+                <div className="max-w-2xl mx-auto py-4">
+                  <DistributionForm />
+                </div>
+              }
+            />
+
+            {/* নতুন অ্যানালিটিক্স ও রিপোর্টস রাউট যুক্ত করা হলো */}
+            <Route
+              path="reports"
+              element={<Reports />}
+            />
+
             <Route
               path="partners"
               element={<Partners />}
@@ -165,7 +179,6 @@ function NGOLayout({
               element={<DonationHistoryLogs />}
             />
 
-            {/* ট্রাস্ট স্কোরের বদলে নতুন রেটিং রাউট */}
             <Route
               path="rating"
               element={<Rating themeMode={themeMode} />}
@@ -194,10 +207,11 @@ function NGOLayout({
         </main>
 
         <footer
-          className={`text-center py-3 text-[11px] border-t mt-auto transition-colors ${themeMode === "dark"
-            ? "text-slate-500 border-slate-800"
-            : "text-slate-400 border-slate-200/60"
-            }`}
+          className={`text-center py-3 text-[11px] border-t mt-auto transition-colors ${
+            themeMode === "dark"
+              ? "text-slate-500 border-slate-800"
+              : "text-slate-400 border-slate-200/60"
+          }`}
         >
           FeedLink NGO Portal, Chattogram · FeedLink © 2026
         </footer>
