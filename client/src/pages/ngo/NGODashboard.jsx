@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 
 import {
   Utensils,
-  HeartHandshake,
   Star,
   Map as MapIcon,
   Maximize2,
@@ -33,8 +32,6 @@ export default function NGODashboard() {
   const [stats, setStats] = useState({
     totalClaimed: 0,
     todayClaimed: 0,
-    mealsDistributed: 0,
-    todayMeals: 0,
     trustScore: 0,
     reviewCount: 0,
     foodWasteSaved: "0 Kg",
@@ -43,7 +40,7 @@ export default function NGODashboard() {
   const [ngoId, setNgoId] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
-  // ডিস্ট্রিবিউশন ফর্মের জন্য নতুন স্টেট
+  // ডিস্ট্রিবিউশন ফর্মের জন্য স্টেট
   const [showDistributionModal, setShowDistributionModal] = useState(false);
   const [selectedDonationForDist, setSelectedDonationForDist] = useState(null);
   const [description, setDescription] = useState("");
@@ -63,8 +60,6 @@ export default function NGODashboard() {
         setStats({
           totalClaimed: statsData.totalClaimed || 0,
           todayClaimed: statsData.todayClaimed || 0,
-          mealsDistributed: statsData.mealsDistributed || 0,
-          todayMeals: statsData.todayMeals || 0,
           trustScore: statsData.trustScore || statsData.avgRating || statsData.restaurantRatings || 0,
           reviewCount: statsData.reviewCount || statsData.totalReviews || 0,
           foodWasteSaved: statsData.foodWasteSaved || "0.0 Kg",
@@ -170,8 +165,8 @@ export default function NGODashboard() {
 
   return (
     <div className="space-y-6">
-      {/* ================= STAT CARDS ================= */}
-      <div className="grid grid-cols-4 gap-5">
+      {/* ================= STAT CARDS (3-COLUMN LAYOUT) ================= */}
+      <div className="grid grid-cols-3 gap-5">
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-36">
           <div className="flex justify-between items-start">
             <div>
@@ -185,24 +180,6 @@ export default function NGODashboard() {
           <div className="flex justify-between items-center text-[11px]">
             <span className="text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md">
               +{stats.todayClaimed || 0} Today
-            </span>
-            <span className="text-slate-400">Live</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-36">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs font-semibold text-slate-400">Meals Distributed</p>
-              <h3 className="text-3xl font-bold text-slate-900 mt-2">{stats.mealsDistributed}</h3>
-            </div>
-            <div className="p-3 bg-blue-100 text-blue-600 rounded-2xl">
-              <HeartHandshake className="w-6 h-6" />
-            </div>
-          </div>
-          <div className="flex justify-between items-center text-[11px]">
-            <span className="text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-md">
-              +{stats.todayMeals || 0} Meals
             </span>
             <span className="text-slate-400">Live</span>
           </div>

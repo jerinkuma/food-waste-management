@@ -153,10 +153,10 @@ const Reports = () => {
         {/* Charts Grid */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(440px, 1fr))", gap: "20px" }}>
           
-          {/* 1. Partner Restaurant Impact Analysis (Kg vs Meals Distributed) */}
+          {/* 1. Partner Restaurant Impact Analysis (Food Saved in Kg Only) */}
           <div style={{ background: "#1e293b", padding: "20px", borderRadius: "12px", border: "1px solid #334155", gridColumn: "1 / -1" }}>
             <h3 style={{ fontSize: "13px", fontWeight: "600", color: "#f8fafc", marginBottom: "16px" }}>
-              Partner Restaurant Impact Analysis: Food Saved (Kg) vs. Meals Distributed
+              Partner Restaurant Impact Analysis: Food Saved (Kg)
             </h3>
             <div style={{ width: "100%", height: 300 }}>
               {(!reportData?.restaurantImpactData || reportData.restaurantImpactData.length === 0) ? (
@@ -172,7 +172,6 @@ const Reports = () => {
                     <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "6px", border: "1px solid #334155", fontSize: "11px" }} />
                     <Legend wrapperStyle={{ fontSize: "11px", color: "#94a3b8" }} />
                     <Bar dataKey="SavedKg" name="Food Saved (Kg)" fill="#10b981" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="MealsDistributed" name="Est. Meals Distributed" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}

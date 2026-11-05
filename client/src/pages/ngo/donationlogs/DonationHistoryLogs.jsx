@@ -166,7 +166,6 @@ export default function DonationHistoryLogs() {
                 <th>Food</th>
                 <th>Restaurant</th>
                 <th>Quantity</th>
-                <th>Estimated Meals</th>
                 <th>Date</th>
                 <th>Status</th>
               </tr>
@@ -177,7 +176,6 @@ export default function DonationHistoryLogs() {
                   const foodTitle = log.foodName || log.foodCategory || "N/A";
                   const restaurantName = getRestaurantName(log);
                   const qty = log.quantity ? `${log.quantity} KG` : "N/A";
-                  const meals = log.estimatedMeals ?? "N/A";
                   const dateFormatted = formatDate(log.pickupDate || log.createdAt);
                   const statusText = getStatusText(log);
 
@@ -186,7 +184,6 @@ export default function DonationHistoryLogs() {
                       <td>${foodTitle}</td>
                       <td>${restaurantName}</td>
                       <td>${qty}</td>
-                      <td>${meals}</td>
                       <td>${dateFormatted}</td>
                       <td>${statusText}</td>
                     </tr>
@@ -261,7 +258,6 @@ export default function DonationHistoryLogs() {
                   <th className="py-4 px-6 font-medium">Food</th>
                   <th className="py-4 px-6 font-medium">Restaurant</th>
                   <th className="py-4 px-6 font-medium">Quantity</th>
-                  <th className="py-4 px-6 font-medium">Estimated Meals</th>
                   <th className="py-4 px-6 font-medium">Date</th>
                   <th className="py-4 px-6 font-medium">Status</th>
                 </tr>
@@ -273,7 +269,6 @@ export default function DonationHistoryLogs() {
                   const foodSub = log.foodType || log.foodCategory || "";
                   const restaurantName = getRestaurantName(log);
                   const qty = log.quantity ? `${log.quantity} KG` : "N/A";
-                  const meals = log.estimatedMeals ?? "N/A";
                   const dateFormatted = formatDate(
                     log.pickupDate || log.createdAt
                   );
@@ -308,11 +303,6 @@ export default function DonationHistoryLogs() {
                         {qty}
                       </td>
 
-                      {/* Estimated Meals Column */}
-                      <td className="py-4 px-6 text-slate-600 font-medium">
-                        {meals}
-                      </td>
-
                       {/* Date Column */}
                       <td className="py-4 px-6 text-slate-500 text-xs">
                         {dateFormatted}
@@ -335,7 +325,7 @@ export default function DonationHistoryLogs() {
                 {!loading && filteredLogs.length === 0 && (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={5}
                       className="py-8 text-center text-slate-400 text-sm"
                     >
                       No donation history found for this NGO.
