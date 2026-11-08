@@ -1,4 +1,22 @@
+
 import React, { useEffect, useMemo, useState } from "react";
+import {
+  Search,
+  Utensils,
+  CheckCircle2,
+  Clock3,
+  XCircle,
+  Eye,
+  X,
+  CalendarDays,
+  UserRound,
+  MapPin,
+  Package,
+  ClipboardList,
+  History,
+  Building2,
+} from "lucide-react";
+
 import { fetchDonations } from "../../services/api";
 import "./Donations.css";
 
@@ -7,6 +25,7 @@ const Donations = () => {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedDonation, setSelectedDonation] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -17,20 +36,19 @@ const Donations = () => {
         setError("");
 
         const response = await fetchDonations();
+
         const list = Array.isArray(response)
           ? response
           : response?.donations || [];
 
-        if (isMounted) {
-          setDonations(list);
-        }
+        if (isMounted) setDonations(list);
       } catch (err) {
         console.error("Failed to load donations:", err);
 
         if (isMounted) {
           setError(
             err.response?.data?.message ||
-              "Donation information load করা যায়নি।"
+            "Donation information load করা যায়নি।"
           );
         }
       } finally {
@@ -45,51 +63,176 @@ const Donations = () => {
     };
   }, []);
 
-  const getFoodName = (donation) =>
-    donation.foodName || donation.food || "N/A";
+  // Close modal with Escape key
+  useEffect(() => {
+    if (!selectedDonation) return;
 
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setSelectedDonation(null);
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [selectedDonation]);
+
+  // Food name
+  const getFoodName = (donation) =>
+    donation?.foodName || donation?.food || "N/A";
+
+  // Quantity
   const getQuantity = (donation) => {
-    const quantity = donation.quantity ?? donation.qty;
+    const quantity = donation?.quantity ?? donation?.qty;
+
     return quantity !== undefined && quantity !== null
       ? `${quantity} kg`
       : "N/A";
   };
 
+  // Donor name
   const getDonorName = (donation) => {
-    if (typeof donation.donor === "object" && donation.donor !== null) {
-      return donation.donor.name || donation.donor.email || "N/A";
+    const donor = donation?.donor;
+
+    if (donor && typeof donor === "object") {
+      return donor.name || donor.email || "N/A";
     }
-    return donation.donorName || donation.donor || "N/A";
+
+    return donation?.donorName || "N/A";
   };
 
+  // Donation status
   const getStatus = (donation) =>
-    donation.pipelineStatus || donation.status || "Pending";
+    donation?.pipelineStatus || donation?.status || "Pending";
 
-  // এনজিওর নাম বা আইডি/রেফারেন্স কোড বের করার ফাংশন
-  const getNgoName = (donation) => {
-    if (donation.ngoName) return donation.ngoName;
-    if (donation.assignedNgo) return donation.assignedNgo;
-    
-    const ngoField = donation.ngo || donation.selectedNgo || donation.ngoId;
-    if (typeof ngoField === "object" && ngoField !== null) {
-      return ngoField.name || ngoField._id || ngoField.id || "Assigned NGO";
-    }
-    if (typeof ngoField === "string" && ngoField.trim() !== "") {
-      return ngoField;
-    }
+  // NGO name - handles populated object and ID/string
+  // =====================================
+  // NGO INFORMATION HELPERS
+  // =====================================
 
-    const status = getStatus(donation).toLowerCase();
-    if (status.includes("completed") || status.includes("delivered") || status.includes("accepted")) {
-      return donation.requestId || donation.donationId || "NGO-Assigned";
-    }
+  const getNgoDetails = (ngo) => {
+    if (!ngo || typeof ngo !== "object") return "";
 
-    return "";
+    return (
+      ngo.user?.name ||
+      ngo.user?.email ||
+      ""
+    );
   };
 
+  const getSelectedNgo = (donation) => {
+    const selected = donation?.selectedNgo;
+
+    if (selected && typeof selected === "object") {
+      return selected;
+    }
+
+    const legacy = donation?.ngoRequest?.requestedBy;
+
+    if (legacy && typeof legacy === "object") {
+      return legacy;
+    }
+
+    const requests = Array.isArray(donation?.ngoRequests)
+      ? donation.ngoRequests
+      : [];
+
+    const acceptedRequest = requests.find(
+      (request) => request.status === "Accepted"
+    );
+
+    const populatedRequest =
+      acceptedRequest?.requestedBy &&
+        typeof acceptedRequest.requestedBy === "object"
+        ? acceptedRequest.requestedBy
+        : requests.find(
+          (request) =>
+            request.requestedBy &&
+            typeof request.requestedBy === "object"
+        )?.requestedBy;
+
+    return populatedRequest || selected || legacy || null;
+  };
+
+  const getSelectedNgoRequest = (donation) => {
+    const requests = Array.isArray(donation?.ngoRequests)
+      ? donation.ngoRequests
+      : [];
+
+    const selectedNgo = getSelectedNgo(donation);
+
+    if (!selectedNgo) {
+      return (
+        requests.find(
+          (request) => request.status === "Accepted"
+        ) ||
+        requests[0] ||
+        null
+      );
+    }
+
+    const selectedNgoId =
+      typeof selectedNgo === "object"
+        ? selectedNgo._id
+        : selectedNgo;
+
+    return (
+      requests.find((request) => {
+        const requestedNgo = request.requestedBy;
+
+        const requestedNgoId =
+          typeof requestedNgo === "object"
+            ? requestedNgo?._id
+            : requestedNgo;
+
+        return (
+          String(requestedNgoId) === String(selectedNgoId)
+        );
+      }) || null
+    );
+  };
+
+  const getNgoName = (donation) => {
+    return getNgoDetails(getSelectedNgo(donation));
+  };
+
+  // Badge style
+  const getBadgeStyle = (status) => {
+    const value = String(status || "").toLowerCase();
+
+    if (
+      value.includes("completed") ||
+      value.includes("delivered")
+    ) {
+      return "completed";
+    }
+
+    if (value.includes("pending")) return "pending";
+
+    if (
+      value.includes("accepted") ||
+      value.includes("assigned") ||
+      value.includes("requested")
+    ) {
+      return "accepted";
+    }
+
+    if (value.includes("rejected")) return "rejected";
+
+    return "default";
+  };
+
+  // Date formatting
   const formatDate = (date) => {
     if (!date) return "N/A";
+
     const parsed = new Date(date);
+
     if (Number.isNaN(parsed.getTime())) return "N/A";
+
     return parsed.toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "short",
@@ -97,173 +240,673 @@ const Donations = () => {
     });
   };
 
+  // Date and time formatting
+  const formatDateTime = (date) => {
+    if (!date) return "N/A";
+
+    const parsed = new Date(date);
+
+    if (Number.isNaN(parsed.getTime())) return "N/A";
+
+    return parsed.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // Status changed by
+  const getChangedBy = (person) => {
+    if (!person) return "";
+
+    if (typeof person === "object") {
+      return person.name || person.email || "";
+    }
+
+    return "";
+  };
+
+  // Summary counts
+  const completedCount = donations.filter((donation) => {
+    const status = getStatus(donation).toLowerCase();
+
+    return (
+      status === "completed" ||
+      status === "delivered"
+    );
+  }).length;
+
+  const pendingCount = donations.filter((donation) => {
+    const status = getStatus(donation).toLowerCase();
+
+    return (
+      status === "pending" ||
+      status === "accepted" ||
+      status === "waiting for ngo acceptance" ||
+      status === "ngo requested"
+    );
+  }).length;
+
+  const rejectedCount = donations.filter(
+    (donation) =>
+      getStatus(donation).toLowerCase() === "rejected"
+  ).length;
+
+  // =====================================
+  // SEARCH FILTER
+  // =====================================
+
   const filteredDonations = useMemo(() => {
     const searchText = search.trim().toLowerCase();
+
     if (!searchText) return donations;
 
     return donations.filter((donation) => {
-      const fields = [
+      const ngoName = getNgoName(donation);
+      const donorName = getDonorName(donation);
+
+      const searchFields = [
         getFoodName(donation),
-        getDonorName(donation),
+        donorName,
+        donation?.donor?.email,
+        ngoName,
         getStatus(donation),
-        getNgoName(donation),
-        donation.quantity,
-        donation.createdAt,
-        donation._id,
+        donation?.donationId,
+        donation?.requestId,
+        donation?.quantity,
+        donation?.foodCategory,
+        donation?.condition,
+        donation?.pickupAddress,
+        donation?.contactNumber,
+        donation?.pickupTime,
+        donation?.status,
+        donation?.pipelineStatus,
+        donation?.createdAt
+          ? formatDate(donation.createdAt)
+          : "",
+        donation?.pickupDate
+          ? formatDate(donation.pickupDate)
+          : "",
       ];
 
-      return fields.some((field) =>
-        String(field ?? "").toLowerCase().includes(searchText)
+      return searchFields.some((field) =>
+        String(field ?? "")
+          .toLowerCase()
+          .includes(searchText)
       );
     });
   }, [donations, search]);
 
-  const pendingCount = donations.filter(
-    (donation) => getStatus(donation).toLowerCase() === "pending"
-  ).length;
+  // Reusable detail item
+  const renderDetail = (label, value) => (
+    <div className="detail-info-item">
+      <span>{label}</span>
+      <strong>{value || "N/A"}</strong>
+    </div>
+  );
 
-  // স্ট্যাটাস অনুযায়ী ব্যাজ কালার কনফিগারেশন
-  const getBadgeStyle = (status) => {
-    const st = status.toLowerCase();
-    if (st.includes("completed") || st.includes("delivered")) {
-      return { background: "#d1fae5", color: "#065f46", border: "1px solid #a7f3d0" };
-    }
-    if (st.includes("pending")) {
-      return { background: "#fef3c7", color: "#b45309", border: "1px solid #fde68a" };
-    }
-    if (st.includes("accepted") || st.includes("assigned")) {
-      return { background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd" };
-    }
-    return { background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0" };
+  // Donation details modal
+  const renderDonationModal = () => {
+    if (!selectedDonation) return null;
+
+    const donation = selectedDonation;
+    const status = getStatus(donation);
+
+    const selectedNgo = getSelectedNgo(donation);
+    const ngoName = getNgoDetails(selectedNgo);
+    const ngoRequest = getSelectedNgoRequest(donation);
+
+    const statusHistory = Array.isArray(donation.statusHistory)
+      ? [...donation.statusHistory].sort(
+        (a, b) =>
+          new Date(a.changedAt || 0) -
+          new Date(b.changedAt || 0)
+      )
+      : [];
+
+    return (
+      <div
+        className="donation-modal-overlay"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) {
+            setSelectedDonation(null);
+          }
+        }}
+      >
+        <div
+          className="donation-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="donation-modal-title"
+        >
+          {/* Modal Header */}
+          <div className="donation-modal-header">
+            <div className="modal-heading-content">
+              <div className="modal-heading-icon">
+                <ClipboardList size={23} />
+              </div>
+
+              <div>
+                <span className="modal-eyebrow">
+                  DONATION RECORD
+                </span>
+
+                <h2 id="donation-modal-title">
+                  Donation Details
+                </h2>
+
+                <p>
+                  {donation.donationId || donation._id}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="modal-close-btn"
+              onClick={() => setSelectedDonation(null)}
+              aria-label="Close details"
+            >
+              <X size={21} />
+            </button>
+          </div>
+
+          <div className="donation-modal-body">
+            {/* 1. Donation Information */}
+            <section className="modal-section">
+              <div className="modal-section-title">
+                <Package size={19} />
+                <h3>Donation Information</h3>
+              </div>
+
+              <div className="modal-status-banner">
+                <div>
+                  <span>Current Status</span>
+                  <strong>{status}</strong>
+                </div>
+
+                <span
+                  className={`donation-badge ${getBadgeStyle(status)}`}
+                >
+                  {status}
+                </span>
+              </div>
+
+              <div className="modal-detail-grid">
+                {renderDetail(
+                  "Food Name",
+                  getFoodName(donation)
+                )}
+
+                {renderDetail(
+                  "Quantity",
+                  getQuantity(donation)
+                )}
+
+                {renderDetail(
+                  "Food Category",
+                  donation.foodCategory
+                )}
+
+                {renderDetail(
+                  "Food Condition",
+                  donation.condition
+                )}
+
+                {renderDetail(
+                  "Cooking Time",
+                  donation.cookingTime
+                )}
+
+                {renderDetail(
+                  "Best Before",
+                  formatDateTime(donation.bestBefore)
+                )}
+
+                {renderDetail(
+                  "Donation Date",
+                  formatDateTime(donation.createdAt)
+                )}
+              </div>
+            </section>
+
+            {/* 2. Donor Information */}
+            <section className="modal-section">
+              <div className="modal-section-title">
+                <UserRound size={19} />
+                <h3>Donor Information</h3>
+              </div>
+
+              <div className="modal-detail-grid">
+                {renderDetail(
+                  "Donor Name",
+                  getDonorName(donation)
+                )}
+
+                {renderDetail(
+                  "Donor Email",
+                  donation.donor?.email
+                )}
+              </div>
+            </section>
+
+            {/* 3. NGO Information */}
+            <section className="modal-section">
+              <div className="modal-section-title">
+                <Building2 size={19} />
+                <h3>NGO Information</h3>
+              </div>
+
+              <div className="modal-detail-grid">
+                {renderDetail("NGO Name", ngoName || "Not Assigned")}
+
+                {renderDetail("Request Status", ngoRequest?.status)}
+
+                {renderDetail(
+                  "Request Date",
+                  formatDate(ngoRequest?.requestedAt)
+                )}
+
+                {renderDetail(
+                  "Response Date",
+                  formatDate(ngoRequest?.respondedAt)
+                )}
+              </div>
+            </section>
+
+            {/* 4. Pickup Information */}
+            <section className="modal-section">
+              <div className="modal-section-title">
+                <MapPin size={19} />
+                <h3>Pickup Information</h3>
+              </div>
+
+              <div className="modal-detail-grid">
+                {renderDetail(
+                  "Pickup Address",
+                  donation.pickupAddress
+                )}
+
+                {renderDetail(
+                  "Pickup Date",
+                  formatDate(donation.pickupDate)
+                )}
+
+                {renderDetail(
+                  "Pickup Time",
+                  donation.pickupTime
+                )}
+
+                {renderDetail(
+                  "Contact Number",
+                  donation.contactNumber
+                )}
+              </div>
+            </section>
+
+            {/* 5. Donation Timeline */}
+            <section className="modal-section">
+              <div className="modal-section-title">
+                <History size={19} />
+                <h3>Donation Timeline</h3>
+
+                <span className="history-count">
+                  {statusHistory.length}
+                </span>
+              </div>
+
+              {statusHistory.length > 0 ? (
+                <div className="status-timeline">
+                  {statusHistory.map((history, index) => (
+                    <div
+                      className="timeline-item"
+                      key={history._id || index}
+                    >
+                      <div className="timeline-marker">
+                        <span />
+                      </div>
+
+                      <div className="timeline-content">
+                        <div className="timeline-top">
+                          <strong>
+                            {history.status || "Status Updated"}
+                          </strong>
+
+                          <span>
+                            {formatDateTime(history.changedAt)}
+                          </span>
+                        </div>
+
+                        {history.note && (
+                          <p>{history.note}</p>
+                        )}
+
+                        {getChangedBy(history.changedBy) && (
+                          <small>
+                            Changed by:{" "}
+                            {getChangedBy(history.changedBy)}
+                          </small>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="history-empty">
+                  No donation timeline available.
+                </div>
+              )}
+            </section>
+          </div>
+
+          {/* Modal Footer */}
+          <div className="donation-modal-footer">
+            <span>
+              <CalendarDays size={15} />
+              Created: {formatDateTime(donation.createdAt)}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setSelectedDonation(null)}
+              className="modal-done-btn"
+            >
+              Close Details
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="page" style={{ padding: "32px", backgroundColor: "#f8fafc", minHeight: "100vh", fontFamily: "Inter, sans-serif" }}>
-      
-      {/* Header Section */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "16px" }}>
-        <h1 style={{ fontSize: "26px", fontWeight: "800", color: "#0f172a", display: "flex", alignItems: "center", gap: "12px", margin: 0 }}>
-          <span style={{ background: "#e2e8f0", padding: "8px", borderRadius: "10px", fontSize: "20px" }}>🍱</span> 
-          Donation Management
-        </h1>
+    <div className="donations-page">
+      {/* Header + Search */}
+      <div className="donations-header">
+        <div className="donations-heading">
+          <div className="donations-heading-icon">
+            <Utensils size={25} />
+          </div>
+
+          <div>
+            <span className="donations-eyebrow">
+              ADMINISTRATION / RECORDS
+            </span>
+
+            <h1>Donation Management</h1>
+
+            <p>
+              Monitor and manage all food donation activities.
+            </p>
+          </div>
+        </div>
+        <div className="donations-search">
+          <Search size={19} />
+
+          <input
+            type="text"
+            placeholder="Search by food, donor, NGO, status, ID..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+            >
+              <X size={17} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="donation-summary" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px", marginBottom: "28px" }}>
-        <div style={{ background: "#ffffff", padding: "22px 24px", borderRadius: "16px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)", border: "1px solid #f1f5f9" }}>
-          <span style={{ fontSize: "13px", fontWeight: "600", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Total Donations</span>
-          <strong style={{ display: "block", fontSize: "32px", fontWeight: "700", color: "#0f172a", marginTop: "8px" }}>{loading ? "..." : donations.length}</strong>
-          <span style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px", display: "block" }}>All active and past records</span>
+      <div className="donation-summary">
+        <div className="summary-card summary-total">
+          <div className="summary-card-top">
+            <div className="summary-icon">
+              <Utensils size={22} />
+            </div>
+            <span className="summary-mini-label">
+              ALL RECORDS
+            </span>
+          </div>
+
+          <div className="summary-card-bottom">
+            <div>
+              <span className="summary-label">
+                Total Donations
+              </span>
+              <strong>
+                {loading ? "..." : donations.length}
+              </strong>
+              <small>All donation records</small>
+            </div>
+            <div className="summary-decoration">01</div>
+          </div>
         </div>
 
-        <div style={{ background: "#ffffff", padding: "22px 24px", borderRadius: "16px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)", border: "1px solid #f1f5f9" }}>
-          <span style={{ fontSize: "13px", fontWeight: "600", color: "#d97706", textTransform: "uppercase", letterSpacing: "0.5px" }}>Pending Donations</span>
-          <strong style={{ display: "block", fontSize: "32px", fontWeight: "700", color: "#d97706", marginTop: "8px" }}>{loading ? "..." : pendingCount}</strong>
-          <span style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px", display: "block" }}>Waiting for processing/approval</span>
+        <div className="summary-card summary-completed">
+          <div className="summary-card-top">
+            <div className="summary-icon">
+              <CheckCircle2 size={22} />
+            </div>
+            <span className="summary-mini-label">
+              SUCCESSFUL
+            </span>
+          </div>
+
+          <div className="summary-card-bottom">
+            <div>
+              <span className="summary-label">Completed</span>
+              <strong>
+                {loading ? "..." : completedCount}
+              </strong>
+              <small>Successfully completed</small>
+            </div>
+            <div className="summary-decoration">02</div>
+          </div>
+        </div>
+
+        <div className="summary-card summary-pending">
+          <div className="summary-card-top">
+            <div className="summary-icon">
+              <Clock3 size={22} />
+            </div>
+            <span className="summary-mini-label">
+              IN PROGRESS
+            </span>
+          </div>
+
+          <div className="summary-card-bottom">
+            <div>
+              <span className="summary-label">Pending</span>
+              <strong>
+                {loading ? "..." : pendingCount}
+              </strong>
+              <small>Pending and accepted</small>
+            </div>
+            <div className="summary-decoration">03</div>
+          </div>
+        </div>
+
+        <div className="summary-card summary-rejected">
+          <div className="summary-card-top">
+            <div className="summary-icon">
+              <XCircle size={22} />
+            </div>
+            <span className="summary-mini-label">
+              DECLINED
+            </span>
+          </div>
+
+          <div className="summary-card-bottom">
+            <div>
+              <span className="summary-label">Rejected</span>
+              <strong>
+                {loading ? "..." : rejectedCount}
+              </strong>
+              <small>Rejected donations</small>
+            </div>
+            <div className="summary-decoration">04</div>
+          </div>
         </div>
       </div>
 
-      {/* Search Toolbar */}
-      <div style={{ marginBottom: "24px", background: "#fff", padding: "12px", borderRadius: "14px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0", display: "inline-block", width: "100%", maxWidth: "450px" }}>
-        <input
-          type="text"
-          placeholder="🔍 Search food, donor, status, or NGO..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "none", outline: "none", fontSize: "14px", background: "transparent", color: "#1e293b" }}
-        />
+      {/* Donation Content */}
+      <div className="donations-content-header">
+        <div>
+          <h2>All Donations</h2>
+          <p>
+            Explore donation records and their current status.
+          </p>
+        </div>
+
+        {!loading && !error && (
+          <div className="donations-total-pill">
+            <span />
+            {filteredDonations.length} Records
+          </div>
+        )}
       </div>
 
-      {/* Content Area */}
       {loading ? (
-        <div style={{ textAlign: "center", padding: "60px", color: "#64748b", fontSize: "15px", fontWeight: "500" }}>
-          Loading donations from database...
+        <div className="donation-message donation-loading">
+          <div className="donation-loader" />
+          <strong>Loading donations...</strong>
+          <span>Fetching records from database</span>
         </div>
       ) : error ? (
-        <div style={{ textAlign: "center", padding: "40px", background: "#fff", borderRadius: "16px", border: "1px solid #fecaca", color: "#dc2626" }}>
-          <p style={{ fontWeight: "600" }}>{error}</p>
-          <button type="button" onClick={() => window.location.reload()} style={{ marginTop: "12px", padding: "8px 20px", background: "#059669", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}>
+        <div className="donation-error">
+          <XCircle size={34} />
+          <p>{error}</p>
+
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+          >
             Try Again
           </button>
         </div>
       ) : (
         <>
-          <p style={{ fontSize: "14px", color: "#64748b", marginBottom: "20px", fontWeight: "500" }}>
-            Showing <strong>{filteredDonations.length}</strong> of <strong>{donations.length}</strong> donations
+          <p className="donation-results">
+            Showing <strong>{filteredDonations.length}</strong> of{" "}
+            <strong>{donations.length}</strong> donations
           </p>
 
-          {/* Cards Grid View */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "24px" }}>
+          <div className="donation-grid">
             {filteredDonations.length > 0 ? (
               filteredDonations.map((donation, index) => {
                 const status = getStatus(donation);
                 const ngoName = getNgoName(donation);
-                const badgeStyle = getBadgeStyle(status);
 
                 return (
-                  <div 
-                    key={donation._id || donation.id || index} 
-                    style={{ 
-                      background: "#fff", 
-                      borderRadius: "16px", 
-                      padding: "24px", 
-                      boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)", 
-                      border: "1px solid #e2e8f0", 
-                      display: "flex", 
-                      flexDirection: "column", 
-                      justifyContent: "space-between",
-                      transition: "all 0.2s ease-in-out",
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-3px)"}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
+                  <div
+                    className="donation-card"
+                    key={donation._id || donation.id || index}
                   >
                     <div>
-                      {/* Top Header of Card */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+                      <div className="donation-card-header">
                         <div>
-                          <span style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Item #{index + 1}</span>
-                          <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#0f172a", margin: "4px 0 0 0", lineHeight: "1.4" }}>{getFoodName(donation)}</h3>
+                          <span className="donation-item-number">
+                            ITEM #{index + 1}
+                          </span>
+
+                          <h3>{getFoodName(donation)}</h3>
                         </div>
-                        <span style={{ padding: "5px 12px", borderRadius: "30px", fontSize: "12px", fontWeight: "700", ...badgeStyle }}>
+
+                        <span
+                          className={`donation-badge ${getBadgeStyle(status)}`}
+                        >
                           {status}
                         </span>
                       </div>
 
-                      {/* Details Info List */}
-                      <div style={{ fontSize: "14px", color: "#475569", display: "flex", flexDirection: "column", gap: "10px", margin: "16px 0", padding: "12px 0", borderTop: "1px solid #f1f5f9", borderBottom: "1px solid #f1f5f9" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ color: "#64748b", fontSize: "13px" }}>Quantity:</span>
-                          <strong style={{ color: "#0f172a", background: "#f8fafc", padding: "2px 8px", borderRadius: "6px" }}>{getQuantity(donation)}</strong>
+                      <div className="donation-card-details">
+                        <div>
+                          <span>Quantity:</span>
+                          <strong>{getQuantity(donation)}</strong>
                         </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ color: "#64748b", fontSize: "13px" }}>Donor / Restaurant:</span>
-                          <strong style={{ color: "#0f172a" }}>{getDonorName(donation)}</strong>
+
+                        <div>
+                          <span>Donor / Restaurant:</span>
+                          <strong>{getDonorName(donation)}</strong>
                         </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ color: "#64748b", fontSize: "13px" }}>Date:</span>
-                          <span style={{ color: "#334155", fontWeight: "500" }}>{formatDate(donation.createdAt || donation.date)}</span>
+
+                        <div>
+                          <span>Date:</span>
+                          <strong>
+                            {formatDate(
+                              donation.createdAt || donation.date
+                            )}
+                          </strong>
                         </div>
                       </div>
                     </div>
 
-                    {/* Assigned NGO Footer Section */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", padding: "10px 14px", borderRadius: "10px", border: "1px solid #f1f5f9" }}>
-                      <span style={{ fontSize: "12px", color: "#64748b", fontWeight: "600" }}>Assigned NGO:</span>
-                      <strong style={{ fontSize: "13px", color: ngoName ? "#059669" : "#94a3b8", fontStyle: ngoName ? "normal" : "italic", fontWeight: ngoName ? "700" : "400" }}>
+                    <div className="donation-card-footer">
+                      <span>Assigned NGO:</span>
+
+                      <strong
+                        className={
+                          ngoName
+                            ? "ngo-assigned"
+                            : "ngo-not-assigned"
+                        }
+                      >
                         {ngoName || "Not Assigned"}
                       </strong>
                     </div>
+
+                    <button
+                      type="button"
+                      className="view-details-btn"
+                      onClick={() => setSelectedDonation(donation)}
+                    >
+                      <Eye size={17} />
+                      View Details
+                    </button>
                   </div>
                 );
               })
             ) : (
-              <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "60px", background: "#fff", borderRadius: "16px", color: "#94a3b8", border: "1px solid #e2e8f0" }}>
-                {search.trim() ? "No donations match your search criteria." : "No donations found in the database."}
+              <div className="donation-empty">
+                <div className="empty-icon">
+                  <Package size={30} />
+                </div>
+
+                <h3>
+                  {search.trim()
+                    ? "No matching donations"
+                    : "No donations found"}
+                </h3>
+
+                <p>
+                  {search.trim()
+                    ? "Try searching with another keyword."
+                    : "Donation records will appear here when available."}
+                </p>
+
+                {search.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                  >
+                    Clear Search
+                  </button>
+                )}
               </div>
             )}
           </div>
         </>
       )}
+
+      {renderDonationModal()}
     </div>
   );
 };

@@ -72,6 +72,16 @@ export const fetchDonorDashboard = async (donorUserId) => {
   return data.dashboard;
 };
 
+
+// Fetch NGO-wise analytics for the logged-in donor
+export const fetchDonorNgoAnalytics = async (donorUserId) => {
+  const { data } = await client.get(
+    `/donations/donor/${donorUserId}/ngo-analytics`
+  );
+
+  return data.analytics;
+};
+
 export const createDonation = async (payload) => {
   const { data } = await client.post("/donations", payload);
   return data;
@@ -175,6 +185,14 @@ export const fetchDonorNgoReviews = async () => {
   return data;
 };
 
+export const fetchDonorDistributionProofs = async () => {
+  const { data } = await client.get(
+    "/ngo/donor/distribution-proofs"
+  );
+
+  return data.proofs || [];
+};
+
 // =====================================================================
 // CONTACT MESSAGES
 // =====================================================================
@@ -262,9 +280,28 @@ export const fetchInventory = async () => {
 };
 
 // 👉 Step 2: এডমিন থেকে রেস্টুরেন্টের কাছে ওয়ার্নিং পাঠানোর API কল
+// Admin: Send warning notification to Donor / NGO
 export const sendAdminFeedback = async (payload) => {
-  const { data } = await client.post("/admin/feedback/send-warning", payload);
+  const { data } = await client.post("/feedback/admin", payload);
   return data;
 };
 
+
+
+// =====================================
+// ADVANCED REPORTS & ANALYTICS
+// =====================================
+export const fetchAdvancedReports = async (year, month = null) => {
+  const params = { year };
+
+  if (month !== null && month !== "") {
+    params.month = month;
+  }
+
+  const { data } = await client.get("/admin/advanced-reports", {
+    params,
+  });
+
+  return data;
+};
 export default client;

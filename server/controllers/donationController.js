@@ -360,7 +360,7 @@ const createDonation = async (req, res) => {
     // ==================================================
     // NOTIFY ALL NGOs
     // ==================================================
-    
+
     // ==================================================
     // NOTIFY ADMINS (Immediate)
     // ==================================================
@@ -376,7 +376,7 @@ const createDonation = async (req, res) => {
 
       // এখানে followingId এর বদলে সঠিক ফিল্ড 'following' ব্যবহার করা হলো
       const followers = await Follow.find({
-        following: donor, 
+        following: donor,
       });
 
       if (followers && followers.length > 0) {
@@ -749,412 +749,412 @@ const verifyDonation = async (req, res) => {
       }
     }
     // ======================================================
-// CREATE DONATION (Updated with Auto-Geocoding Support)
-// ======================================================
+    // CREATE DONATION (Updated with Auto-Geocoding Support)
+    // ======================================================
 
-const createDonation = async (req, res) => {
-  try {
-    const {
-      donor,
-
-      // Food information
-      foodName,
-      foodType,
-      quantity,
-      cookingTime,
-      bestBefore,
-
-      // Food condition/category
-      condition,
-      foodCondition,
-      foodCategory,
-      storageCondition,
-
-      // Pickup information
-      pickupAddress,
-      address,
-      pickupDate,
-      pickupTime,
-      contactNumber,
-      pickupDuration,
-
-      // Location
-      latitude,
-      longitude,
-
-      // Additional information
-      specialInstructions,
-
-      // Safety
-      safetyConfirmed,
-      safetyDeclaration,
-    } = req.body;
-
-    // ==================================================
-    // DONOR VALIDATION
-    // ==================================================
-    if (!donor) {
-      return res.status(400).json({
-        success: false,
-        message: "Donor is required.",
-      });
-    }
-
-    const donorUser = await User.findById(donor);
-
-    if (!donorUser) {
-      return res.status(404).json({
-        success: false,
-        message: "Donor not found.",
-      });
-    }
-
-    if (donorUser.role !== "donor") {
-      return res.status(403).json({
-        success: false,
-        message: "Only donor can create donation.",
-      });
-    }
-
-    // ==================================================
-    // REQUIRED FIELD VALIDATION
-    // ==================================================
-    if (!foodName || !foodType) {
-      return res.status(400).json({
-        success: false,
-        message: "Food name and food type are required.",
-      });
-    }
-
-    if (
-      quantity === undefined ||
-      quantity === null ||
-      quantity === "" ||
-      Number(quantity) <= 0
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Quantity must be greater than 0.",
-      });
-    }
-
-    if (!condition && !foodCondition) {
-      return res.status(400).json({
-        success: false,
-        message: "Food condition is required.",
-      });
-    }
-
-    if (!foodCategory) {
-      return res.status(400).json({
-        success: false,
-        message: "Food category is required.",
-      });
-    }
-
-    if (!pickupAddress && !address) {
-      return res.status(400).json({
-        success: false,
-        message: "Pickup address is required.",
-      });
-    }
-
-    if (!pickupDate) {
-      return res.status(400).json({
-        success: false,
-        message: "Pickup date is required.",
-      });
-    }
-
-    if (!pickupTime) {
-      return res.status(400).json({
-        success: false,
-        message: "Pickup time is required.",
-      });
-    }
-
-    if (!contactNumber) {
-      return res.status(400).json({
-        success: false,
-        message: "Contact number is required.",
-      });
-    }
-
-    if (!pickupDuration) {
-      return res.status(400).json({
-        success: false,
-        message: "Pickup duration is required.",
-      });
-    }
-
-    // ==================================================
-    // SAFETY DECLARATION
-    // ==================================================
-    const finalSafetyDeclaration =
-      safetyDeclaration !== undefined
-        ? safetyDeclaration
-        : Boolean(safetyConfirmed);
-
-    if (!finalSafetyDeclaration) {
-      return res.status(400).json({
-        success: false,
-        message: "Safety declaration must be confirmed.",
-      });
-    }
-
-    // ==================================================
-    // NORMALIZE VALUES
-    // ==================================================
-    const finalCondition =
-      condition || foodCondition;
-
-    const finalPickupAddress =
-      pickupAddress || address;
-
-    const finalQuantity = Number(quantity);
-
-    if (
-      Number.isNaN(finalQuantity) ||
-      finalQuantity <= 0
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid quantity.",
-      });
-    }
-
-    // ==================================================
-    // RESOLVE LOCATION (AUTO GEOCODING FOR MAP PINS)
-    // ==================================================
-    let finalLat = latitude !== undefined && latitude !== "" ? Number(latitude) : undefined;
-    let finalLng = longitude !== undefined && longitude !== "" ? Number(longitude) : undefined;
-
-    let resolvedLocationObj = null;
-
-    if (finalLat && finalLng && !Number.isNaN(finalLat) && !Number.isNaN(finalLng)) {
-      resolvedLocationObj = { lat: finalLat, lng: finalLng };
-    } else if (resolveDonationLocation) {
-      // যদি ইউটিলিটি ফাংশন থাকে তা দিয়ে ট্রাই করবে
+    const createDonation = async (req, res) => {
       try {
-        const geoResult = await resolveDonationLocation(finalPickupAddress);
-        if (geoResult && geoResult.lat && geoResult.lng) {
-          resolvedLocationObj = { lat: Number(geoResult.lat), lng: Number(geoResult.lng) };
+        const {
+          donor,
+
+          // Food information
+          foodName,
+          foodType,
+          quantity,
+          cookingTime,
+          bestBefore,
+
+          // Food condition/category
+          condition,
+          foodCondition,
+          foodCategory,
+          storageCondition,
+
+          // Pickup information
+          pickupAddress,
+          address,
+          pickupDate,
+          pickupTime,
+          contactNumber,
+          pickupDuration,
+
+          // Location
+          latitude,
+          longitude,
+
+          // Additional information
+          specialInstructions,
+
+          // Safety
+          safetyConfirmed,
+          safetyDeclaration,
+        } = req.body;
+
+        // ==================================================
+        // DONOR VALIDATION
+        // ==================================================
+        if (!donor) {
+          return res.status(400).json({
+            success: false,
+            message: "Donor is required.",
+          });
         }
-      } catch (err) {
-        console.error("Geo utility error:", err);
-      }
-    }
 
-    // যদি এখনও কোঅর্ডিনেট না পাওয়া যায়, তবে Nominatim API ব্যবহার করে অটো জেনারেট করবে
-    if (!resolvedLocationObj && finalPickupAddress) {
-      try {
-        const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(finalPickupAddress)}`);
-        const geoData = await geoRes.json();
-        if (geoData && geoData.length > 0) {
-          resolvedLocationObj = {
-            lat: parseFloat(geoData[0].lat),
-            lng: parseFloat(geoData[0].lon)
-          };
+        const donorUser = await User.findById(donor);
+
+        if (!donorUser) {
+          return res.status(404).json({
+            success: false,
+            message: "Donor not found.",
+          });
         }
-      } catch (geoError) {
-        console.error("Nominatim auto-geocoding error:", geoError);
-      }
-    }
 
-    // ফলব্যাক হিসেবে ডিফল্ট চট্টগ্রাম কোঅর্ডিনেট (সদরঘাট এলাকা) সেট করা যেতে পারে যাতে ম্যাপে পিন মিসিং না হয়
-    if (!resolvedLocationObj) {
-      resolvedLocationObj = { lat: 22.3317, lng: 91.8315 };
-    }
+        if (donorUser.role !== "donor") {
+          return res.status(403).json({
+            success: false,
+            message: "Only donor can create donation.",
+          });
+        }
 
-    // ==================================================
-    // GENERATE DONATION ID
-    // ==================================================
-    const donationId = `FL-${Date.now()}-${Math.floor(
-      1000 + Math.random() * 9000
-    )}`;
+        // ==================================================
+        // REQUIRED FIELD VALIDATION
+        // ==================================================
+        if (!foodName || !foodType) {
+          return res.status(400).json({
+            success: false,
+            message: "Food name and food type are required.",
+          });
+        }
 
-    // ==================================================
-    // GENERATE QR CODE
-    // ==================================================
-    const qrCode = await QRCode.toDataURL(
-      donationId
-    );
+        if (
+          quantity === undefined ||
+          quantity === null ||
+          quantity === "" ||
+          Number(quantity) <= 0
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Quantity must be greater than 0.",
+          });
+        }
 
-    // ==================================================
-    // CREATE DONATION
-    // ==================================================
-    const donation = await Donation.create({
-      donationId,
+        if (!condition && !foodCondition) {
+          return res.status(400).json({
+            success: false,
+            message: "Food condition is required.",
+          });
+        }
 
-      donor,
+        if (!foodCategory) {
+          return res.status(400).json({
+            success: false,
+            message: "Food category is required.",
+          });
+        }
 
-      // FOOD INFORMATION
-      foodName,
-      foodType,
-      quantity: finalQuantity,
-      cookingTime,
-      bestBefore,
+        if (!pickupAddress && !address) {
+          return res.status(400).json({
+            success: false,
+            message: "Pickup address is required.",
+          });
+        }
 
-      // FOOD CONDITION / CATEGORY
-      condition: finalCondition,
-      foodCondition: finalCondition,
-      foodCategory,
-      storageCondition,
+        if (!pickupDate) {
+          return res.status(400).json({
+            success: false,
+            message: "Pickup date is required.",
+          });
+        }
 
-      // PICKUP INFORMATION
-      pickupAddress: finalPickupAddress,
-      address: finalPickupAddress,
+        if (!pickupTime) {
+          return res.status(400).json({
+            success: false,
+            message: "Pickup time is required.",
+          });
+        }
 
-      pickupDate,
-      pickupTime,
-      contactNumber,
-      pickupDuration,
+        if (!contactNumber) {
+          return res.status(400).json({
+            success: false,
+            message: "Contact number is required.",
+          });
+        }
 
-      specialInstructions:
-        specialInstructions || "",
+        if (!pickupDuration) {
+          return res.status(400).json({
+            success: false,
+            message: "Pickup duration is required.",
+          });
+        }
 
-      // LOCATION & RESOLVED LOCATION FOR MAP PINS
-      latitude: resolvedLocationObj.lat,
-      longitude: resolvedLocationObj.lng,
-      resolvedLocation: resolvedLocationObj,
+        // ==================================================
+        // SAFETY DECLARATION
+        // ==================================================
+        const finalSafetyDeclaration =
+          safetyDeclaration !== undefined
+            ? safetyDeclaration
+            : Boolean(safetyConfirmed);
 
-      // SAFETY
-      safetyDeclaration:
-        Boolean(finalSafetyDeclaration),
+        if (!finalSafetyDeclaration) {
+          return res.status(400).json({
+            success: false,
+            message: "Safety declaration must be confirmed.",
+          });
+        }
 
-      safetyConfirmed:
-        Boolean(finalSafetyDeclaration),
+        // ==================================================
+        // NORMALIZE VALUES
+        // ==================================================
+        const finalCondition =
+          condition || foodCondition;
 
-      // NGO REQUEST
-      ngoRequest: {
-        requested: false,
-        requestedBy: null,
-        requestedAt: null,
-        acceptedAt: null,
-      },
+        const finalPickupAddress =
+          pickupAddress || address;
 
-      // DELIVERY MAN
-      deliveryMan: {
-        name: "",
-        phone: "",
-        vehicleNumber: "",
-        assignedAt: null,
-      },
+        const finalQuantity = Number(quantity);
 
-      // VERIFICATION
-      verification: {
-        scannedAt: null,
-        checks: [],
-        approved: false,
-        verifiedAt: null,
-        rejectionReason: "",
-      },
+        if (
+          Number.isNaN(finalQuantity) ||
+          finalQuantity <= 0
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid quantity.",
+          });
+        }
 
-      // QR CODE
-      qrCode,
+        // ==================================================
+        // RESOLVE LOCATION (AUTO GEOCODING FOR MAP PINS)
+        // ==================================================
+        let finalLat = latitude !== undefined && latitude !== "" ? Number(latitude) : undefined;
+        let finalLng = longitude !== undefined && longitude !== "" ? Number(longitude) : undefined;
 
-      // STATUS
-      status: "Waiting for NGO Acceptance",
-      pipelineStatus: "Pending",
+        let resolvedLocationObj = null;
 
-      // STATUS HISTORY
-      statusHistory: [
-        {
-          status: "Pending",
-          changedAt: new Date(),
-          changedBy: donor,
-          note:
-            "Donation created and waiting for NGO acceptance.",
-        },
-      ],
-    });
-
-    // ==================================================
-    // NOTIFY ALL NGOs
-  
-
-    // ==================================================
-    // NOTIFY ADMINS (Immediate)
-    // ==================================================
-    getIO()
-      .to(rooms.admins())
-      .emit("donation:new", donation);
-
-    // ==================================================
-    // PRIORITY NOTIFICATION SYSTEM (Instant for Followers ONLY)
-    // ==================================================
-    try {
-      const Follow = require("../models/Follow");
-
-      const followers = await Follow.find({
-        following: donor, 
-      });
-
-      if (followers && followers.length > 0) {
-        followers.forEach(async (f) => {
-          const ngoUser = f.follower;
-
-          if (ngoUser) {
-            await createNotification({
-              recipient: ngoUser.toString(),
-              type: "PRIORITY_DONATION",
-              title: "🔥 Alert: Followed Restaurant Posted!",
-              message: `Your partner restaurant posted a new donation: "${foodName || "Food"}"`,
-              donation: donation._id,
-              data: {
-                role: "ngo",
-                donationId: donation.donationId,
-                action: "view-donation",
-              },
-            });
-
-            // শুধু ফলোয়ার এনজিওদের কাছে ইনস্ট্যান্ট সকেট পাঠানো
-            getIO()
-              .to(rooms.ngo(ngoUser.toString()))
-              .emit("donation:priority-new", donation);
+        if (finalLat && finalLng && !Number.isNaN(finalLat) && !Number.isNaN(finalLng)) {
+          resolvedLocationObj = { lat: finalLat, lng: finalLng };
+        } else if (resolveDonationLocation) {
+          // যদি ইউটিলিটি ফাংশন থাকে তা দিয়ে ট্রাই করবে
+          try {
+            const geoResult = await resolveDonationLocation(finalPickupAddress);
+            if (geoResult && geoResult.lat && geoResult.lng) {
+              resolvedLocationObj = { lat: Number(geoResult.lat), lng: Number(geoResult.lng) };
+            }
+          } catch (err) {
+            console.error("Geo utility error:", err);
           }
+        }
+
+        // যদি এখনও কোঅর্ডিনেট না পাওয়া যায়, তবে Nominatim API ব্যবহার করে অটো জেনারেট করবে
+        if (!resolvedLocationObj && finalPickupAddress) {
+          try {
+            const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(finalPickupAddress)}`);
+            const geoData = await geoRes.json();
+            if (geoData && geoData.length > 0) {
+              resolvedLocationObj = {
+                lat: parseFloat(geoData[0].lat),
+                lng: parseFloat(geoData[0].lon)
+              };
+            }
+          } catch (geoError) {
+            console.error("Nominatim auto-geocoding error:", geoError);
+          }
+        }
+
+        // ফলব্যাক হিসেবে ডিফল্ট চট্টগ্রাম কোঅর্ডিনেট (সদরঘাট এলাকা) সেট করা যেতে পারে যাতে ম্যাপে পিন মিসিং না হয়
+        if (!resolvedLocationObj) {
+          resolvedLocationObj = { lat: 22.3317, lng: 91.8315 };
+        }
+
+        // ==================================================
+        // GENERATE DONATION ID
+        // ==================================================
+        const donationId = `FL-${Date.now()}-${Math.floor(
+          1000 + Math.random() * 9000
+        )}`;
+
+        // ==================================================
+        // GENERATE QR CODE
+        // ==================================================
+        const qrCode = await QRCode.toDataURL(
+          donationId
+        );
+
+        // ==================================================
+        // CREATE DONATION
+        // ==================================================
+        const donation = await Donation.create({
+          donationId,
+
+          donor,
+
+          // FOOD INFORMATION
+          foodName,
+          foodType,
+          quantity: finalQuantity,
+          cookingTime,
+          bestBefore,
+
+          // FOOD CONDITION / CATEGORY
+          condition: finalCondition,
+          foodCondition: finalCondition,
+          foodCategory,
+          storageCondition,
+
+          // PICKUP INFORMATION
+          pickupAddress: finalPickupAddress,
+          address: finalPickupAddress,
+
+          pickupDate,
+          pickupTime,
+          contactNumber,
+          pickupDuration,
+
+          specialInstructions:
+            specialInstructions || "",
+
+          // LOCATION & RESOLVED LOCATION FOR MAP PINS
+          latitude: resolvedLocationObj.lat,
+          longitude: resolvedLocationObj.lng,
+          resolvedLocation: resolvedLocationObj,
+
+          // SAFETY
+          safetyDeclaration:
+            Boolean(finalSafetyDeclaration),
+
+          safetyConfirmed:
+            Boolean(finalSafetyDeclaration),
+
+          // NGO REQUEST
+          ngoRequest: {
+            requested: false,
+            requestedBy: null,
+            requestedAt: null,
+            acceptedAt: null,
+          },
+
+          // DELIVERY MAN
+          deliveryMan: {
+            name: "",
+            phone: "",
+            vehicleNumber: "",
+            assignedAt: null,
+          },
+
+          // VERIFICATION
+          verification: {
+            scannedAt: null,
+            checks: [],
+            approved: false,
+            verifiedAt: null,
+            rejectionReason: "",
+          },
+
+          // QR CODE
+          qrCode,
+
+          // STATUS
+          status: "Waiting for NGO Acceptance",
+          pipelineStatus: "Pending",
+
+          // STATUS HISTORY
+          statusHistory: [
+            {
+              status: "Pending",
+              changedAt: new Date(),
+              changedBy: donor,
+              note:
+                "Donation created and waiting for NGO acceptance.",
+            },
+          ],
+        });
+
+        // ==================================================
+        // NOTIFY ALL NGOs
+
+
+        // ==================================================
+        // NOTIFY ADMINS (Immediate)
+        // ==================================================
+        getIO()
+          .to(rooms.admins())
+          .emit("donation:new", donation);
+
+        // ==================================================
+        // PRIORITY NOTIFICATION SYSTEM (Instant for Followers ONLY)
+        // ==================================================
+        try {
+          const Follow = require("../models/Follow");
+
+          const followers = await Follow.find({
+            following: donor,
+          });
+
+          if (followers && followers.length > 0) {
+            followers.forEach(async (f) => {
+              const ngoUser = f.follower;
+
+              if (ngoUser) {
+                await createNotification({
+                  recipient: ngoUser.toString(),
+                  type: "PRIORITY_DONATION",
+                  title: "🔥 Alert: Followed Restaurant Posted!",
+                  message: `Your partner restaurant posted a new donation: "${foodName || "Food"}"`,
+                  donation: donation._id,
+                  data: {
+                    role: "ngo",
+                    donationId: donation.donationId,
+                    action: "view-donation",
+                  },
+                });
+
+                // শুধু ফলোয়ার এনজিওদের কাছে ইনস্ট্যান্ট সকেট পাঠানো
+                getIO()
+                  .to(rooms.ngo(ngoUser.toString()))
+                  .emit("donation:priority-new", donation);
+              }
+            });
+          }
+        } catch (notifErr) {
+          console.error(
+            "Priority notification error:",
+            notifErr
+          );
+        }
+
+        // ==================================================
+        // 5-MINUTES DELAYED PUBLIC BROADCAST TO ALL NGOS (setTimeout)
+        // ==================================================
+        // ৫ মিনিট (৩০০০০০ মিলি সেকেন্ড) পর সব এনজিওর পাবলিক লিস্টে যাবে
+        setTimeout(() => {
+          try {
+            const io = getIO();
+            if (io) {
+              io.to(rooms.ngos()).emit("donation:new", donation);
+            }
+          } catch (delayErr) {
+            console.error("Delayed public broadcast error:", delayErr);
+          }
+        }, 300000);
+
+        // ==================================================
+        // RESPONSE
+        // ==================================================
+        return res.status(201).json({
+          success: true,
+          message: "Donation created successfully.",
+          donation,
+        });
+      } catch (error) {
+        console.error("Create Donation Error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to create donation.",
+          error: error.message,
         });
       }
-    } catch (notifErr) {
-      console.error(
-        "Priority notification error:",
-        notifErr
-      );
-    }
-
-    // ==================================================
-    // 5-MINUTES DELAYED PUBLIC BROADCAST TO ALL NGOS (setTimeout)
-    // ==================================================
-    // ৫ মিনিট (৩০০০০০ মিলি সেকেন্ড) পর সব এনজিওর পাবলিক লিস্টে যাবে
-    setTimeout(() => {
-      try {
-        const io = getIO();
-        if (io) {
-          io.to(rooms.ngos()).emit("donation:new", donation);
-        }
-      } catch (delayErr) {
-        console.error("Delayed public broadcast error:", delayErr);
-      }
-    }, 300000);
-
-    // ==================================================
-    // RESPONSE
-    // ==================================================
-    return res.status(201).json({
-      success: true,
-      message: "Donation created successfully.",
-      donation,
-    });
-  } catch (error) {
-    console.error("Create Donation Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to create donation.",
-      error: error.message,
-    });
-  }
-};
+    };
     // ==========================================
     // DIRECT BODY FALLBACK
     // ==========================================
@@ -2310,120 +2310,276 @@ const getDonorDashboard = async (
       return partner;
     });
 
-    // ==================================================
-    // FOOD CATEGORIES
-    // ==================================================
+ // ==================================================
+// TOP DONATED FOOD TYPES
+// Based on actual foodType from database
+// Only completed donations are counted.
+// ==================================================
 
-    const categoryMap = new Map();
+const categoryMap = new Map();
 
-    completedDonationList.forEach((donation) => {
-      const category = (
-        donation.foodCategory ||
-        donation.foodType ||
-        "Other"
-      ).trim();
+completedDonationList.forEach((donation) => {
+  // Use foodType instead of foodCategory
+  const foodType = String(
+    donation.foodType || ""
+  ).trim();
 
-      if (!categoryMap.has(category)) {
-        categoryMap.set(category, {
-          name: category,
-          count: 0,
-          meals: 0,
-          quantity: 0,
-        });
-      }
+  // Ignore empty foodType
+  if (!foodType) {
+    return;
+  }
 
-      const categoryData =
-        categoryMap.get(category);
+  // Normalize category key to avoid duplicate entries
+  // Example: Rice, rice, RICE = same category
+  const categoryKey = foodType.toLowerCase();
 
-      categoryData.count += 1;
-
-      categoryData.quantity +=
-        Number(donation.quantity) || 0;
-
-      const estimatedMeals = Number(
-        donation.estimatedMeals
-      );
-
-      if (
-        !Number.isNaN(estimatedMeals) &&
-        estimatedMeals >= 0
-      ) {
-        categoryData.meals += estimatedMeals;
-      } else {
-        categoryData.meals +=
-          Math.floor(
-            (Number(donation.quantity) || 0) * 4
-          );
-      }
+  if (!categoryMap.has(categoryKey)) {
+    categoryMap.set(categoryKey, {
+      name: foodType,
+      count: 0,
+      quantity: 0,
+      meals: 0,
     });
+  }
 
-    // ==================================================
-    // TOTAL CATEGORY MEALS
-    // ==================================================
+  const categoryData = categoryMap.get(categoryKey);
 
-    const totalCategoryMeals = Array.from(
-      categoryMap.values()
-    ).reduce(
-      (total, category) =>
-        total + category.meals,
-      0
+  // Total donations of this food type
+  categoryData.count += 1;
+
+  // Total donated quantity in KG
+  categoryData.quantity +=
+    Number(donation.quantity) || 0;
+
+  // Meals calculation
+  const estimatedMeals = Number(
+    donation.estimatedMeals
+  );
+
+  if (
+    Number.isFinite(estimatedMeals) &&
+    estimatedMeals >= 0
+  ) {
+    categoryData.meals += estimatedMeals;
+  } else {
+    categoryData.meals += Math.floor(
+      (Number(donation.quantity) || 0) * 4
     );
+  }
+});
+
+// ==================================================
+// TOTAL DONATED QUANTITY
+// ==================================================
+
+const totalCategoryQuantity = Array.from(
+  categoryMap.values()
+).reduce(
+  (total, category) => total + category.quantity,
+  0
+);
+
+// ==================================================
+// FINAL TOP 5 FOOD TYPES
+// ==================================================
+
+const categories = Array.from(
+  categoryMap.values()
+)
+  .map((category) => {
+    const percent =
+      totalCategoryQuantity > 0
+        ? (
+            (category.quantity /
+              totalCategoryQuantity) *
+            100
+          ).toFixed(1)
+        : 0;
+
+    return {
+      name: category.name,
+
+      count: category.count,
+
+      quantity: Number(
+        category.quantity.toFixed(2)
+      ),
+
+      meals: Math.round(category.meals),
+
+      percent: Number(percent),
+    };
+  })
+  .sort(
+    (a, b) => b.quantity - a.quantity
+  )
+  .slice(0, 5);
+
 
     // ==================================================
-    // FINAL CATEGORY DATA
+    // RESEARCH-BASED ENVIRONMENTAL IMPACT
+    // Only successfully completed donations are counted.
+    // Quantity is measured in KG.
     // ==================================================
 
-    const categories = Array.from(
-      categoryMap.values()
-    )
-      .map((category) => {
-        const percent =
-          totalCategoryMeals > 0
-            ? (
-              (category.meals /
-                totalCategoryMeals) *
-              100
-            ).toFixed(1)
-            : 0;
+    // --------------------------------------------------
+    // 1. CARBON EMISSIONS AVOIDED
+    // Source: US EPA WARM Food Donation Guidance
+    //
+    // Low-end estimate = 0.54 MTCO2e / US short ton
+    // 1 US short ton = 907.18474 KG
+    // EPA donation loss assumption = 3%
+    // --------------------------------------------------
 
-        return {
-          name: category.name,
-          count: category.count,
-          meals: category.meals,
+    const EPA_LOW_END_CO2_FACTOR = 0.54;
+    const KG_PER_US_SHORT_TON = 907.18474;
+    const DONATION_LOSS_RATE = 0.03;
 
-          quantity: Number(
-            category.quantity.toFixed(2)
-          ),
+    const carbonFactorPerKg =
+      (EPA_LOW_END_CO2_FACTOR * 1000) /
+      KG_PER_US_SHORT_TON;
 
-          percent: Number(percent),
-        };
-      })
-      .sort(
-        (a, b) => b.meals - a.meals
-      )
-      .slice(0, 5);
-
-    // ==================================================
-    // ENVIRONMENTAL IMPACT
-    // ==================================================
+    const effectiveDonatedFoodKg =
+      foodWasteDiverted * (1 - DONATION_LOSS_RATE);
 
     const carbonPrevented = Number(
       (
-        foodWasteDiverted * 2.5
+        effectiveDonatedFoodKg *
+        carbonFactorPerKg
       ).toFixed(2)
     );
+
+    // --------------------------------------------------
+    // 2. WATER FOOTPRINT
+    // Sources:
+    // Mekonnen & Hoekstra (2011, 2012)
+    // Global average water footprint values (L/KG)
+    //
+    // Only identifiable food products are included.
+    // Generic or mixed prepared dishes are excluded.
+    // --------------------------------------------------
+
+    const WATER_FOOTPRINT_FACTORS = [
+      {
+        pattern: /\b(beef|cow meat)\b/i,
+        factor: 15415,
+      },
+      {
+        pattern: /\b(chicken|poultry)\b/i,
+        factor: 4325,
+      },
+      {
+        pattern: /\b(milk)\b/i,
+        factor: 1020,
+      },
+      {
+        pattern: /\b(rice|paddy)\b/i,
+        factor: 3400,
+      },
+      {
+        pattern: /\b(cereal|wheat|grain)\b/i,
+        factor: 1644,
+      },
+      {
+        pattern: /\b(fruit|apple|banana|orange|mango)\b/i,
+        factor: 962,
+      },
+      {
+        pattern: /\b(vegetable|cabbage|tomato|potato|carrot)\b/i,
+        factor: 322,
+      },
+      {
+        pattern: /\b(bread)\b/i,
+        factor: 1300,
+      },
+      {
+        pattern: /\b(egg|eggs)\b/i,
+        factor: 3265,
+      },
+    ];
+
+    const getWaterFootprintFactor = (donation) => {
+      const foodName = String(
+        donation.foodName || ""
+      ).toLowerCase().trim();
+
+      const foodType = String(
+        donation.foodType || ""
+      ).toLowerCase().trim();
+
+      // Avoid assigning raw-food factors to prepared dishes.
+      const preparedDishPattern =
+        /\b(cooked|curry|biryani|fried|roasted|grilled|prepared|meal|leftover)\b/i;
+
+      if (
+        preparedDishPattern.test(foodName) ||
+        preparedDishPattern.test(foodType)
+      ) {
+        return null;
+      }
+
+      const searchableName =
+        `${foodName} ${foodType}`;
+
+      const matchedFactor =
+        WATER_FOOTPRINT_FACTORS.find((item) =>
+          item.pattern.test(searchableName)
+        );
+
+      return matchedFactor
+        ? matchedFactor.factor
+        : null;
+    };
+
+    let waterFootprintLitres = 0;
+    let waterFootprintCoverageKg = 0;
+    let waterUnclassifiedKg = 0;
+
+    completedDonationList.forEach((donation) => {
+      const quantity = Number(donation.quantity) || 0;
+
+      const waterFactor =
+        getWaterFootprintFactor(donation);
+
+      if (waterFactor !== null) {
+        waterFootprintLitres +=
+          quantity * waterFactor;
+
+        waterFootprintCoverageKg += quantity;
+      } else {
+        waterUnclassifiedKg += quantity;
+      }
+    });
+
+    waterFootprintLitres = Number(
+      waterFootprintLitres.toFixed(2)
+    );
+
+    waterFootprintCoverageKg = Number(
+      waterFootprintCoverageKg.toFixed(2)
+    );
+
+    waterUnclassifiedKg = Number(
+      waterUnclassifiedKg.toFixed(2)
+    );
+
+    // --------------------------------------------------
+    // 3. TREE SEQUESTRATION EQUIVALENT
+    // Source: US EPA Greenhouse Gas Equivalencies
+    //
+    // 0.060 metric ton CO2 per urban tree
+    // = 60 KG CO2 per tree (annual equivalent)
+    // --------------------------------------------------
+
+    const CO2_PER_URBAN_TREE_KG = 60;
 
     const treesEquivalent = Number(
       (
-        carbonPrevented / 21
+        carbonPrevented /
+        CO2_PER_URBAN_TREE_KG
       ).toFixed(2)
     );
 
-    const waterSaved = Number(
-      (
-        foodWasteDiverted * 1000
-      ).toFixed(2)
-    );
 
     // ==================================================
     // ANNUAL GOAL
@@ -2492,11 +2648,13 @@ const getDonorDashboard = async (
 
         treesEquivalent: treesEquivalent,
 
-        waterSaved: waterSaved,
+        waterFootprintLitres: waterFootprintLitres,
 
-        annualGoal: Number(
-          annualGoal.toFixed(1)
-        ),
+        waterFootprintCoverageKg: waterFootprintCoverageKg,
+
+        waterUnclassifiedKg: waterUnclassifiedKg,
+
+        annualGoal: Number(annualGoal.toFixed(1)),
 
         // RECENT DONATIONS
 
@@ -2606,7 +2764,7 @@ const listAvailableDonations = async (req, res) => {
 
       // যদি ডাটাবেজে একেবারেই কোঅর্ডিনেট না থাকে, তবে চিটাগাং শহরের বিভিন্ন পয়েন্টে ডাইনামিক পিন বসাবে
       if (!locLat || !locLng || isNaN(locLat) || isNaN(locLng)) {
-        locLat = 22.3567 + (index * 0.008); 
+        locLat = 22.3567 + (index * 0.008);
         locLng = 91.8197 + (index * 0.008);
       }
 
@@ -2631,11 +2789,11 @@ const listAvailableDonations = async (req, res) => {
       const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(userLat * (Math.PI / 180)) *
-          Math.cos(Number(locLat) * (Math.PI / 180)) *
-          Math.sin(dLon / 2) *
-          Math.sin(dLon / 2);
+        Math.cos(Number(locLat) * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      
+
       calculatedDist = Number((R * c * 1.35).toFixed(1));
 
       // সর্বনিম্ন লিমিট চেক
@@ -3559,6 +3717,249 @@ const assignDeliveryDriver = async (req, res) => {
   }
 };
 
+
+//Anlytics
+
+
+const getDonorNgoAnalytics = async (req, res) => {
+  try {
+    const { donorId } = req.params;
+
+    // Only the logged-in donor can access their own analytics
+    if (req.user._id.toString() !== donorId) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to access this analytics.",
+      });
+    }
+
+
+   
+    // Fetch only this donor's completed donations
+    const donations = await Donation.find({
+      donor: donorId,
+      pipelineStatus: "Completed",
+    })
+      .populate({
+        path: "selectedNgo",
+        select: "organizationName organizationId user",
+        populate: {
+          path: "user",
+          select: "name",
+        },
+      })
+      .populate({
+        path: "ngoRequest.requestedBy",
+        select: "organizationName organizationId user",
+        populate: {
+          path: "user",
+          select: "name",
+        },
+      })
+      .sort({ createdAt: -1 });
+
+    const ngoMap = new Map();
+
+    donations.forEach((donation) => {
+      // Selected NGO first, legacy field as fallback
+      const ngo =
+        donation.selectedNgo ||
+        donation.ngoRequest?.requestedBy;
+
+      if (!ngo?._id) return;
+
+      const ngoId = ngo._id.toString();
+
+      const quantity = Math.max(
+        0,
+        Number(donation.quantity) || 0
+      );
+
+      // Completion date
+      const completedDate =
+        donation.verification?.verifiedAt ||
+        donation.statusHistory?.find(
+          (item) => item.status === "Completed"
+        )?.changedAt ||
+        donation.updatedAt;
+
+      const date = new Date(completedDate);
+
+      if (Number.isNaN(date.getTime())) return;
+
+      if (!ngoMap.has(ngoId)) {
+        ngoMap.set(ngoId, {
+          ngoId,
+          ngoName:
+            ngo.organizationName ||
+            ngo.user?.name ||
+            ngo.organizationId ||
+            "NGO",
+
+          organizationId: ngo.organizationId || "",
+          totalReceivedKg: 0,
+          completedDonations: 0,
+          monthly: {},
+          yearly: {},
+          donations: [],
+        });
+      }
+
+      const partner = ngoMap.get(ngoId);
+
+      const year = date.getFullYear();
+      const month = date.getMonth();
+
+      partner.totalReceivedKg += quantity;
+      partner.completedDonations += 1;
+
+      // Monthly aggregation
+      const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
+
+      if (!partner.monthly[monthKey]) {
+        partner.monthly[monthKey] = {
+          year,
+          month: month + 1,
+          monthName: date.toLocaleString("en-US", {
+            month: "short",
+          }),
+          quantity: 0,
+          donations: 0,
+        };
+      }
+
+      partner.monthly[monthKey].quantity += quantity;
+      partner.monthly[monthKey].donations += 1;
+
+      // Yearly aggregation
+      if (!partner.yearly[year]) {
+        partner.yearly[year] = {
+          year,
+          quantity: 0,
+          donations: 0,
+        };
+      }
+
+      partner.yearly[year].quantity += quantity;
+      partner.yearly[year].donations += 1;
+
+      partner.donations.push({
+        donationId: donation.donationId,
+        foodName: donation.foodName,
+        foodType: donation.foodType,
+        quantity,
+        completedAt: date,
+      });
+    });
+
+    const ngoAnalytics = Array.from(ngoMap.values())
+      .map((ngo) => ({
+        ...ngo,
+        totalReceivedKg: Number(
+          ngo.totalReceivedKg.toFixed(2)
+        ),
+        monthly: Object.values(ngo.monthly).map((item) => ({
+          ...item,
+          quantity: Number(item.quantity.toFixed(2)),
+        })),
+        yearly: Object.values(ngo.yearly).map((item) => ({
+          ...item,
+          quantity: Number(item.quantity.toFixed(2)),
+        })),
+      }))
+      .sort(
+        (a, b) => b.totalReceivedKg - a.totalReceivedKg
+      );
+
+    // Overall monthly and yearly totals
+    const overallMonthly = {};
+    const overallYearly = {};
+
+    ngoAnalytics.forEach((ngo) => {
+      ngo.monthly.forEach((item) => {
+        const key = `${item.year}-${String(item.month).padStart(2, "0")}`;
+
+        if (!overallMonthly[key]) {
+          overallMonthly[key] = {
+            year: item.year,
+            month: item.month,
+            monthName: item.monthName,
+            quantity: 0,
+            donations: 0,
+          };
+        }
+
+        overallMonthly[key].quantity += item.quantity;
+        overallMonthly[key].donations += item.donations;
+      });
+
+      ngo.yearly.forEach((item) => {
+        if (!overallYearly[item.year]) {
+          overallYearly[item.year] = {
+            year: item.year,
+            quantity: 0,
+            donations: 0,
+          };
+        }
+
+        overallYearly[item.year].quantity += item.quantity;
+        overallYearly[item.year].donations += item.donations;
+      });
+    });
+
+    const monthlyTotals = Object.values(overallMonthly)
+      .sort((a, b) =>
+        a.year - b.year || a.month - b.month
+      );
+
+    const yearlyTotals = Object.values(overallYearly)
+      .sort((a, b) => a.year - b.year);
+
+    const topMonth = monthlyTotals.length
+      ? [...monthlyTotals].sort(
+          (a, b) => b.quantity - a.quantity
+        )[0]
+      : null;
+
+    const topYear = yearlyTotals.length
+      ? [...yearlyTotals].sort(
+          (a, b) => b.quantity - a.quantity
+        )[0]
+      : null;
+
+    const totalReceivedKg = ngoAnalytics.reduce(
+      (sum, ngo) => sum + ngo.totalReceivedKg,
+      0
+    );
+
+    return res.status(200).json({
+      success: true,
+      analytics: {
+        totalReceivedKg: Number(totalReceivedKg.toFixed(2)),
+        totalNgos: ngoAnalytics.length,
+        totalCompletedDonations: donations.length,
+
+        topNgo: ngoAnalytics[0] || null,
+        topMonth,
+        topYear,
+
+        monthlyTotals,
+        yearlyTotals,
+        ngoAnalytics,
+      },
+    });
+  } catch (error) {
+    console.error("Donor NGO Analytics Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch NGO analytics.",
+      error: error.message,
+    });
+  }
+};
+
+
 // ======================================================
 // EXPORTS
 // ======================================================
@@ -3577,4 +3978,5 @@ module.exports = {
   updateDonationStatus,
   getNgoDonations,
   assignDeliveryDriver,
+  getDonorNgoAnalytics,
 };

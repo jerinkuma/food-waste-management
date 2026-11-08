@@ -9,6 +9,7 @@ import {
   LogOut,
   MessageSquareText,
   MessageCircle,
+  Images,
 } from "lucide-react";
 
 import "./Sidebar.css";
@@ -42,6 +43,11 @@ const Sidebar = () => {
       title: "Donation History",
       icon: <History size={21} />,
       path: "/restaurant/donation-history",
+    },
+    {
+      title: "Distribution Proof",
+      icon: <Images size={21} />,
+      path: "/restaurant/distribution-proofs",
     },
     {
       title: "Analytics",

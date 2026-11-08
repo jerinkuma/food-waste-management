@@ -1,9 +1,30 @@
 
-import React, { useCallback, useEffect, useState } from "react";
-import { fetchDashboardStats } from "../../services/api";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  fetchAdvancedReports,
+} from "../../services/api";
 import "./Reports.css";
 
+const MONTHS = [
+  "January", "February", "March", "April",
+  "May", "June", "July", "August",
+  "September", "October", "November", "December",
+];
+
+const number = (value) => Number(value || 0).toLocaleString("en-US");
+
+const kg = (value) => `${Number(value || 0).toLocaleString("en-US", {
+  maximumFractionDigits: 2,
+})} kg`;
+
+const currencySafePercent = (value, total) =>
+  total > 0 ? Math.min((value / total) * 100, 100) : 0;
+
 const Reports = () => {
+  const currentYear = new Date().getFullYear();
+
+  const [year, setYear] = useState(currentYear);
+  const [month, setMonth] = useState("");
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -13,302 +34,544 @@ const Reports = () => {
       setLoading(true);
       setError("");
 
-      const response = await fetchDashboardStats();
-      const data = response?.data || response;
+      const data = await fetchAdvancedReports(
+        year,
+        month || null
+      );
 
-      if (data?.success === false) {
-        throw new Error(data.message || "Failed to load reports.");
+      if (!data?.success) {
+        throw new Error(data?.message || "Reports could not be loaded.");
       }
 
       setReport(data);
     } catch (err) {
-      console.error("Reports loading error:", err);
+      console.error("Advanced reports error:", err);
       setError(
         err.response?.data?.message ||
-          err.message ||
-          "Reports load kora jacche na."
+        err.message ||
+        "Unable to load reports."
       );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [year, month]);
 
   useEffect(() => {
     loadReports();
   }, [loadReports]);
 
-  const totalUsers = Number(report?.totalUsers) || 0;
-  const totalDonations = Number(report?.totalDonations) || 0;
-  const pendingDonations = Number(report?.pendingDonations) || 0;
-  const otherDonations = Math.max(
-    totalDonations - pendingDonations,
+  const overall = report?.overall || {};
+  const donor = report?.donor || {};
+  const ngo = report?.ngo || {};
+
+  const monthly = report?.monthlyTrend || [];
+  const yearly = report?.yearlyTrend || [];
+  const statuses = report?.statusBreakdown || [];
+
+  const selectedPeriod = month
+    ? `${MONTHS[Number(month) - 1]} ${year}`
+    : `Full year ${year}`;
+
+  const maxMonthly = Math.max(
+    1,
+    ...monthly.map((item) => Number(item.quantity) || 0)
+  );
+
+  const maxYearly = Math.max(
+    1,
+    ...yearly.map((item) => Number(item.quantity) || 0)
+  );
+
+  const totalStatus = statuses.reduce(
+    (sum, item) => sum + Number(item.count || 0),
     0
   );
 
-  const availableFood =
-    report?.availableFood ?? "0 kg";
+  const exportCSV = () => {
+    if (!report) return;
 
-  const foodValue =
-    typeof availableFood === "number"
-      ? `${availableFood} kg`
-      : String(availableFood);
+    const rows = [
+      ["FeedLink Advanced Reports"],
+      ["Period", selectedPeriod],
+      [],
+      ["Platform Metric", "Value"],
+      ["Total Users", overall.totalUsers],
+      ["Total Donors", overall.totalDonors],
+      ["Total NGOs", overall.totalNgos],
+      ["Total Donations", overall.totalDonations],
+      ["Food Donated (kg)", overall.totalFoodDonated],
+      ["Food Received (kg)", overall.totalFoodReceived],
+      ["Food Distributed (kg)", overall.totalFoodDistributed],
+      [],
+      ["Monthly Trend"],
+      ["Month", "Donations", "Quantity (kg)", "Completed"],
+      ...monthly.map((item) => [
+        item.label,
+        item.donations,
+        item.quantity,
+        item.completed,
+      ]),
+      [],
+      ["Yearly Trend"],
+      ["Year", "Donations", "Quantity (kg)", "Completed"],
+      ...yearly.map((item) => [
+        item.year,
+        item.donations,
+        item.quantity,
+        item.completed,
+      ]),
+    ];
 
-  const statusBars = [
-    {
-      label: "Pending Donations",
-      value: pendingDonations,
-      className: "pending",
-      color: "#e6a23c",
-    },
-    {
-      label: "Other Donations",
-      value: otherDonations,
-      className: "other",
-      color: "#26966b",
-    },
-  ];
+    const csv = rows
+      .map((row) =>
+        row.map((cell) => {
+          const value = String(cell ?? "");
+          return `"${value.replace(/"/g, '""')}"`;
+        }).join(",")
+      )
+      .join("\n");
 
-  const recentActivities = Array.isArray(report?.recentActivities)
-    ? report.recentActivities
-    : [];
-
-  const formatDate = (date) => {
-    if (!date) return "Date unavailable";
-
-    const parsedDate = new Date(date);
-
-    if (Number.isNaN(parsedDate.getTime())) {
-      return "Date unavailable";
-    }
-
-    return parsedDate.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
+    const blob = new Blob(["\uFEFF" + csv], {
+      type: "text/csv;charset=utf-8;",
     });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `feedlink-reports-${year}${month ? `-${month}` : ""}.csv`;
+    link.click();
+
+    URL.revokeObjectURL(url);
   };
+
+  const maxDonor = Math.max(
+    1,
+    ...(donor.topPerformers || []).map((item) => item.quantity || 0)
+  );
+
+  const maxNgo = Math.max(
+    1,
+    ...(ngo.topPerformers || []).map((item) => item.completedQuantity || 0)
+  );
 
   return (
     <div className="page reports-page">
-      <div className="reports-heading">
+      <div className="reports-hero">
         <div>
-          <span className="reports-eyebrow">FEEDLINK ADMINISTRATION</span>
-          <h1>
-            <span className="page-icon">📈</span> Reports & Analytics
-          </h1>
-          <p className="reports-description">
-            Monitor donations, platform users and food distribution.
+          <span className="reports-eyebrow">
+            FEEDLINK • ADMIN INTELLIGENCE
+          </span>
+
+          <h1>Reports & Analytics</h1>
+
+          <p>
+            Monitor food donations, donor contributions and NGO
+            distribution performance.
           </p>
         </div>
 
-        <button
-          type="button"
-          className="reports-refresh-btn"
-          onClick={loadReports}
-          disabled={loading}
-        >
-          <span className={loading ? "refresh-icon spinning" : "refresh-icon"}>
-            ↻
-          </span>
-          {loading ? "Loading..." : "Refresh Reports"}
-        </button>
+        <div className="reports-actions">
+          <button
+            type="button"
+            className="report-export-btn"
+            onClick={exportCSV}
+            disabled={!report || loading}
+          >
+            ↓ Export CSV
+          </button>
+
+          <button
+            type="button"
+            className="report-refresh-btn"
+            onClick={loadReports}
+            disabled={loading}
+          >
+            ↻ {loading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
       </div>
 
+      <section className="report-filter-panel">
+        <div>
+          <span className="filter-caption">REPORT PERIOD</span>
+          <h3>{selectedPeriod}</h3>
+          <p>All figures are calculated from database records.</p>
+        </div>
+
+        <div className="report-filter-controls">
+          <label>
+            <span>Year</span>
+            <select
+              value={year}
+              onChange={(event) => setYear(Number(event.target.value))}
+            >
+              {Array.from({ length: 7 }, (_, index) => currentYear - 5 + index)
+                .reverse()
+                .map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Month</span>
+            <select
+              value={month}
+              onChange={(event) => setMonth(event.target.value)}
+            >
+              <option value="">All months</option>
+              {MONTHS.map((item, index) => (
+                <option key={item} value={index + 1}>{item}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </section>
+
       {error && (
-        <div className="reports-error" role="alert">
-          <span>⚠️</span>
-          <div>
-            <strong>Unable to load reports</strong>
-            <p>{error}</p>
-            <button type="button" onClick={loadReports}>
-              Try Again
-            </button>
-          </div>
+        <div className="reports-error">
+          <strong>Unable to load analytics</strong>
+          <p>{error}</p>
+          <button onClick={loadReports}>Try again</button>
         </div>
       )}
 
       {loading && !report ? (
         <div className="reports-loading">
           <span className="reports-spinner" />
-          <p>Loading your latest report data...</p>
+          <p>Loading live analytics...</p>
         </div>
       ) : report ? (
         <>
-          
+          <div className="report-section-heading">
+            <div>
+              <span>PLATFORM OVERVIEW</span>
+              <h2>Performance at a glance</h2>
+            </div>
+            <small>{selectedPeriod}</small>
+          </div>
 
-          <div className="reports-content-grid">
-            <section className="reports-panel">
-              <div className="reports-panel-heading">
+          <div className="report-kpi-grid">
+            <KpiCard
+              icon="👥"
+              label="Total Users"
+              value={number(overall.totalUsers)}
+              note={`${number(overall.totalDonors)} Donors • ${number(overall.totalNgos)} NGOs`}
+              color="green"
+            />
+
+            <KpiCard
+              icon="🍱"
+              label="Total Donations"
+              value={number(overall.totalDonations)}
+              note="Donation records in selected period"
+              color="blue"
+            />
+
+            <KpiCard
+              icon="🌿"
+              label="Food Donated"
+              value={kg(overall.totalFoodDonated)}
+              note="Donor contribution"
+              color="orange"
+            />
+
+            <KpiCard
+              icon="🚚"
+              label="Food Distributed"
+              value={kg(overall.totalFoodDistributed)}
+              note={`${number(overall.completedDonations)} completed records`}
+              color="purple"
+            />
+          </div>
+
+          <div className="report-section-heading">
+            <div>
+              <span>ORGANIZATION PERFORMANCE</span>
+              <h2>Donor & NGO analytics</h2>
+            </div>
+          </div>
+
+          <div className="report-role-grid">
+            <section className="report-panel role-panel donor-panel">
+              <div className="role-panel-heading">
+                <div className="role-icon">🍽️</div>
                 <div>
-                  <h2>Donation Overview</h2>
-                  <p>Current donation record breakdown</p>
+                  <span>DONOR PERFORMANCE</span>
+                  <h3>Donor Analytics</h3>
                 </div>
-                <span className="panel-icon">📊</span>
               </div>
 
-              <div className="donation-overview-total">
-                <div>
-                  <span>Total records</span>
-                  <strong>{totalDonations.toLocaleString()}</strong>
-                </div>
-                <span className="overview-caption">
-                  All-time overview
-                </span>
+              <div className="role-metrics">
+                <Metric label="Registered Donors" value={number(donor.registered)} />
+                <Metric label="Donations Created" value={number(donor.donations)} />
+                <Metric label="Food Donated" value={kg(donor.quantity)} />
+                <Metric label="Completed Donations" value={number(donor.completed)} />
               </div>
 
-              <div className="report-bars">
-                {statusBars.map((item) => {
-                  const percentage =
-                    totalDonations > 0
-                      ? Math.min(
-                          (item.value / totalDonations) * 100,
-                          100
-                        )
-                      : 0;
+              <div className="performer-heading">
+                <strong>Top Donors</strong>
+                <span>By food contribution</span>
+              </div>
+
+              <PerformerList
+                items={donor.topPerformers || []}
+                valueKey="quantity"
+                maxValue={maxDonor}
+                empty="No donor contributions in this period."
+              />
+            </section>
+
+            <section className="report-panel role-panel ngo-panel">
+              <div className="role-panel-heading">
+                <div className="role-icon">🏢</div>
+                <div>
+                  <span>NGO PERFORMANCE</span>
+                  <h3>NGO Analytics</h3>
+                </div>
+              </div>
+
+              <div className="role-metrics">
+                <Metric label="Registered NGOs" value={number(ngo.registered)} />
+                <Metric label="Received Donations" value={number(ngo.donations)} />
+                <Metric label="Food Received" value={kg(ngo.quantity)} />
+                <Metric label="Food Distributed" value={kg(ngo.completedQuantity)} />
+              </div>
+
+              <div className="performer-heading">
+                <strong>Top NGOs</strong>
+                <span>By completed food distribution</span>
+              </div>
+
+              <PerformerList
+                items={ngo.topPerformers || []}
+                valueKey="completedQuantity"
+                maxValue={maxNgo}
+                empty="No NGO distribution in this period."
+              />
+            </section>
+          </div>
+
+          <div className="report-section-heading">
+            <div>
+              <span>DONATION TRENDS</span>
+              <h2>Monthly & yearly performance</h2>
+            </div>
+          </div>
+
+          <section className="report-panel chart-panel">
+            <div className="chart-heading">
+              <div>
+                <h3>Monthly food donation trend</h3>
+                <p>Food quantity recorded in each month of {year}</p>
+              </div>
+              <span className="chart-unit">KG</span>
+            </div>
+
+            <div className="monthly-chart">
+              {monthly.map((item) => {
+                const height = currencySafePercent(item.quantity, maxMonthly);
+
+                return (
+                  <div className="monthly-chart-column" key={item.month}>
+                    <div className="monthly-chart-value">
+                      {item.quantity > 0 ? number(item.quantity) : ""}
+                    </div>
+
+                    <div className="monthly-chart-track">
+                      <div
+                        className={`monthly-chart-bar ${
+                          Number(month) === item.month ? "selected" : ""
+                        }`}
+                        style={{ height: `${Math.max(height, item.quantity ? 3 : 0)}%` }}
+                        title={`${item.label}: ${kg(item.quantity)}`}
+                      />
+                    </div>
+
+                    <span>{item.label}</span>
+                    <small>{number(item.donations)} donations</small>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="report-panel chart-panel yearly-panel">
+            <div className="chart-heading">
+              <div>
+                <h3>Yearly growth overview</h3>
+                <p>Five-year comparison of food donation quantities</p>
+              </div>
+              <span className="chart-unit">KG</span>
+            </div>
+
+            <div className="yearly-chart">
+              {yearly.map((item) => {
+                const height = currencySafePercent(item.quantity, maxYearly);
+
+                return (
+                  <div className="yearly-chart-column" key={item.year}>
+                    <strong>{number(item.quantity)}</strong>
+                    <div className="yearly-chart-track">
+                      <div
+                        className="yearly-chart-bar"
+                        style={{ height: `${Math.max(height, item.quantity ? 3 : 0)}%` }}
+                      />
+                    </div>
+                    <span>{item.year}</span>
+                    <small>{number(item.donations)} donations</small>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <div className="report-bottom-grid">
+            <section className="report-panel">
+              <div className="chart-heading">
+                <div>
+                  <h3>Donation status breakdown</h3>
+                  <p>Distribution of donation pipeline statuses</p>
+                </div>
+              </div>
+
+              <div className="status-total">
+                <strong>{number(totalStatus)}</strong>
+                <span>Total records</span>
+              </div>
+
+              <div className="status-list">
+                {statuses.map((item) => {
+                  const percent = currencySafePercent(item.count, totalStatus);
 
                   return (
-                    <div className="report-bar-item" key={item.className}>
-                      <div className="report-bar-label">
-                        <span>
-                          <i
-                            className={`report-legend-dot ${item.className}`}
-                          />
-                          {item.label}
-                        </span>
-                        <strong>
-                          {item.value.toLocaleString()}{" "}
-                          <small>
-                            ({percentage.toFixed(1)}%)
-                          </small>
-                        </strong>
+                    <div className="status-item" key={item.status}>
+                      <div>
+                        <span>{item.status}</span>
+                        <strong>{number(item.count)} ({percent.toFixed(1)}%)</strong>
                       </div>
-
-                      <div
-                        className="report-bar-track"
-                        role="progressbar"
-                        aria-label={item.label}
-                        aria-valuenow={Math.round(percentage)}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                      >
+                      <div className="status-track">
                         <div
-                          className={`report-bar-fill ${item.className}`}
-                          style={{ width: `${percentage}%` }}
+                          className={`status-fill status-${item.status
+                            .toLowerCase()
+                            .replaceAll(" ", "-")}`}
+                          style={{ width: `${percent}%` }}
                         />
                       </div>
                     </div>
                   );
                 })}
               </div>
-
-              <p className="report-chart-note">
-                “Other Donations” means records that are not currently
-                marked Pending. It does not necessarily mean all have
-                been completed.
-              </p>
             </section>
 
-            <section className="reports-panel">
-              <div className="reports-panel-heading">
+            <section className="report-panel comparison-panel">
+              <div className="chart-heading">
                 <div>
-                  <h2>Report Summary</h2>
-                  <p>Key platform indicators</p>
+                  <h3>Donor vs NGO comparison</h3>
+                  <p>Food contribution and distribution</p>
                 </div>
-                <span className="panel-icon">📋</span>
               </div>
 
-              <div className="summary-list">
-                <div className="summary-row">
-                  <span className="summary-icon">👥</span>
-                  <div>
-                    <strong>Registered Users</strong>
-                    <p>Users across all roles</p>
-                  </div>
-                  <b>{totalUsers.toLocaleString()}</b>
-                </div>
+              <ComparisonRow
+                label="Donor contribution"
+                value={overall.totalFoodDonated}
+                max={Math.max(1, overall.totalFoodDonated, overall.totalFoodReceived)}
+                color="donor"
+              />
 
-                <div className="summary-row">
-                  <span className="summary-icon">🍱</span>
-                  <div>
-                    <strong>Total Donations</strong>
-                    <p>All recorded donations</p>
-                  </div>
-                  <b>{totalDonations.toLocaleString()}</b>
-                </div>
+              <ComparisonRow
+                label="NGO received food"
+                value={overall.totalFoodReceived}
+                max={Math.max(1, overall.totalFoodDonated, overall.totalFoodReceived)}
+                color="ngo"
+              />
 
-                <div className="summary-row">
-                  <span className="summary-icon">⏳</span>
-                  <div>
-                    <strong>Pending Donations</strong>
-                    <p>Require further processing</p>
-                  </div>
-                  <b>{pendingDonations.toLocaleString()}</b>
-                </div>
+              <ComparisonRow
+                label="NGO distributed food"
+                value={overall.totalFoodDistributed}
+                max={Math.max(1, overall.totalFoodDonated, overall.totalFoodReceived)}
+                color="distributed"
+              />
 
-                <div className="summary-row">
-                  <span className="summary-icon">🌿</span>
-                  <div>
-                    <strong>Food Distributed</strong>
-                    <p>Quantity from completed records</p>
-                  </div>
-                  <b>{foodValue}</b>
-                </div>
+              <div className="comparison-note">
+                Donor contribution is based on created donations. NGO
+                distribution is based on completed donations assigned to an NGO.
               </div>
             </section>
           </div>
 
-          <section className="reports-panel reports-activity-panel">
-            <div className="reports-panel-heading">
-              <div>
-                <h2>Recent Donation Activity</h2>
-                <p>Latest donation activity from the database</p>
-              </div>
-              <span className="panel-icon">🕒</span>
-            </div>
-
-            {recentActivities.length > 0 ? (
-              <div className="report-activity-list">
-                {recentActivities.map((activity, index) => (
-                  <div
-                    className="report-activity-row"
-                    key={activity.id || index}
-                  >
-                    <span className="activity-dot">🍽️</span>
-                    <div className="activity-description">
-                      <p>{activity.text || "Donation activity recorded"}</p>
-                      <span>
-                        {formatDate(activity.time)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="reports-empty">
-                <span>📭</span>
-                <strong>No recent activity</strong>
-                <p>Recent donation activities will appear here.</p>
-              </div>
-            )}
-          </section>
-
-          <p className="reports-footer-note">
-            Report figures are loaded from the FeedLink backend. Monthly
-            comparisons and NGO-specific totals are not included until the
-            backend provides those metrics.
-          </p>
-        </>
-      ) : (
-        !error && (
-          <div className="reports-empty">
-            <span>📊</span>
-            <strong>No report data available</strong>
-            <p>Try refreshing the report.</p>
+          <div className="reports-footer">
+            <span>FEEDLINK ANALYTICS</span>
+            <span>Report period: {selectedPeriod}</span>
           </div>
-        )
-      )}
+        </>
+      ) : null}
     </div>
   );
 };
+
+const KpiCard = ({ icon, label, value, note, color }) => (
+  <div className={`report-kpi-card kpi-${color}`}>
+    <div className="kpi-top">
+      <span className="kpi-icon">{icon}</span>
+      <span className="kpi-dot" />
+    </div>
+    <span className="kpi-label">{label}</span>
+    <strong>{value}</strong>
+    <small>{note}</small>
+  </div>
+);
+
+const Metric = ({ label, value }) => (
+  <div className="role-metric">
+    <span>{label}</span>
+    <strong>{value}</strong>
+  </div>
+);
+
+const PerformerList = ({ items, valueKey, maxValue, empty }) => {
+  if (!items.length) {
+    return <div className="performer-empty">{empty}</div>;
+  }
+
+  return (
+    <div className="performer-list">
+      {items.map((item, index) => (
+        <div className="performer-item" key={item.id}>
+          <div className="performer-rank">{index + 1}</div>
+
+          <div className="performer-info">
+            <strong>{item.name}</strong>
+            <div className="performer-track">
+              <div
+                style={{
+                  width: `${currencySafePercent(item[valueKey], maxValue)}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          <b>{kg(item[valueKey])}</b>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const ComparisonRow = ({ label, value, max, color }) => (
+  <div className="comparison-row">
+    <div>
+      <span>{label}</span>
+      <strong>{kg(value)}</strong>
+    </div>
+    <div className="comparison-track">
+      <div
+        className={`comparison-fill ${color}`}
+        style={{ width: `${currencySafePercent(value, max)}%` }}
+      />
+    </div>
+  </div>
+);
 
 export default Reports;

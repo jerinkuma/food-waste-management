@@ -134,10 +134,10 @@ const Dashboard = () => {
             stats.rejected || 0,
 
           carbonPrevented: 0,
-
           treesEquivalent: 0,
-
-          waterSaved: 0,
+          waterFootprintLitres: 0,
+          waterFootprintCoverageKg: 0,
+          waterUnclassifiedKg: 0,
 
           annualGoal: 0,
 
@@ -598,32 +598,15 @@ const Dashboard = () => {
       <div className="mt-8">
 
         <EnvironmentalImpact
-          carbonPrevented={
-            dashboard.carbonPrevented ?? 0
+          carbonPrevented={dashboard.carbonPrevented ?? 0}
+          foodWasteDiverted={dashboard.foodWasteDiverted ?? 0}
+          treesEquivalent={dashboard.treesEquivalent ?? 0}
+          waterFootprintLitres={dashboard.waterFootprintLitres ?? 0}
+          waterFootprintCoverageKg={
+            dashboard.waterFootprintCoverageKg ?? 0
           }
-
-          foodWasteDiverted={
-            dashboard.foodWasteDiverted ?? 0
-          }
-
-          mealsServed={
-            dashboard.mealsServed ?? 0
-          }
-
-          treesEquivalent={
-            dashboard.treesEquivalent ?? 0
-          }
-
-          waterSaved={
-            dashboard.waterSaved ?? 0
-          }
-
-          /*
-           * Backend now returns annualGoal
-           * as percentage progress (0-100).
-           */
-          annualGoal={
-            dashboard.annualGoal ?? 0
+          waterUnclassifiedKg={
+            dashboard.waterUnclassifiedKg ?? 0
           }
         />
 
@@ -650,9 +633,7 @@ const Dashboard = () => {
       <div className="mt-8">
 
         <TopDonatedCategories
-          categories={
-            dashboard.categories || []
-          }
+          categories={dashboard.categories || []}
         />
 
       </div>

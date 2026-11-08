@@ -176,52 +176,205 @@ const getNgoCompletedDonations = async (req, res) => {
 
 const submitDistributionProof = async (req, res) => {
   try {
-    const { ngoId, restaurantId, donationId, description, ngoName } = req.body;
+    const { restaurantId, donationId, description } = req.body;
+
+    // Logged-in NGO বের করা
+    const ngo = await Ngo.findOne({
+      user: req.user._id,
+    }).populate("user", "name");
+
+    if (!ngo) {
+      return res.status(404).json({
+        success: false,
+        message: "NGO profile not found.",
+      });
+    }
+
     let imageUrls = [];
-    
+
     if (req.files && req.files.images) {
       let uploadedFiles = req.files.images;
+
       if (!Array.isArray(uploadedFiles)) {
         uploadedFiles = [uploadedFiles];
       }
 
       for (const file of uploadedFiles) {
-        const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-        const uploadPath = path.join(__dirname, "../uploads/", fileName);
+        const fileName = `${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+
+        const uploadPath = path.join(
+          __dirname,
+          "../uploads/",
+          fileName
+        );
+
         await file.mv(uploadPath);
+
         imageUrls.push(`/uploads/${fileName}`);
       }
     }
 
     if (imageUrls.length === 0) {
-      return res.status(400).json({ success: false, message: "Please upload at least one image file." });
+      return res.status(400).json({
+        success: false,
+        message: "Please upload at least one image file.",
+      });
     }
 
     const newDistribution = new Distribution({
-      ngoId: ngoId ? String(ngoId) : "unknown-ngo",
-      restaurantId: restaurantId ? String(restaurantId) : "manual-restaurant",
+      // NGO document-এর actual MongoDB _id
+      ngoId: ngo._id.toString(),
+
+      restaurantId: restaurantId
+        ? String(restaurantId)
+        : "manual-restaurant",
+
       donationId: donationId || `DIST-${Date.now()}`,
+
       description: description || "No description provided",
-      imageUrl: imageUrls[0], 
-      imageUrls: imageUrls    
+
+      imageUrl: imageUrls[0],
+      imageUrls: imageUrls,
     });
 
     await newDistribution.save();
 
-    return res.status(201).json({ 
-      success: true, 
-      message: 'Distribution proof submitted successfully!', 
-      data: newDistribution 
+    return res.status(201).json({
+      success: true,
+      message: "Distribution proof submitted successfully!",
+      data: newDistribution,
+      ngoName: ngo.user?.name || "NGO Partner",
+      ngoOrganizationId: ngo.organizationId,
     });
+
   } catch (error) {
     console.error("Submit Distribution Error:", error);
-    return res.status(500).json({ success: false, error: error.message });
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
+
+
+
+const getDonorDistributionProofs = async (req, res) => {
+  try {
+    const donorId = req.user._id.toString();
+
+    const proofs = await Distribution.find({
+      restaurantId: donorId,
+    }).sort({ createdAt: -1 });
+
+    const proofsWithNgoDetails = await Promise.all(
+      proofs.map(async (proof) => {
+        let ngo = null;
+
+        // 1. First try: NGO document ID
+        if (
+          proof.ngoId &&
+          mongoose.Types.ObjectId.isValid(proof.ngoId)
+        ) {
+          ngo = await Ngo.findById(proof.ngoId)
+            .populate("user", "name");
+
+          // 2. Legacy: NGO User ID
+          if (!ngo) {
+            ngo = await Ngo.findOne({
+              user: proof.ngoId,
+            }).populate("user", "name");
+          }
+        }
+
+        // 3. Fallback: Find NGO through related Donation
+        if (!ngo && proof.donationId) {
+          let donation = null;
+
+          if (
+            mongoose.Types.ObjectId.isValid(proof.donationId)
+          ) {
+            donation = await Donation.findById(
+              proof.donationId
+            );
+          }
+
+          // Also support human-readable donationId
+          if (!donation) {
+            donation = await Donation.findOne({
+              donationId: proof.donationId,
+            });
+          }
+
+          if (donation) {
+            // First preference: selected NGO
+            if (donation.selectedNgo) {
+              ngo = await Ngo.findById(
+                donation.selectedNgo
+              ).populate("user", "name");
+            }
+
+            // Second preference: accepted NGO request
+            if (!ngo && donation.ngoRequests?.length) {
+              const acceptedRequest =
+                donation.ngoRequests.find(
+                  (request) =>
+                    request.status?.toLowerCase() === "accepted"
+                );
+
+              if (acceptedRequest?.requestedBy) {
+                ngo = await Ngo.findById(
+                  acceptedRequest.requestedBy
+                ).populate("user", "name");
+              }
+            }
+
+            // Third preference: legacy NGO request
+            if (
+              !ngo &&
+              donation.ngoRequest?.requestedBy
+            ) {
+              ngo = await Ngo.findById(
+                donation.ngoRequest.requestedBy
+              ).populate("user", "name");
+            }
+          }
+        }
+
+        return {
+          ...proof.toObject(),
+
+          ngoName: ngo?.user?.name || "NGO Partner",
+
+          ngoOrganizationId:
+            ngo?.organizationId || "Not available",
+        };
+      })
+    );
+
+    return res.status(200).json({
+      success: true,
+      proofs: proofsWithNgoDetails,
+    });
+
+  } catch (error) {
+    console.error(
+      "Get Donor Distribution Proofs Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch distribution proofs.",
+    });
+  }
+};
+
 
 module.exports = {
   getNgoProfile,
   getNgoStats,
   getNgoCompletedDonations,
   submitDistributionProof,
+  getDonorDistributionProofs,
 };

@@ -13,6 +13,7 @@ const {
 
   getDonorDonations,
   getDonorDashboard,
+  getDonorNgoAnalytics,
 
   listAvailableDonations,
   acceptDonation,
@@ -166,6 +167,17 @@ router.get(
   getDonationById
 );
 
+
+// ======================================================
+// DONOR NGO ANALYTICS
+// DONOR ONLY
+// ======================================================
+router.get(
+  "/donor/:donorId/ngo-analytics",
+  protect,
+  restrictTo("donor"),
+  getDonorNgoAnalytics
+);
 
 // ======================================================
 

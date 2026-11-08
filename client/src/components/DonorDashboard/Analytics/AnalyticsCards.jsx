@@ -5,69 +5,153 @@ import {
   Clock3,
   Target,
   Award,
+  Weight,
+  XCircle,
 } from "lucide-react";
+
+// =========================================
+// NORMALIZE DONATION STATUS
+// =========================================
+
+const getDonationStatus = (donation) => {
+  const pipeline = String(donation?.pipelineStatus || "")
+    .trim()
+    .toLowerCase();
+
+  const legacy = String(donation?.status || "")
+    .trim()
+    .toLowerCase();
+
+  // Prefer pipelineStatus when available.
+  if (pipeline) {
+    if (pipeline === "completed") return "completed";
+    if (pipeline === "accepted") return "accepted";
+    if (pipeline === "out for delivery") return "outForDelivery";
+    if (pipeline === "pending") return "pending";
+    if (pipeline === "rejected") return "rejected";
+  }
+
+  // Fallback to legacy status.
+  if (legacy === "food picked up" || legacy === "completed") {
+    return "completed";
+  }
+
+  if (
+    legacy === "ngo accepted" ||
+    legacy === "ngo requested" ||
+    legacy === "accepted"
+  ) {
+    return "accepted";
+  }
+
+  if (legacy === "out for delivery") {
+    return "outForDelivery";
+  }
+
+  if (
+    legacy === "waiting for ngo acceptance" ||
+    legacy === "pending"
+  ) {
+    return "pending";
+  }
+
+  if (legacy === "rejected") {
+    return "rejected";
+  }
+
+  return "pending";
+};
 
 const AnalyticsCards = ({ donations = [], loading }) => {
   const total = donations.length;
 
-  const completed = donations.filter(
-    (d) =>
-      d.status === "Food Picked Up" ||
-      d.pipelineStatus === "Completed"
-  ).length;
+  const totalQuantity = donations.reduce(
+    (sum, donation) =>
+      sum + Math.max(0, Number(donation.quantity) || 0),
+    0
+  );
 
-  const accepted = donations.filter(
-    (d) =>
-      d.status === "NGO Accepted" ||
-      d.status === "NGO Requested" ||
-      d.pipelineStatus === "Accepted"
-  ).length;
+  const statusCounts = {
+    completed: 0,
+    accepted: 0,
+    outForDelivery: 0,
+    pending: 0,
+    rejected: 0,
+  };
 
-  const pending = donations.filter(
-    (d) =>
-      d.status === "Waiting for NGO Acceptance" &&
-      d.pipelineStatus !== "Accepted"
-  ).length;
+  donations.forEach((donation) => {
+    const status = getDonationStatus(donation);
+    statusCounts[status] += 1;
+  });
+
+  const completed = statusCounts.completed;
+  const accepted = statusCounts.accepted;
+  const pending = statusCounts.pending;
+  const rejected = statusCounts.rejected;
 
   const completionRate = total
-    ? Math.min((completed / total) * 100, 100).toFixed(1)
+    ? ((completed / total) * 100).toFixed(1)
     : "0.0";
+
+  // =========================================
+  // TOP DONATED FOOD TYPE
+  // =========================================
 
   const foodCounts = {};
 
-  donations.forEach((d) => {
+  donations.forEach((donation) => {
     const type =
-      typeof d.foodType === "string" && d.foodType.trim()
-        ? d.foodType.trim()
+      typeof donation.foodType === "string" &&
+      donation.foodType.trim()
+        ? donation.foodType.trim()
         : "Other";
 
-    foodCounts[type] = (foodCounts[type] || 0) + 1;
+    const normalizedType = type.toLowerCase();
+
+    if (!foodCounts[normalizedType]) {
+      foodCounts[normalizedType] = {
+        name: type,
+        count: 0,
+      };
+    }
+
+    foodCounts[normalizedType].count += 1;
   });
 
-  const topFood = Object.entries(foodCounts).sort(
-    (a, b) => b[1] - a[1]
+  const topFood = Object.values(foodCounts).sort(
+    (a, b) => b.count - a.count
   )[0];
 
   const cards = [
     {
       title: "Total Donations",
-      value: total,
-      description: "All donations created",
+      value: total.toLocaleString(),
+      description: "All donations in selected date range",
       icon: ClipboardList,
       iconBg: "bg-blue-50 dark:bg-blue-500/10",
       iconColor: "text-blue-600 dark:text-blue-400",
     },
     {
+      title: "Food Quantity",
+      value: `${totalQuantity.toLocaleString(undefined, {
+        maximumFractionDigits: 2,
+      })} KG`,
+      description: "Total donated food quantity",
+      icon: Weight,
+      iconBg: "bg-violet-50 dark:bg-violet-500/10",
+      iconColor: "text-violet-600 dark:text-violet-400",
+    },
+    {
       title: "Completed",
-      value: completed,
-      description: "Successfully completed",
+      value: completed.toLocaleString(),
+      description: "Successfully completed donations",
       icon: PackageCheck,
       iconBg: "bg-emerald-50 dark:bg-emerald-500/10",
       iconColor: "text-emerald-600 dark:text-emerald-400",
     },
     {
       title: "Accepted",
-      value: accepted,
+      value: accepted.toLocaleString(),
       description: "Accepted by NGOs",
       icon: CheckCircle2,
       iconBg: "bg-indigo-50 dark:bg-indigo-500/10",
@@ -75,18 +159,28 @@ const AnalyticsCards = ({ donations = [], loading }) => {
     },
     {
       title: "Pending",
-      value: pending,
+      value: pending.toLocaleString(),
       description: "Awaiting NGO response",
       icon: Clock3,
       iconBg: "bg-amber-50 dark:bg-amber-500/10",
       iconColor: "text-amber-600 dark:text-amber-400",
     },
+    {
+      title: "Rejected",
+      value: rejected.toLocaleString(),
+      description: "Rejected donations",
+      icon: XCircle,
+      iconBg: "bg-rose-50 dark:bg-rose-500/10",
+      iconColor: "text-rose-600 dark:text-rose-400",
+    },
   ];
 
   return (
     <div className="analytics-summary space-y-4 print:!space-y-2">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 print:!grid-cols-4 print:!gap-2">
+
+      {/* KPI CARDS */}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 print:!grid-cols-3 print:!gap-2">
         {cards.map((card) => {
           const Icon = card.icon;
 
@@ -102,10 +196,10 @@ const AnalyticsCards = ({ donations = [], loading }) => {
                   </p>
 
                   {loading ? (
-                    <div className="mt-2 h-7 w-12 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-700 print:hidden" />
+                    <div className="mt-2 h-7 w-16 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-700 print:hidden" />
                   ) : (
                     <h3 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 print:!mt-1 print:!text-xl">
-                      {card.value.toLocaleString()}
+                      {card.value}
                     </h3>
                   )}
                 </div>
@@ -130,9 +224,12 @@ const AnalyticsCards = ({ donations = [], loading }) => {
         })}
       </div>
 
-      {/* Performance Insights */}
+      {/* PERFORMANCE INSIGHTS */}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:!grid-cols-2 print:!gap-2">
-        {/* Completion Rate */}
+
+        {/* COMPLETION RATE */}
+
         <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6 print:!rounded-lg print:!border-slate-200 print:!bg-white print:!p-2 print:!shadow-none">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-3 print:!gap-2">
@@ -177,7 +274,8 @@ const AnalyticsCards = ({ donations = [], loading }) => {
           </div>
         </div>
 
-        {/* Top Donated Food */}
+        {/* TOP DONATED FOOD */}
+
         <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6 print:!rounded-lg print:!border-slate-200 print:!bg-white print:!p-2 print:!shadow-none">
           <div className="flex items-center gap-3 print:!gap-2">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-500/10 print:!h-7 print:!w-7">
@@ -192,7 +290,7 @@ const AnalyticsCards = ({ donations = [], loading }) => {
                 Top Donated Food
               </h3>
               <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500 print:text-[8px]">
-                Your most frequently donated category
+                Your most frequently donated food type
               </p>
             </div>
           </div>
@@ -202,11 +300,11 @@ const AnalyticsCards = ({ donations = [], loading }) => {
           ) : topFood ? (
             <div className="mt-4 flex items-end justify-between gap-3 print:!mt-2">
               <h3 className="truncate text-2xl font-bold text-slate-1000 dark:text-slate-100 print:text-base">
-                {topFood[0]}
+                {topFood.name}
               </h3>
 
               <span className="shrink-0 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 print:!px-2 print:!py-1 print:text-[8px]">
-                {topFood[1]} donations
+                {topFood.count} donations
               </span>
             </div>
           ) : (

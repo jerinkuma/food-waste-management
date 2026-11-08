@@ -16,8 +16,7 @@ const menuItems = [
     label: "Contact Messages",
     showUnread: true,
   },
-  { path: "/admin/reports", icon: "📈", label: "Reports" },
-  { path: "/admin/inventory", icon: "📦", label: "Inventory" },
+  { path: "/admin/reports", icon: "📈", label: "Analytics" },
   { path: "/admin/settings", icon: "👤", label: "Profile" },
 ];
 
@@ -40,7 +39,6 @@ const Sidebar = ({ mobileOpen = false, onClose }) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Fetch unread contact message count
   useEffect(() => {
     let isMounted = true;
 

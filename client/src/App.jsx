@@ -16,6 +16,7 @@ import Dashboard from "./pages/DonorDashboard/Dashboard";
 import AddDonation from "./pages/DonorDashboard/AddDonation";
 import DonationSuccess from "./pages/DonorDashboard/DonationSuccess";
 import DonationHistory from "./pages/DonorDashboard/DonationHistory";
+import DistributionProof from "./pages/DonorDashboard/DistributionProof.jsx";
 import Analytics from "./pages/DonorDashboard/Analytics";
 import NGOReviews from "./pages/DonorDashboard/NGOReviews";
 import Profile from "./pages/DonorDashboard/Profile";
@@ -51,7 +52,7 @@ import AdminDonations from "./pages/Admindashboard/Donations";
 import AdminOrphanages from "./pages/Admindashboard/Orphanages";
 import AdminFeedback from "./pages/Admindashboard/Feedback";
 import AdminReports from "./pages/Admindashboard/Reports";
-import AdminInventory from "./pages/Admindashboard/Inventory";
+
 import AdminSettings from "./pages/Admindashboard/Settings";
 import AdminContactMessages from "./pages/Admindashboard/ContactMessages";
 
@@ -113,11 +114,10 @@ function NGOLayout({
 }) {
   return (
     <div
-      className={`flex h-screen font-sans transition-colors duration-300 ${
-        themeMode === "dark"
-          ? "bg-[#0f172a] text-slate-100"
-          : "bg-[#F8FAFC] text-slate-800"
-      }`}
+      className={`flex h-screen font-sans transition-colors duration-300 ${themeMode === "dark"
+        ? "bg-[#0f172a] text-slate-100"
+        : "bg-[#F8FAFC] text-slate-800"
+        }`}
     >
       <NGOSidebar />
 
@@ -207,11 +207,10 @@ function NGOLayout({
         </main>
 
         <footer
-          className={`text-center py-3 text-[11px] border-t mt-auto transition-colors ${
-            themeMode === "dark"
-              ? "text-slate-500 border-slate-800"
-              : "text-slate-400 border-slate-200/60"
-          }`}
+          className={`text-center py-3 text-[11px] border-t mt-auto transition-colors ${themeMode === "dark"
+            ? "text-slate-500 border-slate-800"
+            : "text-slate-400 border-slate-200/60"
+            }`}
         >
           FeedLink NGO Portal, Chattogram · FeedLink © 2026
         </footer>
@@ -283,10 +282,7 @@ function AdminLayout() {
               element={<AdminReports />}
             />
 
-            <Route
-              path="inventory"
-              element={<AdminInventory />}
-            />
+            
 
             <Route
               path="settings"
@@ -397,11 +393,18 @@ function App() {
           element={<DonorFeedback />}
         />
 
+
+
         <Route
           path="/restaurant/profile"
           element={<Profile />}
         />
 
+
+        <Route
+          path="/restaurant/distribution-proofs"
+          element={<DistributionProof />}
+        />
         {/* ================= NGO ================= */}
         <Route
           path="/ngo/*"

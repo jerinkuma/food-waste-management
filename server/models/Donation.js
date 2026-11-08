@@ -373,7 +373,7 @@ const donationSchema = new mongoose.Schema(
     // FOOD VERIFICATION
     // =====================================
 
-    verification: {
+        verification: {
       scannedAt: {
         type: Date,
         default: null,
@@ -399,6 +399,22 @@ const donationSchema = new mongoose.Schema(
         default: "",
         trim: true,
       },
+    },
+
+    // =====================================
+    // REJECTION REASONS
+    // =====================================
+
+    donationReason: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    ngoAcceptanceReason: {
+      type: String,
+      trim: true,
+      default: "",
     },
   },
   {

@@ -1,6 +1,49 @@
-import React, { useEffect, useState, useMemo } from "react";
-import { fetchFeedback, updateFeedbackStatus, sendAdminFeedback } from "../../services/api";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  MessageSquare,
+  Search,
+  Users,
+  Building2,
+  RefreshCw,
+  Mail,
+  CalendarDays,
+  CheckCircle,
+  XCircle,
+  Send,
+  AlertCircle,
+} from "lucide-react";
+
+import {
+  fetchFeedback,
+  updateFeedbackStatus,
+  sendAdminFeedback,
+} from "../../services/api";
+
 import "./Feedback.css";
+
+// Feedback sender identify
+const isDonorFeedback = (feedback) => {
+  const submittedBy = String(feedback.submittedBy || "").toLowerCase();
+  const category = String(feedback.category || "").toLowerCase();
+
+  return (
+    submittedBy === "donor" ||
+    category.includes("donor rating")
+  );
+};
+
+// Feedback message
+const getMessage = (feedback) =>
+  feedback.message || feedback.comment || feedback.feedback || "";
+
+// Feedback sender name
+const getSenderName = (feedback) =>
+  feedback.donorName ||
+  feedback.ngoName ||
+  feedback.ngo?.name ||
+  feedback.restaurantName ||
+  feedback.restaurant?.name ||
+  "Unknown User";
 
 const Feedback = () => {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -8,12 +51,18 @@ const Feedback = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [warningMessages, setWarningMessages] = useState({});
+  const [sendingWarningId, setSendingWarningId] = useState(null);
+  const [updatingId, setUpdatingId] = useState(null);
+
+  // Load feedback
   const loadFeedback = async () => {
     try {
       setLoading(true);
       setError("");
 
       const response = await fetchFeedback();
+
       const list = Array.isArray(response)
         ? response
         : response?.feedbacks || response?.feedback || [];
@@ -21,7 +70,10 @@ const Feedback = () => {
       setFeedbacks(Array.isArray(list) ? list : []);
     } catch (err) {
       console.error("Failed to load feedback:", err);
-      setError("Feedback load করা যায়নি।");
+      setError(
+        err.response?.data?.message ||
+          "Feedback load করা যায়নি।"
+      );
     } finally {
       setLoading(false);
     }
@@ -31,207 +83,463 @@ const Feedback = () => {
     loadFeedback();
   }, []);
 
+  // Update feedback status
   const handleStatusChange = async (feedbackId, newStatus) => {
+    if (!feedbackId || updatingId) return;
+
     try {
-      const response = await updateFeedbackStatus(feedbackId, newStatus);
+      setUpdatingId(feedbackId);
+
+      const response = await updateFeedbackStatus(
+        feedbackId,
+        newStatus
+      );
+
       if (response.success || response.feedback) {
         setFeedbacks((prev) =>
           prev.map((item) =>
-            (item._id === feedbackId || item.id === feedbackId)
+            String(item._id || item.id) === String(feedbackId)
               ? { ...item, status: newStatus }
               : item
           )
         );
+      } else {
+        alert("Feedback status update করা যায়নি।");
       }
     } catch (err) {
       console.error("Failed to update status:", err);
-      alert("Failed to update status");
+      alert(
+        err.response?.data?.message ||
+          "Failed to update feedback status."
+      );
+    } finally {
+      setUpdatingId(null);
     }
   };
 
-  // রেস্টুরেন্ট বা ডোনারের নাম বের করার সঠিক লজিক
-  const getRestaurantName = (feedback) => {
-    return (
-      feedback.donorName ||
-      feedback.restaurantName ||
-      feedback.restaurant?.name ||
-      (typeof feedback.restaurant === "object" && feedback.restaurant?.name) ||
-      "Unknown Restaurant"
-    );
-  };
-
-  const getMessage = (feedback) =>
-    feedback.message || feedback.comment || feedback.feedback || "";
-
+  // Search filtering
   const filteredFeedbacks = useMemo(() => {
     const query = search.trim().toLowerCase();
+
     if (!query) return feedbacks;
 
     return feedbacks.filter((feedback) => {
-      const name = getRestaurantName(feedback);
-      const msg = getMessage(feedback);
-      const donationId = feedback.donationId || "";
-      return (
-        name.toLowerCase().includes(query) ||
-        msg.toLowerCase().includes(query) ||
-        donationId.toLowerCase().includes(query)
+      const name = getSenderName(feedback);
+      const message = getMessage(feedback);
+
+      const donationId = String(feedback.donationId || "");
+      const category = String(feedback.category || "");
+      const status = String(feedback.status || "");
+      const sender = String(feedback.submittedBy || "");
+
+      return [
+        name,
+        message,
+        donationId,
+        category,
+        status,
+        sender,
+      ].some((value) =>
+        String(value).toLowerCase().includes(query)
       );
     });
   }, [feedbacks, search]);
 
+  // Separate Donor and NGO feedback
+  const donorFeedbacks = useMemo(
+    () => filteredFeedbacks.filter(isDonorFeedback),
+    [filteredFeedbacks]
+  );
+
+  const ngoFeedbacks = useMemo(
+    () => filteredFeedbacks.filter((item) => !isDonorFeedback(item)),
+    [filteredFeedbacks]
+  );
+
+  // Send warning
+  
+// =====================================
+// SEND ADMIN WARNING TO DONOR / NGO
+// =====================================
+const handleSendWarning = async (feedback) => {
+  const feedbackId = feedback._id || feedback.id;
+
+  const warningMessage = (
+    warningMessages[feedbackId] || ""
+  ).trim();
+
+  if (!warningMessage) {
+    alert("দয়া করে আগে ওয়ার্নিং মেসেজটি লিখুন!");
+    return;
+  }
+
+  if (!feedbackId) {
+    alert("Feedback ID পাওয়া যায়নি।");
+    return;
+  }
+
+  try {
+    setSendingWarningId(feedbackId);
+
+    // Backend will identify the correct recipient
+    // using feedback.submittedBy
+    const response = await sendAdminFeedback({
+      feedbackId,
+      message: warningMessage,
+    });
+
+    if (response.success) {
+      alert(
+        `সফলভাবে ${isDonorFeedback(feedback) ? "Donor" : "NGO"}-কে Admin warning পাঠানো হয়েছে!`
+      );
+
+      setWarningMessages((prev) => ({
+        ...prev,
+        [feedbackId]: "",
+      }));
+    } else {
+      alert(
+        response.message || "Warning message পাঠানো যায়নি।"
+      );
+    }
+
+  } catch (err) {
+    console.error("Failed to send warning:", err);
+
+    alert(
+      err.response?.data?.message ||
+      "মেসেজ পাঠাতে ব্যর্থ হয়েছে।"
+    );
+
+  } finally {
+    setSendingWarningId(null);
+  }
+};
+
+
+  // Format date
+  const formatDate = (date) => {
+    if (!date) return "Recent";
+
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) return "Recent";
+
+    return parsedDate.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  // Feedback card
+  const renderFeedbackCard = (feedback, index) => {
+    const feedbackId = feedback._id || feedback.id || index;
+
+    const currentStatus =
+      feedback.status || "Awaiting Response";
+
+    const normalizedStatus = currentStatus.toLowerCase();
+
+    const isApproved = normalizedStatus === "approved";
+    const isDeclined = normalizedStatus === "declined";
+
+    const isUpdating =
+      String(updatingId) === String(feedbackId);
+
+    const isSending =
+      String(sendingWarningId) === String(feedbackId);
+
+    return (
+      <div className="admin-feedback-card" key={feedbackId}>
+        {/* Card Header */}
+        <div className="admin-feedback-card-header">
+          <div className="admin-feedback-user">
+            <div className="admin-feedback-avatar">
+              {isDonorFeedback(feedback) ? (
+                <Users size={19} />
+              ) : (
+                <Building2 size={19} />
+              )}
+            </div>
+
+            <div className="admin-feedback-user-info">
+              <strong>{getSenderName(feedback)}</strong>
+
+              <span>
+                <CalendarDays size={13} />
+                {formatDate(feedback.date || feedback.createdAt)}
+              </span>
+            </div>
+          </div>
+
+          <span
+            className={`admin-feedback-status ${
+              isApproved
+                ? "approved"
+                : isDeclined
+                ? "declined"
+                : "pending"
+            }`}
+          >
+            {currentStatus}
+          </span>
+        </div>
+
+        {/* Feedback Information */}
+        <div className="admin-feedback-meta">
+          <span>
+            Donation ID: <strong>{feedback.donationId || "N/A"}</strong>
+          </span>
+
+          <span>
+            Category: <strong>{feedback.category || "General"}</strong>
+          </span>
+        </div>
+
+        {/* Message */}
+        <div className="admin-feedback-message">
+          <MessageSquare size={16} />
+
+          <p>
+            {getMessage(feedback) || "No message provided."}
+          </p>
+        </div>
+
+        {/* Rating */}
+        {feedback.rating && (
+          <div className="admin-feedback-rating">
+            <span>Rating</span>
+            <strong>★ {feedback.rating}/5</strong>
+          </div>
+        )}
+
+        {/* Status Actions */}
+        <div className="admin-feedback-actions">
+          <button
+            type="button"
+            className="admin-feedback-approve"
+            onClick={() =>
+              handleStatusChange(feedback._id || feedback.id, "Approved")
+            }
+            disabled={
+              !feedback._id && !feedback.id
+                ? true
+                : isUpdating || isApproved || updatingId !== null
+            }
+          >
+            <CheckCircle size={14} />
+            {isUpdating ? "Updating..." : "Approve"}
+          </button>
+
+          <button
+            type="button"
+            className="admin-feedback-decline"
+            onClick={() =>
+              handleStatusChange(feedback._id || feedback.id, "Declined")
+            }
+            disabled={
+              !feedback._id && !feedback.id
+                ? true
+                : isUpdating || isDeclined || updatingId !== null
+            }
+          >
+            <XCircle size={14} />
+            Decline
+          </button>
+        </div>
+
+        {/* Warning Message */}
+        <div className="admin-feedback-warning">
+          <label>
+            <Mail size={15} />
+            Send Warning Message
+          </label>
+
+          <div className="admin-feedback-warning-input">
+            <input
+              type="text"
+              placeholder="Write warning message..."
+              value={warningMessages[feedbackId] || ""}
+              onChange={(event) =>
+                setWarningMessages((prev) => ({
+                  ...prev,
+                  [feedbackId]: event.target.value,
+                }))
+              }
+            />
+
+            <button
+              type="button"
+              onClick={() => handleSendWarning(feedback)}
+              disabled={isSending}
+            >
+              <Send size={14} />
+              {isSending ? "Sending..." : "Send"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="page">
-      <h1>
-        <span className="page-icon">💬</span> Feedback Management
-      </h1>
+    <div className="admin-feedback-page">
 
-      <div className="feedback-summary">
-        <div className="feedback-summary-card">
-          <span>Total Feedback</span>
-          <strong>{loading ? "..." : feedbacks.length}</strong>
-          <small>Feedback received from users</small>
+      {/* Page Header */}
+      <div className="admin-feedback-heading">
+        <div className="admin-feedback-heading-icon">
+          <MessageSquare size={25} />
+        </div>
+
+        <div>
+          <p className="admin-feedback-eyebrow">
+            ADMINISTRATION 
+          </p>
+
+          <h1>Feedback Management</h1>
+
+          <p>
+            Review and manage feedback received from Donors and NGOs.
+          </p>
         </div>
       </div>
 
-      <div className="feedback-toolbar">
-        <input
-          type="text"
-          className="search-input"
-          placeholder="Search by restaurant name, donation ID or message..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-      </div>
+      {/* Summary + Search */}
+      <div className="admin-feedback-overview">
 
-      {loading ? (
-        <div className="feedback-state">Loading feedback from database...</div>
-      ) : error ? (
-        <div className="feedback-state feedback-error">
-          <p>{error}</p>
-          <button type="button" onClick={() => loadFeedback()}>Try Again</button>
-        </div>
-      ) : (
-        <div className="feedback-list">
-          {filteredFeedbacks.length > 0 ? (
-            filteredFeedbacks.map((feedback, index) => {
-              const currentStatus = feedback.status || "Awaiting Response";
-              const restaurantName = getRestaurantName(feedback);
-              const feedbackId = feedback._id || feedback.id || index;
+        <div className="admin-feedback-search">
+          <Search size={19} />
 
-              return (
-                <div className="feedback-item" key={feedbackId} style={{ background: "#fff", padding: "16px", borderRadius: "8px", marginBottom: "12px", border: "1px solid #e5e7eb" }}>
-                  <div className="feedback-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <strong style={{ fontSize: "16px", color: "#111827" }}>{restaurantName}</strong>
-                      <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>
-                        ID: {feedback.donationId || "N/A"} | Category: {feedback.category || "General"}
-                      </div>
-                    </div>
-                  </div>
+          <input
+            type="text"
+            placeholder="Search feedback, name, donation ID..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
 
-                  <p style={{ marginTop: "10px", color: "#374151", fontSize: "14px" }}>
-                    {getMessage(feedback) || "No message provided."}
-                  </p>
-
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", paddingTop: "8px", borderTop: "1px solid #f3f4f6" }}>
-                    <small className="time" style={{ color: "#9ca3af" }}>{feedback.date || "Recent"}</small>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ 
-                        padding: "4px 10px", borderRadius: "4px", fontSize: "12px", fontWeight: "600",
-                        backgroundColor: currentStatus === "Approved" ? "#d1fae5" : currentStatus === "Declined" ? "#fee2e2" : "#fef3c7",
-                        color: currentStatus === "Approved" ? "#065f46" : currentStatus === "Declined" ? "#991b1b" : "#92400e"
-                      }}>
-                        {currentStatus}
-                      </span>
-
-                      <button
-                        onClick={() => handleStatusChange(feedback._id || feedback.id, "Approved")}
-                        style={{ background: "#10b981", color: "#fff", padding: "5px 12px", borderRadius: "4px", fontSize: "12px", border: "none", cursor: "pointer", fontWeight: "600" }}
-                      >
-                        Approve
-                      </button>
-
-                      <button
-                        onClick={() => handleStatusChange(feedback._id || feedback.id, "Declined")}
-                        style={{ background: "#ef4444", color: "#fff", padding: "5px 12px", borderRadius: "4px", fontSize: "12px", border: "none", cursor: "pointer", fontWeight: "600" }}
-                      >
-                        Decline
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 👉 নতুন যোগ করা হলো: এডমিন থেকে রেস্টুরেন্টের কাছে ওয়ার্নিং মেসেজ পাঠানোর সেকশন */}
-                  <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px dashed #e5e7eb", display: "flex", gap: "8px", alignItems: "center" }}>
-                    <input
-                      type="text"
-                      placeholder="Write warning message for restaurant..."
-                      id={`warning-msg-${feedbackId}`}
-                      style={{
-                        flex: 1,
-                        padding: "6px 10px",
-                        borderRadius: "4px",
-                        border: "1px solid #cbd5e1",
-                        fontSize: "13px"
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const messageInput = document.getElementById(`warning-msg-${feedbackId}`);
-                        const warningMessage = messageInput.value.trim();
-                        
-                        if (!warningMessage) {
-                          alert("দয়া করে আগে ওয়ার্নিং মেসেজটি লিখুন!");
-                          return;
-                        }
-
-                        try {
-                          const recipientUserId = feedback.restaurantUser?._id || feedback.restaurant?._id || feedback.restaurant || feedback.donor;
-                          
-                          if (!recipientUserId) {
-                            alert("দুঃখিত, এই ফিডব্যাকের সাথে কোনো রেস্টুরেন্ট ইউজার আইডি পাওয়া যায়নি।");
-                            return;
-                          }
-
-                          const response = await sendAdminFeedback({
-                            recipientId: recipientUserId,
-                            status: feedback.status || "Approved",
-                            message: warningMessage
-                          });
-
-                          if (response.success) {
-                            alert("সফলভাবে রেস্টুরেন্টের কাছে ওয়ার্নিং মেসেজ পাঠানো হয়েছে!");
-                            messageInput.value = "";
-                          }
-                        } catch (err) {
-                          console.error("Failed to send warning:", err);
-                          alert("মেসেজ পাঠাতে ব্যর্থ হয়েছে।");
-                        }
-                      }}
-                      style={{
-                        backgroundColor: "#dc2626",
-                        color: "#ffffff",
-                        border: "none",
-                        padding: "6px 12px",
-                        borderRadius: "4px",
-                        fontSize: "12px",
-                        cursor: "pointer",
-                        fontWeight: "bold",
-                        whiteSpace: "nowrap"
-                      }}
-                    >
-                      Send Warning ⚠️
-                    </button>
-                  </div>
-
-                </div>
-              );
-            })
-          ) : (
-            <div className="feedback-state">No feedback found.</div>
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+            >
+              ×
+            </button>
           )}
         </div>
+
+        <button
+          type="button"
+          className="admin-feedback-refresh"
+          onClick={loadFeedback}
+          disabled={loading}
+        >
+          <RefreshCw
+            size={16}
+            className={loading ? "admin-feedback-spinning" : ""}
+          />
+          Refresh
+        </button>
+      </div>
+
+      {/* Loading */}
+      {loading ? (
+        <div className="admin-feedback-state">
+          <RefreshCw
+            size={27}
+            className="admin-feedback-spinning"
+          />
+          <p>Loading feedback from database...</p>
+        </div>
+      ) : error ? (
+        <div className="admin-feedback-state error">
+          <AlertCircle size={28} />
+          <p>{error}</p>
+
+          <button type="button" onClick={loadFeedback}>
+            Try Again
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Two Feedback Sections */}
+          <div className="admin-feedback-columns">
+
+            {/* Donor Feedback */}
+            <section className="admin-feedback-section">
+              <div className="admin-feedback-section-header donor">
+                <div className="admin-feedback-section-title">
+                  <div className="admin-feedback-section-icon">
+                    <Users size={19} />
+                  </div>
+
+                  <div>
+                    <h2>Donor Feedback</h2>
+                    <p>Feedback submitted by donors</p>
+                  </div>
+                </div>
+
+                <span className="admin-feedback-count donor-count">
+                  {donorFeedbacks.length}
+                </span>
+              </div>
+
+              <div className="admin-feedback-list">
+                {donorFeedbacks.length > 0 ? (
+                  donorFeedbacks.map(renderFeedbackCard)
+                ) : (
+                  <div className="admin-feedback-empty">
+                    <Users size={30} />
+                    <h3>No Donor Feedback</h3>
+                    <p>
+                      {search
+                        ? "No matching donor feedback found."
+                        : "No donor feedback received yet."}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* NGO Feedback */}
+            <section className="admin-feedback-section">
+              <div className="admin-feedback-section-header ngo">
+                <div className="admin-feedback-section-title">
+                  <div className="admin-feedback-section-icon">
+                    <Building2 size={19} />
+                  </div>
+
+                  <div>
+                    <h2>NGO Feedback</h2>
+                    <p>Feedback submitted by NGOs</p>
+                  </div>
+                </div>
+
+                <span className="admin-feedback-count ngo-count">
+                  {ngoFeedbacks.length}
+                </span>
+              </div>
+
+              <div className="admin-feedback-list">
+                {ngoFeedbacks.length > 0 ? (
+                  ngoFeedbacks.map(renderFeedbackCard)
+                ) : (
+                  <div className="admin-feedback-empty">
+                    <Building2 size={30} />
+                    <h3>No NGO Feedback</h3>
+                    <p>
+                      {search
+                        ? "No matching NGO feedback found."
+                        : "No NGO feedback received yet."}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+          </div>
+        </>
       )}
     </div>
   );

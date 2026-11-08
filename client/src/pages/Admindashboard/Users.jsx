@@ -1,5 +1,19 @@
+
 import React, { useEffect, useState, useMemo } from "react";
-import { fetchUsers, updateUserStatus } from "../../services/api"; // 👉 সঠিক ফাংশনটি এখানে ইমপোর্ট করা হলো
+import {
+  Users as UsersIcon,
+  Search,
+  RefreshCw,
+  ShieldCheck,
+  ShieldBan,
+  Mail,
+  Phone,
+  MapPin,
+  CalendarDays,
+  UserRound,
+} from "lucide-react";
+
+import { fetchUsers, updateUserStatus } from "../../services/api";
 import "./Users.css";
 
 const Users = () => {
@@ -7,12 +21,15 @@ const Users = () => {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [updatingId, setUpdatingId] = useState(null);
 
   const loadUsers = async () => {
     try {
       setLoading(true);
       setError("");
+
       const response = await fetchUsers();
+
       const list = Array.isArray(response)
         ? response
         : response?.users || [];
@@ -20,7 +37,11 @@ const Users = () => {
       setUsers(list);
     } catch (err) {
       console.error("Failed to load users:", err);
-      setError(err.response?.data?.message || "Users information load করা যায়নি।");
+
+      setError(
+        err.response?.data?.message ||
+        "Users information could not be loaded."
+      );
     } finally {
       setLoading(false);
     }
@@ -30,16 +51,19 @@ const Users = () => {
     loadUsers();
   }, []);
 
-  // ইউজার স্ট্যাটাস পরিবর্তন (Active / Blocked) করার ফাংশন
+  // Update donor status
   const handleStatusChange = async (userId, newStatus) => {
+    if (!userId || updatingId) return;
+
     try {
-      // ব্যাকএন্ডে API কল করে ডাটাবেজে পার্মানেন্টলি সেভ করা
+      setUpdatingId(userId);
+
       await updateUserStatus(userId, newStatus);
 
-      // ফ্রন্টএন্ডের স্টেট ইনস্ট্যান্ট আপডেট করা
       setUsers((prevUsers) =>
         prevUsers.map((user) => {
           const id = user.id || user._id;
+
           if (id === userId) {
             return {
               ...user,
@@ -47,6 +71,7 @@ const Users = () => {
               isBlocked: newStatus === "Blocked",
             };
           }
+
           return user;
         })
       );
@@ -54,12 +79,20 @@ const Users = () => {
       alert(`User status successfully changed to ${newStatus}`);
     } catch (err) {
       console.error("Failed to update status:", err);
-      alert("Failed to update status on server.");
+
+      alert(
+        err.response?.data?.message ||
+        "Failed to update user status."
+      );
+    } finally {
+      setUpdatingId(null);
     }
   };
 
+  // Search filtering
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
+
     if (!query) return users;
 
     return users.filter((user) =>
@@ -70,14 +103,19 @@ const Users = () => {
         user.role,
         user.status,
         user.location,
-      ].some((value) => String(value ?? "").toLowerCase().includes(query))
+      ].some((value) =>
+        String(value ?? "").toLowerCase().includes(query)
+      )
     );
   }, [users, search]);
 
   const formatDate = (date) => {
     if (!date) return "N/A";
+
     const parsedDate = new Date(date);
+
     if (Number.isNaN(parsedDate.getTime())) return "N/A";
+
     return parsedDate.toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "short",
@@ -85,59 +123,177 @@ const Users = () => {
     });
   };
 
+  const blockedUsers = users.filter(
+    (user) =>
+      (user.status || (user.isBlocked ? "Blocked" : "Active"))
+        .toLowerCase() === "blocked"
+  ).length;
+
+  const activeUsers = users.length - blockedUsers;
+
   return (
-    <div className="page">
-      <h1>
-        <span className="page-icon">👥</span> User Management (Donors)
-      </h1>
+    <div className="users-page">
 
-      <div className="user-summary">
-        <div className="user-summary-card">
-          <span>Total Donors</span>
-          <strong>{loading ? "..." : users.length}</strong>
-          <small>Donors registered in the database</small>
-        </div>
-      </div>
-
-      <div className="user-toolbar">
-        <input
-          type="text"
-          className="search-input"
-          placeholder="Search donor name, email, phone, location..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-      </div>
-
-      <div className="table-wrap">
-        {loading ? (
-          <p className="user-message">Loading users from database...</p>
-        ) : error ? (
-          <div className="user-error">
-            <p>{error}</p>
-            <button type="button" onClick={loadUsers}>
-              Try Again
-            </button>
+      {/* Page Header */}
+      <div className="users-page-header">
+        <div className="users-heading">
+          <div className="users-heading-icon">
+            <UsersIcon size={25} />
           </div>
-        ) : (
-          <>
-            <p className="user-results">
-              Showing <strong>{filteredUsers.length}</strong> of{" "}
-              <strong>{users.length}</strong> Donors
-            </p>
 
-            <table>
+          <div>
+            <span className="users-eyebrow">
+              ADMINISTRATION / USERS
+            </span>
+
+            <h1>User Management</h1>
+
+            <p>
+              Manage registered donors and monitor their account status.
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="users-refresh-btn"
+          onClick={loadUsers}
+          disabled={loading}
+        >
+          <RefreshCw
+            size={16}
+            className={loading ? "refresh-spinning" : ""}
+          />
+          Refresh
+        </button>
+      </div>
+
+      {/* Statistics */}
+      <div className="users-stats-grid">
+
+        <div className="users-stat-card total-users-card">
+          <div className="users-stat-top">
+            <div className="users-stat-icon">
+              <UsersIcon size={23} />
+            </div>
+            <span className="users-stat-label">TOTAL DONORS</span>
+          </div>
+
+          <strong>
+            {loading ? "..." : users.length}
+          </strong>
+
+          <p>Donors registered on FeedLink</p>
+        </div>
+
+        <div className="users-stat-card active-users-card">
+          <div className="users-stat-top">
+            <div className="users-stat-icon">
+              <ShieldCheck size={23} />
+            </div>
+            <span className="users-stat-label">ACTIVE ACCOUNTS</span>
+          </div>
+
+          <strong>
+            {loading ? "..." : activeUsers}
+          </strong>
+
+          <p>Currently active donor accounts</p>
+        </div>
+
+        <div className="users-stat-card blocked-users-card">
+          <div className="users-stat-top">
+            <div className="users-stat-icon">
+              <ShieldBan size={23} />
+            </div>
+            <span className="users-stat-label">BLOCKED ACCOUNTS</span>
+          </div>
+
+          <strong>
+            {loading ? "..." : blockedUsers}
+          </strong>
+
+          <p>Donor accounts currently blocked</p>
+        </div>
+
+      </div>
+
+      {/* Users Table Section */}
+      <div className="users-content-card">
+
+        <div className="users-content-header">
+          <div>
+            <h2>Registered Donors</h2>
+            <p>
+              View, search and manage donor information.
+            </p>
+          </div>
+
+          <span className="users-total-label">
+            {loading ? "Loading..." : `${filteredUsers.length} Records`}
+          </span>
+        </div>
+
+        {/* Search */}
+        <div className="users-toolbar">
+          <div className="users-search-box">
+            <Search size={19} />
+
+            <input
+              type="text"
+              placeholder="Search by name, email, phone, location..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+
+            {search && (
+              <button
+                type="button"
+                className="users-clear-search"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="users-table-wrapper">
+
+          {loading ? (
+            <div className="users-state">
+              <RefreshCw size={28} className="refresh-spinning" />
+              <h3>Loading Donors</h3>
+              <p>Fetching donor information...</p>
+            </div>
+          ) : error ? (
+            <div className="users-state users-error-state">
+              <ShieldBan size={32} />
+              <h3>Unable to Load Users</h3>
+              <p>{error}</p>
+
+              <button
+                type="button"
+                onClick={loadUsers}
+                className="users-retry-btn"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : (
+            <table className="users-table">
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Phone</th>
-                  <th>Location</th>
-                  <th>Status</th>
-                  <th>Joined Date</th>
-                  <th>Actions</th>
+                  <th>DONOR INFORMATION</th>
+                  <th>ROLE</th>
+                  <th>CONTACT</th>
+                  <th>LOCATION</th>
+                  <th>STATUS</th>
+                  <th>JOINED DATE</th>
+                  <th>ACTIONS</th>
                 </tr>
               </thead>
 
@@ -145,60 +301,109 @@ const Users = () => {
                 {filteredUsers.length > 0 ? (
                   filteredUsers.map((user, index) => {
                     const targetId = user.id || user._id;
-                    const currentStatus = user.status || (user.isBlocked ? "Blocked" : "Active");
-                    const isBlocked = currentStatus.toLowerCase() === "blocked";
+
+                    const currentStatus =
+                      user.status ||
+                      (user.isBlocked ? "Blocked" : "Active");
+
+                    const isBlocked =
+                      currentStatus.toLowerCase() === "blocked";
+
+                    const isUpdating = updatingId === targetId;
 
                     return (
                       <tr key={targetId || user.email || index}>
-                        <td>{index + 1}</td>
-                        <td>
-                          <strong>{user.name || "N/A"}</strong>
+                        <td className="users-index">
+                          {String(index + 1).padStart(2, "0")}
                         </td>
-                        <td>{user.email || "N/A"}</td>
+
                         <td>
-                          <span className="badge role">{user.role || "donor"}</span>
+                          <div className="donor-info">
+                            <div className="donor-avatar">
+                              <UserRound size={20} />
+                            </div>
+
+                            <div className="donor-details">
+                              <strong>
+                                {user.name || "N/A"}
+                              </strong>
+
+                              <span>
+                                <Mail size={12} />
+                                {user.email || "N/A"}
+                              </span>
+                            </div>
+                          </div>
                         </td>
-                        <td>{user.phone || "Not provided"}</td>
-                        <td>{user.location || "Not provided"}</td>
+
                         <td>
-                          <span className={`badge ${currentStatus.toLowerCase()}`}>
+                          <span className="users-role-badge">
+                            {user.role || "donor"}
+                          </span>
+                        </td>
+
+                        <td>
+                          <div className="users-contact">
+                            <Phone size={14} />
+                            <span>
+                              {user.phone || "Not provided"}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td>
+                          <div className="users-contact">
+                            <MapPin size={14} />
+                            <span>
+                              {user.location || "Not provided"}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td>
+                          <span
+                            className={`users-status-badge ${
+                              isBlocked ? "status-blocked" : "status-active"
+                            }`}
+                          >
+                            <span className="status-dot" />
                             {currentStatus}
                           </span>
                         </td>
-                        <td>{formatDate(user.createdAt)}</td>
+
                         <td>
-                          <div style={{ display: "flex", gap: "6px" }}>
+                          <div className="users-date">
+                            <CalendarDays size={14} />
+                            {formatDate(user.createdAt)}
+                          </div>
+                        </td>
+
+                        <td>
+                          <div className="users-action-group">
                             <button
                               type="button"
-                              onClick={() => handleStatusChange(targetId, "Active")}
-                              style={{
-                                padding: "4px 10px",
-                                fontSize: "12px",
-                                fontWeight: "600",
-                                borderRadius: "4px",
-                                border: "none",
-                                cursor: "pointer",
-                                backgroundColor: !isBlocked ? "#059669" : "#e2e8f0",
-                                color: !isBlocked ? "#ffffff" : "#64748b",
-                              }}
+                              className={`users-action-btn ${
+                                !isBlocked ? "action-active-selected" : ""
+                              }`}
+                              onClick={() =>
+                                handleStatusChange(targetId, "Active")
+                              }
+                              disabled={isUpdating || !isBlocked}
                             >
-                              Active
+                              {isUpdating ? "Saving..." : "Active"}
                             </button>
+
                             <button
                               type="button"
-                              onClick={() => handleStatusChange(targetId, "Blocked")}
-                              style={{
-                                padding: "4px 10px",
-                                fontSize: "12px",
-                                fontWeight: "600",
-                                borderRadius: "4px",
-                                border: "none",
-                                cursor: "pointer",
-                                backgroundColor: isBlocked ? "#dc2626" : "#e2e8f0",
-                                color: isBlocked ? "#ffffff" : "#64748b",
-                              }}
+                              className={`users-action-btn ${
+                                isBlocked ? "action-blocked-selected" : ""
+                              }`}
+                              onClick={() =>
+                                handleStatusChange(targetId, "Blocked")
+                              }
+                              disabled={isUpdating || isBlocked}
                             >
-                              Block
+                              {isUpdating ? "Saving..." : "Block"}
                             </button>
                           </div>
                         </td>
@@ -207,17 +412,43 @@ const Users = () => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="9" className="user-empty">
-                      {search.trim()
-                        ? "No users match your search."
-                        : "No users found in the database."}
+                    <td colSpan="8" className="users-empty">
+                      <div>
+                        <UsersIcon size={32} />
+                        <strong>
+                          {search.trim()
+                            ? "No matching donors found"
+                            : "No donors available"}
+                        </strong>
+                        <span>
+                          {search.trim()
+                            ? "Try searching with a different keyword."
+                            : "Registered donors will appear here."}
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-          </>
+          )}
+
+        </div>
+
+        {!loading && !error && (
+          <div className="users-table-footer">
+            <span>
+              Showing <strong>{filteredUsers.length}</strong> of{" "}
+              <strong>{users.length}</strong> donors
+            </span>
+
+            <span className="users-footer-status">
+              <span />
+              FeedLink User Database
+            </span>
+          </div>
         )}
+
       </div>
     </div>
   );

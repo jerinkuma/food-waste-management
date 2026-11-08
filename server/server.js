@@ -59,6 +59,10 @@ app.use("/api/restaurants", restaurantRoutes);
 // Donations
 app.use("/api/donations", donationRoutes);
 
+//distribution proof for donor
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 // Reports & Analytics API (এখানে সঠিকভাবে রেজিস্টার করা হলো)
 app.use("/api/reports", reportsRoutes);
 

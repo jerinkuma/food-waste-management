@@ -1,126 +1,154 @@
+
 import {
   Pizza,
   Soup,
   Sandwich,
   Salad,
   Cake,
+  Utensils,
   TrendingUp,
 } from "lucide-react";
+
+const categoryStyles = [
+  {
+    icon: Pizza,
+    color: "bg-orange-500",
+  },
+  {
+    icon: Soup,
+    color: "bg-red-500",
+  },
+  {
+    icon: Sandwich,
+    color: "bg-blue-500",
+  },
+  {
+    icon: Salad,
+    color: "bg-green-500",
+  },
+  {
+    icon: Cake,
+    color: "bg-pink-500",
+  },
+];
+
+const getFoodIcon = (foodType) => {
+  const type = String(foodType || "").toLowerCase();
+
+  if (
+    /rice|biryani|pulao|khichuri|polao/.test(type)
+  ) {
+    return Pizza;
+  }
+
+  if (
+    /curry|soup|dal|lentil|stew/.test(type)
+  ) {
+    return Soup;
+  }
+
+  if (
+    /sandwich|burger|bread|pizza|fast food/.test(type)
+  ) {
+    return Sandwich;
+  }
+
+  if (
+    /vegetable|salad|fruit|greens/.test(type)
+  ) {
+    return Salad;
+  }
+
+  if (
+    /cake|dessert|sweet|pastry/.test(type)
+  ) {
+    return Cake;
+  }
+
+  return Utensils;
+};
 
 const TopDonatedCategories = ({
   categories = [],
 }) => {
-  // Different icons/colors for different food categories
-  const categoryStyles = [
-    {
-      icon: Pizza,
-      color: "bg-orange-500",
-    },
-    {
-      icon: Soup,
-      color: "bg-red-500",
-    },
-    {
-      icon: Sandwich,
-      color: "bg-blue-500",
-    },
-    {
-      icon: Salad,
-      color: "bg-green-500",
-    },
-    {
-      icon: Cake,
-      color: "bg-pink-500",
-    },
-  ];
-
-  const categoryList = Array.isArray(categories)
+  const validCategories = Array.isArray(categories)
     ? categories
+      .filter(
+        (item) =>
+          item &&
+          item.name &&
+          Number(item.quantity) > 0
+      )
+      .sort(
+        (a, b) =>
+          Number(b.quantity) - Number(a.quantity)
+      )
+      .slice(0, 5)
     : [];
 
+  const formatNumber = (value) => {
+    return Number(value || 0).toLocaleString(
+      undefined,
+      {
+        maximumFractionDigits: 2,
+      }
+    );
+  };
+
   return (
-    <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
+    <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm transition-colors duration-300 sm:p-6 lg:p-7 dark:border-gray-700 dark:bg-gray-800">
 
       {/* Header */}
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
 
         <div>
-
-          <h2 className="text-2xl font-bold text-gray-800">
+          <h2 className="text-xl font-bold text-gray-800 sm:text-2xl dark:text-gray-100">
             Top Donated Food Categories
           </h2>
 
-          <p className="mt-1 text-gray-500">
-            Most donated food items this month
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Most donated food types based on completed donations
           </p>
-
         </div>
 
-        <div className="rounded-2xl bg-green-100 p-3">
-
+        <div className="shrink-0 rounded-2xl bg-green-100 p-3 dark:bg-green-900/30">
           <TrendingUp
-            className="text-green-600"
-            size={26}
+            className="text-green-600 dark:text-green-400"
+            size={24}
           />
-
         </div>
 
       </div>
 
-      {/* Categories */}
+      {/* Dynamic Categories */}
 
-      <div className="mt-8 space-y-6">
+      {validCategories.length > 0 ? (
 
-        {categoryList.length === 0 ? (
+        <div className="mt-8 space-y-6">
 
-          <div className="rounded-2xl border border-dashed border-gray-300 p-8 text-center">
-
-            <p className="text-gray-500">
-              No food category data available yet.
-            </p>
-
-            <p className="mt-1 text-sm text-gray-400">
-              Categories will appear here after you make donations.
-            </p>
-
-          </div>
-
-        ) : (
-
-          categoryList.map((item, index) => {
+          {validCategories.map((item, index) => {
+            const Icon = getFoodIcon(item.name);
 
             const style =
-              categoryStyles[
-                index %
-                  categoryStyles.length
-              ];
+              categoryStyles[index % categoryStyles.length];
 
-            const Icon = style.icon;
-
-            const meals =
-              Number(item.meals) || 0;
-
-            const percent = Math.min(
-              Math.max(
-                Number(item.percent) || 0,
-                0
-              ),
+            const percentage = Math.min(
+              Math.max(Number(item.percent) || 0, 0),
               100
             );
 
             return (
+              <div key={`${item.name}-${index}`}>
 
-              <div
-                key={`${item.name}-${index}`}
-              >
+                {/* Category Information */}
 
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-2 flex items-center justify-between gap-3">
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
 
                     <div
-                      className={`rounded-xl p-3 ${style.color}`}
+                      className={`shrink-0 rounded-xl p-3 ${style.color}`}
                     >
                       <Icon
                         className="text-white"
@@ -128,46 +156,71 @@ const TopDonatedCategories = ({
                       />
                     </div>
 
-                    <div>
+                    <div className="min-w-0">
 
-                      <h3 className="font-semibold text-gray-800">
-                        {item.name || "Other"}
+                      <h3 className="truncate font-semibold text-gray-800 dark:text-gray-100">
+                        {item.name}
                       </h3>
 
-                      <p className="text-sm text-gray-500">
-                        {meals.toLocaleString()} Meals Donated
+                      <p className="text-xs text-gray-500 sm:text-sm dark:text-gray-400">
+                        {formatNumber(item.quantity)} KG donated
+                      </p>
+
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
+                        {Number(item.count) || 0} donation(s)
                       </p>
 
                     </div>
 
                   </div>
 
-                  <span className="font-bold text-gray-700">
-                    {percent}%
+                  <span className="shrink-0 font-bold text-gray-700 dark:text-gray-200">
+                    {percentage}%
                   </span>
 
                 </div>
 
-                <div className="h-3 overflow-hidden rounded-full bg-gray-200">
+                {/* Progress Bar */}
+
+                <div className="h-3 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
 
                   <div
-                    className={`${style.color} h-full rounded-full transition-all duration-500`}
+                    className={`${style.color} h-full rounded-full transition-all duration-700`}
                     style={{
-                      width: `${percent}%`,
+                      width: `${percentage}%`,
                     }}
                   />
 
                 </div>
 
               </div>
-
             );
+          })}
 
-          })
+        </div>
 
-        )}
+      ) : (
 
-      </div>
+        /* Empty State */
+
+        <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 px-4 py-10 text-center dark:border-gray-600">
+
+          <Utensils
+            size={38}
+            className="mb-3 text-gray-400"
+          />
+
+          <h3 className="font-semibold text-gray-700 dark:text-gray-200">
+            No Completed Food Donations Yet
+          </h3>
+
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Your donated food types will appear here after successful completion.
+          </p>
+
+        </div>
+
+      )}
 
     </div>
   );

@@ -1,93 +1,678 @@
-.actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.btn-approve, .btn-reject { padding: 4px 12px; border: none; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; }
-.btn-approve { background: #e2f3e6; color: #1e6f4a; }
-.btn-approve:hover { background: #b8d9c2; }
-.btn-reject { background: #fde8e8; color: #b34141; }
-.btn-reject:hover { background: #f5c6c6; }
-.badge.accepted { background: #d6eaff; color: #1a5a8a; }
-.badge.rejected { background: #fde8e8; color: #b34141; }
-.badge.pending { background: #fff4d6; color: #9e7a2c; }
+/* =========================================
+   NGO MANAGEMENT PAGE
+========================================= */
 
-
-
-.ngo-summary {
-  margin: 20px 0;
+.orphanages-page {
+  width: 100%;
+  min-width: 0;
+  color: #1e293b;
 }
 
-.ngo-summary-card {
+/* Header */
+
+.orphanages-header {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 320px;
-  padding: 20px;
-  background: #fff;
-  border: 1px solid #e2e8e4;
-  border-radius: 14px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 28px;
 }
 
-.ngo-summary-card span,
-.ngo-summary-card small,
-.ngo-results {
-  color: #64748b;
+.orphanages-heading {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.orphanages-heading-icon {
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 15px;
+  background: #e6f4e8;
+  color: #1b5e20;
+}
+
+.orphanages-eyebrow {
+  margin: 0 0 5px;
+  color: #84918a;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.1px;
+}
+
+.orphanages-header h1 {
+  margin: 0;
+  color: #173d24;
+  font-size: 26px;
+  font-weight: 750;
+}
+
+.orphanages-subtitle {
+  margin: 6px 0 0;
+  color: #7b8794;
   font-size: 13px;
 }
 
-.ngo-summary-card strong {
+.orphanages-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 17px;
+  border: 1px solid #d7e8da;
+  border-radius: 9px;
+  background: #ffffff;
   color: #1b5e20;
-  font-size: 30px;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: 0.2s ease;
 }
 
-.ngo-toolbar {
+.orphanages-refresh-btn:hover:not(:disabled) {
+  background: #1b5e20;
+  border-color: #1b5e20;
+  color: #ffffff;
+}
+
+.orphanages-refresh-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* Loading animation */
+
+.orphanages-spinning {
+  animation: orphanages-spin 1s linear infinite;
+}
+
+@keyframes orphanages-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =========================================
+   SUMMARY CARDS
+========================================= */
+
+.orphanages-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 25px;
+}
+
+.orphanages-stat-card {
+  min-width: 0;
+  padding: 21px 22px;
+  border: 1px solid #e6ece7;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 3px 12px rgba(20, 60, 30, 0.035);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.orphanages-stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 7px 20px rgba(20, 60, 30, 0.07);
+}
+
+.orphanages-stat-top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
   margin-bottom: 16px;
 }
 
-.ngo-toolbar .search-input {
-  box-sizing: border-box;
+.orphanages-stat-icon {
+  width: 39px;
+  height: 39px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+}
+
+.orphanages-stat-icon.total {
+  background: #e8f1ff;
+  color: #3474c5;
+}
+
+.orphanages-stat-icon.active {
+  background: #e5f5e9;
+  color: #218348;
+}
+
+.orphanages-stat-icon.blocked {
+  background: #fff0ed;
+  color: #dc5147;
+}
+
+.orphanages-stat-label {
+  color: #66756b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.orphanages-stat-card > strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #183e25;
+  font-size: 30px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.orphanages-stat-card > small {
+  color: #929e96;
+  font-size: 12px;
+}
+
+/* =========================================
+   MAIN CONTENT
+========================================= */
+
+.orphanages-content {
+  overflow: hidden;
+  border: 1px solid #e5ebe6;
+  border-radius: 15px;
+  background: #ffffff;
+  box-shadow: 0 3px 14px rgba(20, 60, 30, 0.035);
+}
+
+.orphanages-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 23px;
+  border-bottom: 1px solid #edf1ed;
+}
+
+.orphanages-toolbar h2 {
+  margin: 0;
+  color: #203d29;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.orphanages-toolbar p {
+  margin: 5px 0 0;
+  color: #89958d;
+  font-size: 12px;
+}
+
+/* Search */
+
+.orphanages-search {
   width: 100%;
-  max-width: 420px;
-  padding: 11px 14px;
-  border: 1px solid #d1d5db;
+  max-width: 340px;
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  border: 1px solid #dfe7e1;
   border-radius: 9px;
-  outline: none;
+  background: #fbfdfb;
+  color: #8a978e;
+  transition: 0.2s ease;
 }
 
-.ngo-toolbar .search-input:focus {
+.orphanages-search:focus-within {
   border-color: #2e7d32;
-  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
+  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
 }
 
-.ngo-results {
-  margin-bottom: 12px;
+.orphanages-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #334155;
+  font-size: 12px;
 }
 
-.ngo-message,
-.ngo-empty {
-  padding: 24px;
-  color: #64748b;
-  text-align: center;
+.orphanages-search input::placeholder {
+  color: #a0aaa3;
 }
 
-.ngo-error {
-  padding: 20px;
-  color: #b91c1c;
-}
-
-.ngo-error button {
-  margin-top: 10px;
-  padding: 8px 14px;
-  border: 0;
-  border-radius: 8px;
-  background: #1b5e20;
-  color: #fff;
+.orphanages-clear-search {
+  padding: 0 3px;
+  border: none;
+  background: transparent;
+  color: #7b8980;
+  font-size: 21px;
   cursor: pointer;
 }
 
-@media (max-width: 640px) {
-  .table-wrap {
-    overflow-x: auto;
+/* Table information */
+
+.orphanages-table-info {
+  padding: 15px 23px 12px;
+  color: #89958d;
+  font-size: 12px;
+}
+
+.orphanages-table-info strong {
+  color: #315c3b;
+  font-weight: 700;
+}
+
+/* =========================================
+   TABLE
+========================================= */
+
+.orphanages-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.orphanages-table {
+  width: 100%;
+  min-width: 1100px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.orphanages-table thead {
+  background: #f6f9f6;
+}
+
+.orphanages-table th {
+  padding: 14px 13px;
+  color: #728078;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.55px;
+  white-space: nowrap;
+  border-top: 1px solid #edf1ed;
+  border-bottom: 1px solid #e9eee9;
+}
+
+.orphanages-table td {
+  padding: 15px 13px;
+  border-bottom: 1px solid #edf1ed;
+  color: #526157;
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+.orphanages-table tbody tr {
+  transition: background 0.18s ease;
+}
+
+.orphanages-table tbody tr:hover {
+  background: #f9fcf9;
+}
+
+.orphanages-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.orphanages-index {
+  color: #96a198 !important;
+  font-weight: 600;
+}
+
+/* NGO information */
+
+.orphanages-ngo-info {
+  min-width: 185px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.orphanages-avatar {
+  width: 39px;
+  height: 39px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: #e9f4eb;
+  color: #28713a;
+}
+
+.orphanages-ngo-details {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.orphanages-ngo-details strong {
+  max-width: 180px;
+  overflow: hidden;
+  color: #263f2d;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orphanages-ngo-details span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #89958d;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* Contact and address */
+
+.orphanages-contact,
+.orphanages-address,
+.orphanages-org-id,
+.orphanages-date {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #66756b;
+  font-size: 11px;
+}
+
+.orphanages-contact svg,
+.orphanages-address svg,
+.orphanages-org-id svg,
+.orphanages-date svg {
+  flex-shrink: 0;
+  color: #91a197;
+}
+
+.orphanages-address {
+  max-width: 170px;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+
+.orphanages-address span {
+  overflow-wrap: anywhere;
+}
+
+.orphanages-org-id {
+  white-space: nowrap;
+}
+
+/* Status badge */
+
+.orphanages-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.orphanages-status.active {
+  background: #e6f5e9;
+  color: #238047;
+}
+
+.orphanages-status.blocked {
+  background: #fff0ee;
+  color: #cf4942;
+}
+
+.orphanages-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Action buttons */
+
+.orphanages-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.orphanages-action-btn {
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.orphanages-action-btn.activate {
+  border-color: #cce8d2;
+  background: #eff8f1;
+  color: #287a40;
+}
+
+.orphanages-action-btn.activate.selected,
+.orphanages-action-btn.activate:hover:not(:disabled) {
+  border-color: #258044;
+  background: #258044;
+  color: #ffffff;
+}
+
+.orphanages-action-btn.block {
+  border-color: #f4d4d1;
+  background: #fff4f2;
+  color: #c94e45;
+}
+
+.orphanages-action-btn.block.selected,
+.orphanages-action-btn.block:hover:not(:disabled) {
+  border-color: #d64d43;
+  background: #d64d43;
+  color: #ffffff;
+}
+
+.orphanages-action-btn:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+/* =========================================
+   LOADING, ERROR AND EMPTY STATES
+========================================= */
+
+.orphanages-state {
+  min-height: 250px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 25px;
+  color: #75847a;
+  text-align: center;
+}
+
+.orphanages-state > svg {
+  color: #328044;
+}
+
+.orphanages-state p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.orphanages-state.error > svg {
+  color: #dc5147;
+}
+
+.orphanages-state h3 {
+  margin: 0;
+  color: #34483a;
+  font-size: 17px;
+}
+
+.orphanages-state.error p {
+  max-width: 420px;
+  line-height: 1.6;
+}
+
+.orphanages-retry-btn {
+  margin-top: 5px;
+  padding: 9px 17px;
+  border: none;
+  border-radius: 8px;
+  background: #1b5e20;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.orphanages-retry-btn:hover {
+  background: #144719;
+}
+
+.orphanages-empty {
+  min-height: 210px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: #9aa69d;
+  text-align: center;
+}
+
+.orphanages-empty svg {
+  color: #a4b8a8;
+}
+
+.orphanages-empty h3 {
+  margin: 0;
+  color: #405447;
+  font-size: 15px;
+}
+
+.orphanages-empty p {
+  margin: 0;
+  color: #929e96;
+  font-size: 12px;
+}
+
+/* =========================================
+   RESPONSIVE DESIGN
+========================================= */
+
+@media (max-width: 1000px) {
+  .orphanages-stats {
+    gap: 12px;
   }
 
-  .table-wrap table {
-    min-width: 900px;
+  .orphanages-stat-card {
+    padding: 17px;
+  }
+
+  .orphanages-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .orphanages-search {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .orphanages-header {
+    align-items: flex-start;
+  }
+
+  .orphanages-header h1 {
+    font-size: 22px;
+  }
+
+  .orphanages-subtitle {
+    max-width: 350px;
+    line-height: 1.5;
+  }
+
+  .orphanages-heading-icon {
+    width: 46px;
+    height: 46px;
+  }
+
+  .orphanages-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .orphanages-stat-card:first-child {
+    grid-column: span 2;
+  }
+
+  .orphanages-content {
+    border-radius: 12px;
+  }
+
+  .orphanages-toolbar {
+    padding: 18px;
+  }
+
+  .orphanages-table-info {
+    padding-left: 18px;
+  }
+}
+
+@media (max-width: 520px) {
+  .orphanages-header {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .orphanages-refresh-btn {
+    align-self: flex-end;
+  }
+
+  .orphanages-heading {
+    align-items: flex-start;
+    gap: 11px;
+  }
+
+  .orphanages-header h1 {
+    font-size: 20px;
+  }
+
+  .orphanages-eyebrow {
+    font-size: 9px;
+  }
+
+  .orphanages-subtitle {
+    font-size: 12px;
+  }
+
+  .orphanages-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .orphanages-stat-card:first-child {
+    grid-column: auto;
+  }
+
+  .orphanages-stat-card {
+    padding: 17px;
+  }
+
+  .orphanages-toolbar h2 {
+    font-size: 15px;
+  }
+
+  .orphanages-search {
+    min-width: 0;
   }
 }
