@@ -159,11 +159,9 @@ const Reports = () => {
     <div className="page reports-page">
       <div className="reports-hero">
         <div>
-          <span className="reports-eyebrow">
-            FEEDLINK • ADMIN INTELLIGENCE
-          </span>
+          
 
-          <h1>Reports & Analytics</h1>
+          <h1>Analytics</h1>
 
           <p>
             Monitor food donations, donor contributions and NGO
@@ -172,14 +170,7 @@ const Reports = () => {
         </div>
 
         <div className="reports-actions">
-          <button
-            type="button"
-            className="report-export-btn"
-            onClick={exportCSV}
-            disabled={!report || loading}
-          >
-            ↓ Export CSV
-          </button>
+          
 
           <button
             type="button"

@@ -22,8 +22,9 @@ import {
   fetchAvailableDonations,
   acceptDonation,
   updateDonationStatus,
+  submitDistributionProof,
+  fetchNgoCompletedDonations,
 } from "../../services/api";
-import axios from "axios";
 
 export default function NGODashboard() {
   const navigate = useNavigate();
@@ -37,6 +38,7 @@ export default function NGODashboard() {
     foodWasteSaved: "0 Kg",
   });
   const [requests, setRequests] = useState([]);
+  const [completedDonations, setCompletedDonations] = useState([]);
   const [ngoId, setNgoId] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
@@ -50,9 +52,10 @@ export default function NGODashboard() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const [statsRes, profileRes] = await Promise.all([
+      const [statsRes, profileRes, completedRes] = await Promise.all([
         fetchNgoStats().catch(() => null),
         fetchNgoProfile().catch(() => null),
+        fetchNgoCompletedDonations().catch(() => []),
       ]);
 
       if (statsRes) {
@@ -68,6 +71,9 @@ export default function NGODashboard() {
 
       const profileData = profileRes?.ngo || profileRes;
       setNgoId(profileData?._id || profileData?.id || null);
+      setCompletedDonations(
+        Array.isArray(completedRes) ? completedRes : completedRes?.donations || []
+      );
 
       navigator.geolocation?.getCurrentPosition(
         async (pos) => {
@@ -84,19 +90,22 @@ export default function NGODashboard() {
       console.error("Error fetching dashboard data:", err);
     }
   }, []);
-
   useEffect(() => {
     loadDashboard();
 
     const socket = getSocket();
-    if (socket) {
-      socket.on("donation:new", loadDashboard);
-      socket.on("donation:updated", loadDashboard);
-      return () => {
-        socket.off("donation:new", loadDashboard);
-        socket.off("donation:updated", loadDashboard);
-      };
-    }
+
+    if (!socket) return;
+
+    socket.on("donation:new", loadDashboard);
+    socket.on("donation:priority-new", loadDashboard);
+    socket.on("donation:updated", loadDashboard);
+
+    return () => {
+      socket.off("donation:new", loadDashboard);
+      socket.off("donation:priority-new", loadDashboard);
+      socket.off("donation:updated", loadDashboard);
+    };
   }, [loadDashboard]);
 
   const handleAccept = async (donationId) => {
@@ -131,30 +140,57 @@ export default function NGODashboard() {
   // ডিস্ট্রিবিউশন প্রুফ সাবমিট করার হ্যান্ডলার
   const handleDistributionSubmit = async (e) => {
     e.preventDefault();
+
     if (!ngoId) {
       alert("NGO Profile ID not found.");
       return;
     }
 
+    if (!selectedDonationForDist?._id) {
+      setDistMessage("❌ Please select a donation first.");
+      return;
+    }
+
     setDistLoading(true);
+    setDistMessage("");
+
     try {
-      await axios.post('/api/ngo/submit-distribution', {
+      await submitDistributionProof({
         ngoId,
-        restaurantId: selectedDonationForDist?.donor?._id || selectedDonationForDist?.restaurantId,
-        donationId: selectedDonationForDist?._id,
+        restaurantId:
+          selectedDonationForDist?.donor?._id ||
+          selectedDonationForDist?.restaurantId,
+        donationId: selectedDonationForDist._id,
         description,
         imageUrl,
-        ngoName: user?.name || user?.fullName || "NGO Partner"
+        ngoName:
+          user?.name ||
+          user?.fullName ||
+          "NGO Partner",
       });
-      setDistMessage("📦 Distribution proof submitted successfully and restaurant notified!");
+
+      setDistMessage(
+        "📦 Distribution proof submitted successfully and restaurant notified!"
+      );
+
       setDescription("");
       setImageUrl("");
+
       setTimeout(() => {
         setShowDistributionModal(false);
+        setSelectedDonationForDist(null);
         setDistMessage("");
       }, 2000);
     } catch (err) {
-      setDistMessage("❌ Failed to submit. Please check inputs.");
+      console.error(
+        "Distribution proof submission failed:",
+        err
+      );
+
+      setDistMessage(
+        err?.response?.data?.message ||
+        "❌ Failed to submit. Please try again."
+      );
     } finally {
       setDistLoading(false);
     }
@@ -189,7 +225,9 @@ export default function NGODashboard() {
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-36">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-semibold text-slate-400">Restaurant Ratings</p>
+              <p className="text-xs font-semibold text-slate-400">
+                Donor Ratings
+              </p>
               <h3 className="text-3xl font-bold text-slate-900 mt-2">
                 {stats.trustScore} <span className="text-amber-400 text-xl">★</span>
               </h3>
@@ -200,7 +238,7 @@ export default function NGODashboard() {
           </div>
           <div className="flex justify-between items-center text-[11px]">
             <span className="text-slate-600 font-semibold bg-slate-100 px-2 py-0.5 rounded-md">
-              {stats.reviewCount} Reviews Given
+              {stats.reviewCount} Reviews Received
             </span>
             <span className="text-slate-400">Live</span>
           </div>
@@ -229,15 +267,15 @@ export default function NGODashboard() {
       <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-5 rounded-2xl text-white flex justify-between items-center shadow-md">
         <div>
           <h3 className="font-bold text-lg">🚚 Completed Food Distribution?</h3>
-          <p className="text-xs text-emerald-100 mt-1">Submit proof photos & details so restaurants can view and rate your performance.</p>
+          <p className="text-xs text-emerald-100 mt-1">Submit proof photos & details for a completed donation so the restaurant can view your distribution.</p>
         </div>
         <button
           onClick={() => {
-            if (requests.length > 0) {
-              setSelectedDonationForDist(requests[0]);
+            if (completedDonations.length > 0) {
+              setSelectedDonationForDist(completedDonations[0]);
               setShowDistributionModal(true);
             } else {
-              alert("No active donation available to submit proof for.");
+              alert("No completed donation is available for distribution proof yet.");
             }
           }}
           className="bg-white text-emerald-800 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-emerald-50 transition cursor-pointer flex items-center gap-2 shadow"
@@ -367,6 +405,10 @@ export default function NGODashboard() {
             )}
 
             <form onSubmit={handleDistributionSubmit} className="space-y-4">
+              <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-700">
+                <span className="font-bold">Completed donation: </span>
+                {selectedDonationForDist?.foodName || selectedDonationForDist?.donationId || "Selected donation"}
+              </div>
               <div>
                 <label className="block text-slate-700 text-xs font-bold mb-1">Distribution Description</label>
                 <textarea
@@ -380,11 +422,11 @@ export default function NGODashboard() {
               </div>
 
               <div>
-                <label className="block text-slate-700 text-xs font-bold mb-1">Image URL / Proof Link</label>
+                <label className="block text-slate-700 text-xs font-bold mb-1">Proof Image URL</label>
                 <input
                   type="text"
                   className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-emerald-500 text-xs text-slate-800"
-                  placeholder="Paste image URL here..."
+                  placeholder="https://example.com/distribution-proof.jpg"
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
                   required

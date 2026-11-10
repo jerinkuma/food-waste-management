@@ -368,6 +368,10 @@ const createDonation = async (req, res) => {
       .to(rooms.admins())
       .emit("donation:new", donation);
 
+    getIO()
+      .to(rooms.restaurant(donor.toString()))
+      .emit("donation:new", donation);
+
     // ==================================================
     // PRIORITY NOTIFICATION SYSTEM (Instant for Followers ONLY)
     // ==================================================
@@ -1546,6 +1550,10 @@ const rejectDonation = async (req, res) => {
       .to(rooms.ngos())
       .emit("donation:updated", updated);
 
+    getIO()
+      .to(rooms.admins())
+      .emit("donation:updated", updated);
+
     return res.json({
       success: true,
       message: "Your donation request has been withdrawn.",
@@ -1789,6 +1797,30 @@ const getDonorDashboard = async (
         createdAt: -1,
       });
 
+    const getPipelineStatus = (donation) => {
+      const pipeline = String(donation.pipelineStatus || "").trim().toLowerCase();
+      const legacy = String(donation.status || "").trim().toLowerCase();
+      const statuses = [pipeline, legacy];
+
+      if (statuses.some((status) => status === "completed" || status === "delivered")) return "Completed";
+      if (statuses.includes("rejected")) return "Rejected";
+      if (statuses.some((status) =>
+        ["out for delivery", "delivery man assigned", "food picked up", "in transit"].includes(status)
+      )) return "Out for Delivery";
+      if (statuses.some((status) => ["accepted", "ngo requested"].includes(status))) return "Accepted";
+      return "Pending";
+    };
+
+    const getCompletedAt = (donation) => {
+      const historyDate = [...(donation.statusHistory || [])]
+        .reverse()
+        .find((item) =>
+          String(item.status || "").trim().toLowerCase() === "completed" &&
+          item.changedAt
+        )?.changedAt;
+      return donation.verification?.verifiedAt || historyDate || null;
+    };
+
     // ==================================================
     // NGO RATING AVERAGE
     // ONLY Donation.rating.score
@@ -1832,7 +1864,12 @@ const getDonorDashboard = async (
 
     const ratingsByNgo = ratedDonations
       .map((donation) => {
+        const acceptedNgoRequest = (donation.ngoRequests || []).find(
+          (request) => String(request.status || "").toLowerCase() === "accepted"
+        );
         const ngo =
+          donation.selectedNgo ||
+          acceptedNgoRequest?.requestedBy ||
           donation.ngoRequest?.requestedBy;
 
         if (!ngo?._id) {
@@ -1949,27 +1986,27 @@ const getDonorDashboard = async (
 
     const pending = donations.filter(
       (donation) =>
-        donation.pipelineStatus === "Pending"
+        getPipelineStatus(donation) === "Pending"
     ).length;
 
     const accepted = donations.filter(
       (donation) =>
-        donation.pipelineStatus === "Accepted"
+        getPipelineStatus(donation) === "Accepted"
     ).length;
 
     const outForDelivery = donations.filter(
       (donation) =>
-        donation.pipelineStatus === "Out for Delivery"
+        getPipelineStatus(donation) === "Out for Delivery"
     ).length;
 
     const completed = donations.filter(
       (donation) =>
-        donation.pipelineStatus === "Completed"
+        getPipelineStatus(donation) === "Completed"
     ).length;
 
     const rejected = donations.filter(
       (donation) =>
-        donation.pipelineStatus === "Rejected"
+        getPipelineStatus(donation) === "Rejected"
     ).length;
 
     // ==================================================
@@ -1978,7 +2015,7 @@ const getDonorDashboard = async (
 
     const completedDonationList = donations.filter(
       (donation) =>
-        donation.pipelineStatus === "Completed"
+        getPipelineStatus(donation) === "Completed"
     );
 
     // ==================================================
@@ -1992,8 +2029,8 @@ const getDonorDashboard = async (
         );
 
         if (
-          !Number.isNaN(meals) &&
-          meals >= 0
+          Number.isFinite(meals) &&
+          meals > 0
         ) {
           return totalMeals + meals;
         }
@@ -2076,11 +2113,9 @@ const getDonorDashboard = async (
       }
 
       // Count only active statuses
-      return [
-        "Pending",
-        "Accepted",
-        "Out for Delivery",
-      ].includes(donation.pipelineStatus);
+      return ["Pending", "Accepted", "Out for Delivery"].includes(
+        getPipelineStatus(donation)
+      );
     }).length;
     // ==================================================
     // RECENT DONATIONS
@@ -2166,7 +2201,12 @@ const getDonorDashboard = async (
     const ngoMap = new Map();
 
     donations.forEach((donation) => {
+      const acceptedNgoRequest = (donation.ngoRequests || []).find(
+        (request) => String(request.status || "").toLowerCase() === "accepted"
+      );
       const ngo =
+        donation.selectedNgo ||
+        acceptedNgoRequest?.requestedBy ||
         donation.ngoRequest?.requestedBy;
 
       if (!ngo?._id) {
@@ -2212,7 +2252,7 @@ const getDonorDashboard = async (
       partner.requestCount += 1;
 
       if (
-        donation.pipelineStatus === "Completed"
+        getPipelineStatus(donation) === "Completed"
       ) {
         partner.quantity +=
           Number(donation.quantity) || 0;
@@ -2282,8 +2322,8 @@ const getDonorDashboard = async (
         createdAt: donation.createdAt,
 
         completedAt:
-          donation.pipelineStatus === "Completed"
-            ? donation.updatedAt
+          getPipelineStatus(donation) === "Completed"
+            ? getCompletedAt(donation)
             : null,
       });
     });
@@ -2711,6 +2751,7 @@ const listAvailableDonations = async (req, res) => {
     // Fetch only non-expired pending donations
     const donations = await Donation.find({
       pipelineStatus: "Pending",
+      selectedNgo: null,
       $or: [
         { bestBefore: { $gt: now } },
         { bestBefore: { $exists: false } },
@@ -3310,14 +3351,19 @@ const updateDonationStatus = async (
           "name email role"
         )
         .populate({
-          path:
-            "ngoRequest.requestedBy",
-          select:
-            "organizationId phone address user",
+          path: "ngoRequest.requestedBy",
+          select: "organizationId phone address user",
           populate: {
             path: "user",
-            select:
-              "name email",
+            select: "name email",
+          },
+        })
+        .populate({
+          path: "selectedNgo",
+          select: "organizationId phone address user",
+          populate: {
+            path: "user",
+            select: "name email",
           },
         });
 
@@ -3334,24 +3380,20 @@ const updateDonationStatus = async (
         );
     }
 
-    if (
-      updated.ngoRequest
-        ?.requestedBy
-    ) {
+    const assignedNgoUserId =
+      updated.selectedNgo?.user?._id ||
+      updated.ngoRequest?.requestedBy?.user?._id;
+
+    if (assignedNgoUserId) {
       getIO()
-        .to(
-          rooms.ngo(
-            updated.ngoRequest
-              .requestedBy
-              ._id
-              .toString()
-          )
-        )
-        .emit(
-          "donation:updated",
-          updated
-        );
+        .to(rooms.ngo(assignedNgoUserId.toString()))
+        .emit("donation:updated", updated);
     }
+
+    // Keep all NGO dashboards in sync with the shared donation pipeline.
+    getIO()
+      .to(rooms.ngos())
+      .emit("donation:updated", updated);
 
     getIO()
       .to(rooms.admins())
@@ -3738,7 +3780,6 @@ const getDonorNgoAnalytics = async (req, res) => {
     // Fetch only this donor's completed donations
     const donations = await Donation.find({
       donor: donorId,
-      pipelineStatus: "Completed",
     })
       .populate({
         path: "selectedNgo",
@@ -3756,14 +3797,32 @@ const getDonorNgoAnalytics = async (req, res) => {
           select: "name",
         },
       })
+      .populate({
+        path: "ngoRequests.requestedBy",
+        select: "organizationName organizationId user",
+        populate: {
+          path: "user",
+          select: "name",
+        },
+      })
       .sort({ createdAt: -1 });
 
     const ngoMap = new Map();
 
-    donations.forEach((donation) => {
-      // Selected NGO first, legacy field as fallback
+    donations
+      .filter((donation) => {
+        return [donation.pipelineStatus, donation.status].some((value) =>
+          ["completed", "delivered"].includes(String(value || "").trim().toLowerCase())
+        );
+      })
+      .forEach((donation) => {
+      // Selected NGO first, accepted request second, legacy field last.
+      const acceptedRequest = (donation.ngoRequests || []).find(
+        (request) => String(request.status || "").toLowerCase() === "accepted"
+      );
       const ngo =
         donation.selectedNgo ||
+        acceptedRequest?.requestedBy ||
         donation.ngoRequest?.requestedBy;
 
       if (!ngo?._id) return;
@@ -3776,15 +3835,20 @@ const getDonorNgoAnalytics = async (req, res) => {
       );
 
       // Completion date
+      const completedHistory = [...(donation.statusHistory || [])]
+        .reverse()
+        .find((item) =>
+          String(item.status || "").trim().toLowerCase() === "completed" &&
+          item.changedAt
+        );
+
       const completedDate =
         donation.verification?.verifiedAt ||
-        donation.statusHistory?.find(
-          (item) => item.status === "Completed"
-        )?.changedAt ||
-        donation.updatedAt;
+        completedHistory?.changedAt ||
+        null;
 
+      if (!completedDate) return;
       const date = new Date(completedDate);
-
       if (Number.isNaN(date.getTime())) return;
 
       if (!ngoMap.has(ngoId)) {

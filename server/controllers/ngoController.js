@@ -1,187 +1,382 @@
 const Ngo = require("../models/Ngo");
-const Donation = require("../models/Donation"); 
-const Distribution = require("../models/Distribution"); 
-const Notification = require("../models/Notification"); 
-const User = require("../models/User"); 
+const Donation = require("../models/Donation");
+const Distribution = require("../models/Distribution");
+const Notification = require("../models/Notification");
+const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const path = require("path");
+const fs = require("fs");
+const { getIO, rooms } = require("../utils/socket");
+
+
+//rating ngo
+
+const Feedback = require("../models/Feedback");
+
+// ======================================================
+// HELPERS
+// ======================================================
+
+const getRequestUserId = (req) => {
+  const fromUser =
+    req.user?._id ||
+    req.user?.id ||
+    req.user?.userId;
+
+  if (fromUser) return String(fromUser);
+
+  const authHeader = req.headers.authorization || "";
+
+  if (!authHeader.startsWith("Bearer ")) return null;
+
+  try {
+    const decoded = jwt.verify(
+      authHeader.slice(7),
+      process.env.JWT_SECRET
+    );
+
+    const id =
+      decoded.id ||
+      decoded.userId ||
+      decoded._id;
+
+    return id ? String(id) : null;
+  } catch {
+    return null;
+  }
+};
+
+const getId = (value) => {
+  if (!value) return "";
+
+  return String(
+    value._id ||
+    value.id ||
+    value
+  );
+};
+
+const isCompletedDonation = (donation) => {
+  const statuses = [
+    donation.pipelineStatus,
+    donation.status,
+  ].map((value) =>
+    String(value || "").trim().toLowerCase()
+  );
+
+  return statuses.some(
+    (status) =>
+      status === "completed" ||
+      status === "delivered"
+  );
+};
+
+const getDonationCompletedAt = (donation) => {
+  const historyDate = [
+    ...(donation.statusHistory || []),
+  ]
+    .reverse()
+    .find(
+      (item) =>
+        String(item.status || "")
+          .trim()
+          .toLowerCase() === "completed" &&
+        item.changedAt
+    )?.changedAt;
+
+  return (
+    donation.verification?.verifiedAt ||
+    historyDate ||
+    null
+  );
+};
+
+const isDonationOwnedByNgo = (donation, ngoId) => {
+  const targetId = String(ngoId);
+
+  if (
+    getId(donation.selectedNgo) === targetId
+  ) {
+    return true;
+  }
+
+  const acceptedRequest = (
+    donation.ngoRequests || []
+  ).some(
+    (request) =>
+      getId(request.requestedBy) === targetId &&
+      String(request.status || "").toLowerCase() ===
+        "accepted"
+  );
+
+  if (acceptedRequest) return true;
+
+  if (
+    getId(donation.ngoRequest?.requestedBy) ===
+    targetId
+  ) {
+    return true;
+  }
+
+  return (
+    getId(donation.ngoId || donation.ngo) ===
+    targetId
+  );
+};
+
+const getCurrentNgoDocument = async (req) => {
+  const userId = getRequestUserId(req);
+
+  if (!userId) {
+    return {
+      userId: null,
+      ngo: null,
+    };
+  }
+
+  const ngo = await Ngo.findOne({
+    user: userId,
+  }).populate("user", "name email");
+
+  return {
+    userId,
+    ngo,
+  };
+};
+
+// ======================================================
+// GET NGO PROFILE
+// ======================================================
 
 const getNgoProfile = async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ success: false, message: "Authorization token missing" });
+
+    if (
+      !authHeader ||
+      !authHeader.startsWith("Bearer ")
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Authorization token missing",
+      });
     }
 
     const token = authHeader.split(" ")[1];
+
     let decoded;
+
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET
+      );
     } catch (error) {
-      return res.status(401).json({ success: false, message: "Invalid or expired token" });
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired token",
+      });
     }
 
-    const userId = decoded.id || decoded.userId || decoded._id;
+    const userId =
+      decoded.id ||
+      decoded.userId ||
+      decoded._id;
+
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User ID not found in token" });
+      return res.status(401).json({
+        success: false,
+        message: "User ID not found in token",
+      });
     }
 
-    const ngo = await Ngo.findOne({ user: userId }).populate("user", "name fullName email role");
+    const ngo = await Ngo.findOne({
+      user: userId,
+    }).populate(
+      "user",
+      "name fullName email role"
+    );
+
     if (!ngo) {
-      return res.status(404).json({ success: false, message: "NGO profile not found for this account" });
+      return res.status(404).json({
+        success: false,
+        message:
+          "NGO profile not found for this account",
+      });
     }
 
-    return res.status(200).json({ success: true, ngo });
+    return res.status(200).json({
+      success: true,
+      ngo,
+    });
   } catch (error) {
     console.error("Get NGO Profile Error:", error);
-    return res.status(500).json({ success: false, message: "Server error", error: error.message });
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
   }
 };
 
+// ======================================================
+// GET NGO STATS
+// ======================================================
+
+
 const getNgoStats = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ success: false, message: "Authorization token missing" });
-    }
+    const { userId, ngo } =
+      await getCurrentNgoDocument(req);
 
-    const token = authHeader.split(" ")[1];
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (error) {
-      return res.status(401).json({ success: false, message: "Invalid or expired token" });
-    }
-
-    const userIdStr = String(decoded.id || decoded.userId || decoded._id || "");
-    const ngoDoc = await Ngo.findOne({ user: userIdStr }).lean();
-    const ngoIdStr = ngoDoc ? String(ngoDoc._id) : "";
-
-    const allLogs = await Donation.find({}).lean();
-
-    // শুধুমাত্র কমপ্লিটেড এবং ভ্যালিড লগগুলো ফিল্টার করা
-    const myLogs = allLogs.filter((d) => {
-      const isCompleted = String(d.status || '').toLowerCase() === 'completed' || String(d.pipelineStatus || '').toLowerCase() === 'completed';
-      
-      const requestedBy = String(d.ngoRequest?.requestedBy || "");
-      const historyMatches = Array.isArray(d.statusHistory) && d.statusHistory.some((h) => {
-        const changedBy = String(h.changedBy || "");
-        return (userIdStr && changedBy === userIdStr) || (ngoIdStr && changedBy === ngoIdStr);
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message:
+          "Authorization token missing or invalid.",
       });
-      const directNgoId = String(d.ngoId?._id || d.ngoId || d.ngo?._id || d.ngo || "");
+    }
 
-      const isRequestedByMe = (userIdStr && requestedBy === userIdStr) || (ngoIdStr && requestedBy === ngoIdStr);
-      const isDirectMatch = (userIdStr && directNgoId === userIdStr) || (ngoIdStr && directNgoId === ngoIdStr);
+    if (!ngo) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "NGO profile not found for this account.",
+      });
+    }
 
-      const isMine = isRequestedByMe || historyMatches || isDirectMatch;
+    const allDonations = await Donation.find({}).lean();
 
-      return isCompleted && isMine;
+    const completedDonations = allDonations.filter(
+      (donation) =>
+        isCompletedDonation(donation) &&
+        isDonationOwnedByNgo(donation, ngo._id)
+    );
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    let totalMeals = 0;
+    let totalWasteKg = 0;
+    let todayClaimed = 0;
+    let todayMeals = 0;
+
+    completedDonations.forEach((donation) => {
+      const quantity = Number(donation.quantity) || 0;
+
+      const storedMeals = Number(donation.estimatedMeals);
+
+      const meals =
+        Number.isFinite(storedMeals) && storedMeals > 0
+          ? storedMeals
+          : Math.floor(quantity * 4);
+
+      totalMeals += meals;
+      totalWasteKg += quantity;
+
+      const completedAt = getDonationCompletedAt(donation);
+
+      if (completedAt) {
+        const completedDate = new Date(completedAt);
+
+        if (
+          completedDate >= todayStart &&
+          completedDate < tomorrowStart
+        ) {
+          todayClaimed += 1;
+          todayMeals += meals;
+        }
+      }
     });
 
-    const totalClaimed = myLogs.length;
+    // =====================================
+    // DONOR -> NGO RATINGS
+    // =====================================
+    // Ratings are stored in Feedback collection.
+    // Only ratings submitted by Donors for this NGO
+    // are included in the NGO's trust score.
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayClaimed = myLogs.filter((d) => {
-      const dDate = new Date(d.createdAt || d.pickupDate);
-      return dDate >= today;
-    }).length;
+    const donorRatings = await Feedback.find({
+      ngo: ngo._id,
+      submittedBy: "Donor",
+      category: "NGO Rating",
+      rating: {
+        $gte: 1,
+        $lte: 5,
+      },
+    })
+      .select("rating")
+      .lean();
 
-    let mealsDistributed = 0;
-    let wasteInKg = 0;
+    const validRatings = donorRatings
+      .map((item) => Number(item.rating))
+      .filter(
+        (score) =>
+          Number.isFinite(score) &&
+          score >= 1 &&
+          score <= 5
+      );
 
-    myLogs.forEach((d) => {
-      const estMeals = Number(d.estimatedMeals) || 0;
-      let qtyNum = Number(d.quantity) || parseFloat(String(d.quantity || "0").replace(/[^0-9.]/g, "")) || 0;
-
-      if (estMeals > 0) {
-        mealsDistributed += estMeals;
-      } else if (qtyNum > 0) {
-        mealsDistributed += Math.round(qtyNum * 4);
-      }
-
-      if (qtyNum > 0) {
-        wasteInKg += qtyNum;
-      }
-    });
-
-    const foodWasteSaved = `${wasteInKg.toFixed(1)} Kg`;
+    const trustScore = validRatings.length
+      ? Number(
+          (
+            validRatings.reduce(
+              (sum, score) => sum + score,
+              0
+            ) / validRatings.length
+          ).toFixed(1)
+        )
+      : 0;
 
     return res.status(200).json({
       success: true,
       stats: {
-        totalClaimed: totalClaimed,
-        todayClaimed: todayClaimed,
-        mealsDistributed: mealsDistributed,
-        todayMeals: 0,
-        trustScore: 0.0,
-        reviewCount: 0,
-        foodWasteSaved: foodWasteSaved,
+        totalClaimed: completedDonations.length,
+        todayClaimed,
+        mealsDistributed: totalMeals,
+        todayMeals,
+        trustScore,
+        reviewCount: validRatings.length,
+        foodWasteSaved: `${totalWasteKg.toFixed(1)} Kg`,
       },
     });
   } catch (error) {
     console.error("Get NGO Stats Error:", error);
-    return res.status(500).json({ success: false, message: "Server error", error: error.message });
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Server error while loading NGO statistics.",
+      error: error.message,
+    });
   }
 };
 
-const getNgoCompletedDonations = async (req, res) => {
+
+// ======================================================
+// GET NGO COMPLETED DONATIONS
+// ======================================================
+
+const getNgoCompletedDonations = async (
+  req,
+  res
+) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ success: false, message: "Authorization token missing" });
-    }
+    const { userId, ngo } =
+      await getCurrentNgoDocument(req);
 
-    const token = authHeader.split(" ")[1];
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (err) {
-      return res.status(401).json({ success: false, message: "Invalid token" });
-    }
-
-    const userIdStr = String(decoded.id || decoded.userId || decoded._id || "");
-    const ngoDoc = await Ngo.findOne({ user: userIdStr }).lean();
-    const ngoIdStr = ngoDoc ? String(ngoDoc._id) : "";
-
-    const allDonations = await Donation.find({})
-      .populate('donor', 'name organizationName email restaurantName businessName')
-      .lean();
-
-    const completedList = allDonations.filter((d) => {
-      const isCompleted = String(d.status || '').toLowerCase() === 'completed' || String(d.pipelineStatus || '').toLowerCase() === 'completed';
-      
-      const requestedBy = String(d.ngoRequest?.requestedBy || "");
-      const historyMatches = Array.isArray(d.statusHistory) && d.statusHistory.some((h) => {
-        const changedBy = String(h.changedBy || "");
-        return (userIdStr && changedBy === userIdStr) || (ngoIdStr && changedBy === ngoIdStr);
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message:
+          "Authorization token missing or invalid.",
       });
-      const directNgoId = String(d.ngoId?._id || d.ngoId || d.ngo?._id || d.ngo || "");
-
-      const isMine = (userIdStr && requestedBy === userIdStr) || (ngoIdStr && requestedBy === ngoIdStr) || historyMatches || (userIdStr && directNgoId === userIdStr) || (ngoIdStr && directNgoId === ngoIdStr);
-
-      return isCompleted && isMine;
-    });
-
-    return res.status(200).json({
-      success: true,
-      donations: completedList,
-    });
-  } catch (error) {
-    console.error("Get Completed Donations Error:", error);
-    return res.status(500).json({ success: false, message: "Server error", error: error.message });
-  }
-};
-
-const submitDistributionProof = async (req, res) => {
-  try {
-    const { restaurantId, donationId, description } = req.body;
-
-    // Logged-in NGO বের করা
-    const ngo = await Ngo.findOne({
-      user: req.user._id,
-    }).populate("user", "name");
+    }
 
     if (!ngo) {
       return res.status(404).json({
@@ -190,173 +385,403 @@ const submitDistributionProof = async (req, res) => {
       });
     }
 
-    let imageUrls = [];
+    const donations = await Donation.find({
+      $or: [
+        {
+          selectedNgo: ngo._id,
+        },
+        {
+          ngoRequests: {
+            $elemMatch: {
+              requestedBy: ngo._id,
+              status: "Accepted",
+            },
+          },
+        },
+        {
+          "ngoRequest.requestedBy": ngo._id,
+        },
+        {
+          ngoId: ngo._id,
+        },
+        {
+          ngo: ngo._id,
+        },
+      ],
+    })
+      .populate(
+        "donor",
+        "name email organizationName restaurantName businessName"
+      )
+      .sort({
+        updatedAt: -1,
+      })
+      .lean();
 
-    if (req.files && req.files.images) {
-      let uploadedFiles = req.files.images;
+    const completed = donations
+      .filter(isCompletedDonation)
+      .map((donation) => ({
+        ...donation,
+        completedAt:
+          getDonationCompletedAt(donation),
+      }));
 
-      if (!Array.isArray(uploadedFiles)) {
-        uploadedFiles = [uploadedFiles];
-      }
+    return res.status(200).json({
+      success: true,
+      count: completed.length,
+      donations: completed,
+    });
+  } catch (error) {
+    console.error(
+      "Get Completed Donations Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to load completed donations.",
+      error: error.message,
+    });
+  }
+};
+
+// ======================================================
+// SUBMIT DISTRIBUTION PROOF
+// ======================================================
+
+const submitDistributionProof = async (
+  req,
+  res
+) => {
+  try {
+    const { userId, ngo } =
+      await getCurrentNgoDocument(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    if (!ngo) {
+      return res.status(404).json({
+        success: false,
+        message: "NGO profile not found.",
+      });
+    }
+
+    const {
+      donationId,
+      description,
+      imageUrl,
+    } = req.body || {};
+
+    if (!donationId) {
+      return res.status(400).json({
+        success: false,
+        message: "Donation ID is required.",
+      });
+    }
+
+    let donation = null;
+
+    if (
+      mongoose.Types.ObjectId.isValid(
+        String(donationId)
+      )
+    ) {
+      donation = await Donation.findById(
+        donationId
+      );
+    }
+
+    if (!donation) {
+      donation = await Donation.findOne({
+        donationId: String(donationId),
+      });
+    }
+
+    if (!donation) {
+      return res.status(404).json({
+        success: false,
+        message: "Donation not found.",
+      });
+    }
+
+    if (!isCompletedDonation(donation)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Proof can only be submitted for a completed donation.",
+      });
+    }
+
+    if (
+      !isDonationOwnedByNgo(
+        donation,
+        ngo._id
+      )
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "This completed donation does not belong to your NGO.",
+      });
+    }
+
+    const imageUrls = [];
+
+    const uploadedFiles = req.files?.images
+      ? Array.isArray(req.files.images)
+        ? req.files.images
+        : [req.files.images]
+      : [];
+
+    if (uploadedFiles.length) {
+      const uploadDirectory = path.join(
+        __dirname,
+        "../uploads"
+      );
+
+      fs.mkdirSync(uploadDirectory, {
+        recursive: true,
+      });
 
       for (const file of uploadedFiles) {
-        const fileName = `${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+        const safeName = String(
+          file.name || "proof-image"
+        ).replace(/[^a-zA-Z0-9._-]/g, "_");
+
+        const fileName = `${Date.now()}_${Math.random()
+          .toString(36)
+          .slice(2, 8)}_${safeName}`;
 
         const uploadPath = path.join(
-          __dirname,
-          "../uploads/",
+          uploadDirectory,
           fileName
         );
 
         await file.mv(uploadPath);
 
-        imageUrls.push(`/uploads/${fileName}`);
+        imageUrls.push(
+          `/uploads/${fileName}`
+        );
       }
     }
 
-    if (imageUrls.length === 0) {
+    // Support the existing dashboard image URL input.
+    if (
+      !imageUrls.length &&
+      typeof imageUrl === "string" &&
+      imageUrl.trim()
+    ) {
+      imageUrls.push(imageUrl.trim());
+    }
+
+    if (!imageUrls.length) {
       return res.status(400).json({
         success: false,
-        message: "Please upload at least one image file.",
+        message:
+          "Please provide an image URL or upload at least one proof image.",
       });
     }
 
-    const newDistribution = new Distribution({
-      // NGO document-এর actual MongoDB _id
-      ngoId: ngo._id.toString(),
+    const restaurantId = getId(
+      donation.donor
+    );
 
-      restaurantId: restaurantId
-        ? String(restaurantId)
-        : "manual-restaurant",
+    if (!restaurantId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "The donation has no linked restaurant account.",
+      });
+    }
 
-      donationId: donationId || `DIST-${Date.now()}`,
-
-      description: description || "No description provided",
-
+    const proof = await Distribution.create({
+      ngoId: String(ngo._id),
+      restaurantId,
+      donationId: String(donation._id),
+      description: String(
+        description ||
+          "Food distribution completed."
+      ),
       imageUrl: imageUrls[0],
-      imageUrls: imageUrls,
+      imageUrls,
     });
 
-    await newDistribution.save();
+    const payload = {
+      ...proof.toObject(),
+
+      ngoName:
+        ngo.user?.name || "NGO Partner",
+
+      ngoOrganizationId:
+        ngo.organizationId,
+
+      donation: {
+        _id: donation._id,
+        donationId: donation.donationId,
+        foodName: donation.foodName,
+      },
+    };
+
+    getIO()
+      .to(rooms.restaurant(restaurantId))
+      .emit(
+        "donation:distribution-proof",
+        payload
+      );
+
+    getIO()
+      .to(rooms.admins())
+      .emit(
+        "donation:distribution-proof",
+        payload
+      );
 
     return res.status(201).json({
       success: true,
-      message: "Distribution proof submitted successfully!",
-      data: newDistribution,
-      ngoName: ngo.user?.name || "NGO Partner",
-      ngoOrganizationId: ngo.organizationId,
+      message:
+        "Distribution proof submitted successfully.",
+      data: payload,
     });
-
   } catch (error) {
-    console.error("Submit Distribution Error:", error);
+    console.error(
+      "Submit Distribution Error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message:
+        "Failed to submit distribution proof.",
+      error: error.message,
     });
   }
 };
 
+// ======================================================
+// GET DONOR DISTRIBUTION PROOFS
+// ======================================================
 
-
-const getDonorDistributionProofs = async (req, res) => {
+const getDonorDistributionProofs = async (
+  req,
+  res
+) => {
   try {
     const donorId = req.user._id.toString();
 
     const proofs = await Distribution.find({
       restaurantId: donorId,
-    }).sort({ createdAt: -1 });
+    }).sort({
+      createdAt: -1,
+    });
 
-    const proofsWithNgoDetails = await Promise.all(
-      proofs.map(async (proof) => {
-        let ngo = null;
+    const proofsWithNgoDetails =
+      await Promise.all(
+        proofs.map(async (proof) => {
+          let ngo = null;
 
-        // 1. First try: NGO document ID
-        if (
-          proof.ngoId &&
-          mongoose.Types.ObjectId.isValid(proof.ngoId)
-        ) {
-          ngo = await Ngo.findById(proof.ngoId)
-            .populate("user", "name");
-
-          // 2. Legacy: NGO User ID
-          if (!ngo) {
-            ngo = await Ngo.findOne({
-              user: proof.ngoId,
-            }).populate("user", "name");
-          }
-        }
-
-        // 3. Fallback: Find NGO through related Donation
-        if (!ngo && proof.donationId) {
-          let donation = null;
-
+          // 1. First try: NGO document ID
           if (
-            mongoose.Types.ObjectId.isValid(proof.donationId)
+            proof.ngoId &&
+            mongoose.Types.ObjectId.isValid(
+              proof.ngoId
+            )
           ) {
-            donation = await Donation.findById(
-              proof.donationId
-            );
+            ngo = await Ngo.findById(
+              proof.ngoId
+            ).populate("user", "name");
+
+            // 2. Legacy: NGO User ID
+            if (!ngo) {
+              ngo = await Ngo.findOne({
+                user: proof.ngoId,
+              }).populate("user", "name");
+            }
           }
 
-          // Also support human-readable donationId
-          if (!donation) {
-            donation = await Donation.findOne({
-              donationId: proof.donationId,
-            });
-          }
+          // 3. Fallback: Find NGO through Donation
+          if (!ngo && proof.donationId) {
+            let donation = null;
 
-          if (donation) {
-            // First preference: selected NGO
-            if (donation.selectedNgo) {
-              ngo = await Ngo.findById(
-                donation.selectedNgo
-              ).populate("user", "name");
+            if (
+              mongoose.Types.ObjectId.isValid(
+                proof.donationId
+              )
+            ) {
+              donation = await Donation.findById(
+                proof.donationId
+              );
             }
 
-            // Second preference: accepted NGO request
-            if (!ngo && donation.ngoRequests?.length) {
-              const acceptedRequest =
-                donation.ngoRequests.find(
-                  (request) =>
-                    request.status?.toLowerCase() === "accepted"
-                );
+            if (!donation) {
+              donation = await Donation.findOne({
+                donationId: proof.donationId,
+              });
+            }
 
-              if (acceptedRequest?.requestedBy) {
+            if (donation) {
+              // First preference: selected NGO
+              if (donation.selectedNgo) {
                 ngo = await Ngo.findById(
-                  acceptedRequest.requestedBy
+                  donation.selectedNgo
+                ).populate("user", "name");
+              }
+
+              // Second preference: accepted NGO request
+              if (
+                !ngo &&
+                donation.ngoRequests?.length
+              ) {
+                const acceptedRequest =
+                  donation.ngoRequests.find(
+                    (request) =>
+                      request.status?.toLowerCase() ===
+                      "accepted"
+                  );
+
+                if (
+                  acceptedRequest?.requestedBy
+                ) {
+                  ngo = await Ngo.findById(
+                    acceptedRequest.requestedBy
+                  ).populate("user", "name");
+                }
+              }
+
+              // Third preference: legacy NGO request
+              if (
+                !ngo &&
+                donation.ngoRequest?.requestedBy
+              ) {
+                ngo = await Ngo.findById(
+                  donation.ngoRequest.requestedBy
                 ).populate("user", "name");
               }
             }
-
-            // Third preference: legacy NGO request
-            if (
-              !ngo &&
-              donation.ngoRequest?.requestedBy
-            ) {
-              ngo = await Ngo.findById(
-                donation.ngoRequest.requestedBy
-              ).populate("user", "name");
-            }
           }
-        }
 
-        return {
-          ...proof.toObject(),
+          return {
+            ...proof.toObject(),
 
-          ngoName: ngo?.user?.name || "NGO Partner",
+            ngoName:
+              ngo?.user?.name || "NGO Partner",
 
-          ngoOrganizationId:
-            ngo?.organizationId || "Not available",
-        };
-      })
-    );
+            ngoOrganizationId:
+              ngo?.organizationId ||
+              "Not available",
+          };
+        })
+      );
 
     return res.status(200).json({
       success: true,
       proofs: proofsWithNgoDetails,
     });
-
   } catch (error) {
     console.error(
       "Get Donor Distribution Proofs Error:",
@@ -365,11 +790,15 @@ const getDonorDistributionProofs = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch distribution proofs.",
+      message:
+        "Failed to fetch distribution proofs.",
     });
   }
 };
 
+// ======================================================
+// EXPORTS
+// ======================================================
 
 module.exports = {
   getNgoProfile,

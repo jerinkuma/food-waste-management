@@ -60,7 +60,7 @@ const Sidebar = () => {
       path: "/restaurant/ngo-reviews",
     },
     {
-      title: "Feedback",
+      title: "Feedback & Rating",
       icon: <MessageCircle size={21} />,
       path: "/restaurant/feedback",
     },

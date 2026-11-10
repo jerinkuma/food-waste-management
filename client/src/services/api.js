@@ -61,6 +61,12 @@ export const fetchNgoDonations = async (ngoId) => {
   return data; // { active, archived, count }
 };
 
+// Completed donations owned by the authenticated NGO.
+export const fetchNgoCompletedDonations = async () => {
+  const { data } = await client.get("/ngo/completed-donations");
+  return data.donations || [];
+};
+
 // A restaurant's own posted donations (donor = User id)
 export const fetchRestaurantDonations = async (donorUserId) => {
   const { data } = await client.get(`/donations/donor/${donorUserId}`);
@@ -69,7 +75,7 @@ export const fetchRestaurantDonations = async (donorUserId) => {
 
 export const fetchDonorDashboard = async (donorUserId) => {
   const { data } = await client.get(`/donations/dashboard/${donorUserId}`);
-  return data.dashboard;
+  return data.dashboard || data;
 };
 
 
@@ -84,6 +90,17 @@ export const fetchDonorNgoAnalytics = async (donorUserId) => {
 
 export const createDonation = async (payload) => {
   const { data } = await client.post("/donations", payload);
+  return data;
+};
+
+// Submit NGO distribution proof.
+// Uses the shared Axios client, API_URL and JWT interceptor.
+export const submitDistributionProof = async (payload) => {
+  const { data } = await client.post(
+    "/ngo/submit-distribution",
+    payload
+  );
+
   return data;
 };
 
@@ -179,6 +196,17 @@ export const submitDonorFeedback = async (payload) => {
   const { data } = await client.post("/feedback/donor", payload);
   return data;
 };
+
+
+export const submitDonorNgoRating = async (payload) => {
+  const { data } = await client.post(
+    "/feedback/donor/rating",
+    payload
+  );
+
+  return data;
+};
+
 
 export const fetchDonorNgoReviews = async () => {
   const { data } = await client.get("/feedback/donor/ngo-reviews");

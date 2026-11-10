@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Users,
   Utensils,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { fetchDashboardStats } from "../../services/api";
+import { getSocket } from "../../services/socket";
 import "./Dashboard.css";
 
 const Dashboard = () => {
@@ -23,9 +24,9 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadDashboardStats = async () => {
+  const loadDashboardStats = useCallback(async (showLoader = true) => {
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
       setError("");
 
       const response = await fetchDashboardStats();
@@ -47,13 +48,26 @@ const Dashboard = () => {
           "Could not load dashboard data."
       );
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadDashboardStats();
-  }, []);
+    loadDashboardStats(true);
+
+    const socket = getSocket();
+    const refresh = () => loadDashboardStats(false);
+
+    socket.on("donation:new", refresh);
+    socket.on("donation:updated", refresh);
+    socket.on("donation:distribution-proof", refresh);
+
+    return () => {
+      socket.off("donation:new", refresh);
+      socket.off("donation:updated", refresh);
+      socket.off("donation:distribution-proof", refresh);
+    };
+  }, [loadDashboardStats]);
 
   const formatActivityTime = (value) => {
     if (!value) return "";

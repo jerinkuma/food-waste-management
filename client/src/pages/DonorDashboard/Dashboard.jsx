@@ -1,5 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { io } from "socket.io-client";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 
 import DashboardLayout from "../../components/DonorDashboard/DashboardLayout";
 import StatCard from "../../components/DonorDashboard/StatCard";
@@ -8,7 +12,9 @@ import EnvironmentalImpact from "../../components/DonorDashboard/EnvironmentalIm
 import NGOPerformance from "../../components/DonorDashboard/NGOPerformance";
 import TopDonatedCategories from "../../components/DonorDashboard/TopDonatedCategories";
 
-const SOCKET_URL = "http://localhost:5000";
+import { getCurrentUser } from "../../services/auth";
+import { getSocket } from "../../services/socket";
+import { fetchDonorDashboard } from "../../services/api";
 
 const Dashboard = () => {
   const [dashboard, setDashboard] = useState(null);
@@ -32,321 +38,122 @@ const Dashboard = () => {
   // LOAD DONOR DASHBOARD
   // ==========================================
 
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async (showLoader = true) => {
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
       setError("");
 
-      const userData = localStorage.getItem("user");
+      const user = getCurrentUser();
+      const donorId = user?.id || user?._id;
 
-      console.log("USER FROM LOCAL STORAGE:", userData);
-
-      const user = userData ? JSON.parse(userData) : null;
-
-      console.log("PARSED USER:", user);
-
-      if (!user?.id) {
-        setError("User information not found.");
-        setLoading(false);
+      if (!donorId) {
+        setError("User information not found. Please log in again.");
+        setDashboard(null);
         return;
       }
 
-      const apiUrl = `http://localhost:5000/api/donations/dashboard/${user.id}`;
+      const response = await fetchDonorDashboard(donorId);
+      const data = response?.dashboard || response;
 
-      console.log("DASHBOARD API URL:", apiUrl);
-
-      const response = await fetch(apiUrl, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-
-        // Prevent browser from showing an old cached response
-        cache: "no-store",
-      });
-
-      console.log("DASHBOARD RESPONSE STATUS:", response.status);
-
-      const data = await response.json();
-
-      console.log("DONOR DASHBOARD API RESPONSE:", data);
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to load dashboard."
-        );
-      }
-
-      // ==========================================
-      // NEW BACKEND RESPONSE
-      // ==========================================
-
-      if (data?.dashboard) {
-        console.log(
-          "DASHBOARD DATA FOUND:",
-          data.dashboard
-        );
-
-        setDashboard(data.dashboard);
-
+      if (
+        data &&
+        (
+          Object.prototype.hasOwnProperty.call(data, "totalDonations") ||
+          Object.prototype.hasOwnProperty.call(data, "pickupDonations") ||
+          Object.prototype.hasOwnProperty.call(data, "foodWasteDiverted")
+        )
+      ) {
+        setDashboard(data);
         return;
       }
-
-      // ==========================================
-      // OLD BACKEND RESPONSE SUPPORT
-      // ==========================================
 
       if (data?.stats) {
-        console.log(
-          "OLD STATS DATA FOUND:",
-          data.stats
-        );
-
         const stats = data.stats;
-
-        const fallbackDashboard = {
+        setDashboard({
           totalDonations: stats.total || 0,
-
           todayDonations: 0,
-
           mealsServed: 0,
-
           foodWasteDiverted: 0,
-
           activeDonations:
             (stats.pending || 0) +
             (stats.accepted || 0) +
             (stats.outForDelivery || 0),
-
-          pendingDonations:
-            stats.pending || 0,
-
-          acceptedDonations:
-            stats.accepted || 0,
-
-          outForDelivery:
-            stats.outForDelivery || 0,
-
-          completedDonations:
-            stats.completed || 0,
-
-          rejectedDonations:
-            stats.rejected || 0,
-
+          pendingDonations: stats.pending || 0,
+          acceptedDonations: stats.accepted || 0,
+          outForDelivery: stats.outForDelivery || 0,
+          completedDonations: stats.completed || 0,
+          rejectedDonations: stats.rejected || 0,
           carbonPrevented: 0,
           treesEquivalent: 0,
           waterFootprintLitres: 0,
           waterFootprintCoverageKg: 0,
           waterUnclassifiedKg: 0,
-
           annualGoal: 0,
-
           recentDonations: [],
-
           pickupDonations: [],
-
           ngoPartners: [],
-
           categories: [],
-
           stats,
-        };
-
-        console.log(
-          "CREATED FALLBACK DASHBOARD:",
-          fallbackDashboard
-        );
-
-        setDashboard(fallbackDashboard);
-
+        });
         return;
       }
 
-      // ==========================================
-      // NO DASHBOARD DATA
-      // ==========================================
-
-      console.log(
-        "NO DASHBOARD OR STATS FOUND IN API RESPONSE."
-      );
-
       setDashboard(null);
-    } catch (error) {
-      console.error(
-        "DONOR DASHBOARD ERROR:",
-        error
-      );
-
+    } catch (err) {
+      console.error("Donor dashboard error:", err);
       setError(
-        error.message ||
+        err?.response?.data?.message ||
+        err.message ||
         "Failed to load dashboard."
       );
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
-  };
-
-  // ==========================================
-  // LOAD ON PAGE OPEN
-  // ==========================================
-
-  useEffect(() => {
-    loadDashboard();
   }, []);
 
-  // ==========================================
-  // SOCKET.IO - REAL-TIME FRESHNESS ALERT
-  // ==========================================
+  // Initial load and shared real-time socket updates.
+  useEffect(() => {
+    loadDashboard(true);
+  }, [loadDashboard]);
 
   useEffect(() => {
-    const userData =
-      localStorage.getItem("user");
+    const user = getCurrentUser();
+    if (!user?.id && !user?._id) return;
 
-    if (!userData) {
-      return;
-    }
-
-    let user = null;
-
-    try {
-      user = JSON.parse(userData);
-    } catch (error) {
-      console.error(
-        "Error parsing user data for socket:",
-        error
-      );
-
-      return;
-    }
-
-    if (!user?.id) {
-      console.error(
-        "User ID not found. Socket connection skipped."
-      );
-
-      return;
-    }
-
-    console.log(
-      "Connecting donor socket..."
-    );
-
-    const socket = io(SOCKET_URL, {
-      transports: ["websocket", "polling"],
-    });
-
+    const socket = getSocket();
     socketRef.current = socket;
 
-    // ==========================================
-    // SOCKET CONNECTED
-    // ==========================================
+    const refreshDashboard = () => loadDashboard(false);
 
-    socket.on("connect", () => {
-      console.log(
-        "DONOR SOCKET CONNECTED:",
-        socket.id
-      );
+    const handleFreshnessAlert = (notification) => {
+      if (!notification) return;
 
-      /*
-       * IMPORTANT:
-       * The exact room-join event must match
-       * server/utils/socket.js.
-       */
+      const notificationKey = [
+        notification.donationId || notification.customDonationId || "",
+        notification.urgency || "",
+        notification.remainingMinutes || "",
+      ].join("-");
 
-      socket.emit("identify", {
-        role: "donor",
-        userId: user.id,
-      });
+      if (lastNotificationRef.current === notificationKey) return;
 
-      console.log(
-        "DONOR JOIN REQUEST SENT:",
-        user.id
-      );
-    });
+      lastNotificationRef.current = notificationKey;
+      setFreshnessNotification(notification);
+    };
 
-    // ==========================================
-    // FRESHNESS ALERT RECEIVED
-    // ==========================================
-
-    socket.on(
-      "donation:freshness-alert",
-      (notification) => {
-        console.log(
-          "FRESHNESS ALERT RECEIVED:",
-          notification
-        );
-
-        if (!notification) {
-          return;
-        }
-
-        /*
-         * Create a unique key so the same alert
-         * does not constantly replace itself.
-         */
-
-        const notificationKey = [
-          notification.donationId ||
-          notification.customDonationId ||
-          "",
-
-          notification.urgency || "",
-
-          notification.remainingMinutes || "",
-        ].join("-");
-
-        if (
-          lastNotificationRef.current ===
-          notificationKey
-        ) {
-          return;
-        }
-
-        lastNotificationRef.current =
-          notificationKey;
-
-        setFreshnessNotification(
-          notification
-        );
-      }
-    );
-
-    // ==========================================
-    // SOCKET ERROR
-    // ==========================================
-
-    socket.on(
-      "connect_error",
-      (error) => {
-        console.error(
-          "DONOR SOCKET CONNECTION ERROR:",
-          error
-        );
-      }
-    );
-
-    // ==========================================
-    // CLEANUP
-    // ==========================================
+    socket.on("donation:new", refreshDashboard);
+    socket.on("donation:updated", refreshDashboard);
+    socket.on("donation:distribution-proof", refreshDashboard);
+    socket.on("donation:freshness-alert", handleFreshnessAlert);
 
     return () => {
-      console.log(
-        "Disconnecting donor socket..."
-      );
-
-      socket.off(
-        "donation:freshness-alert"
-      );
-
-      socket.off("connect");
-
-      socket.off("connect_error");
-
-      socket.disconnect();
-
+      socket.off("donation:new", refreshDashboard);
+      socket.off("donation:updated", refreshDashboard);
+      socket.off("donation:distribution-proof", refreshDashboard);
+      socket.off("donation:freshness-alert", handleFreshnessAlert);
       socketRef.current = null;
+      // Do not disconnect here: the socket is shared by the whole app.
     };
-  }, []);
+  }, [loadDashboard]);
 
   // ==========================================
   // DEBUG STATE

@@ -9,7 +9,7 @@ const {
 } = require("../middleware/authMiddleware");
 
 // ======================================================
-// DONOR -> NGO FEEDBACK
+// DONOR -> NGO
 // ======================================================
 
 // Donor submits text feedback to NGO
@@ -20,7 +20,15 @@ router.post(
   feedbackController.submitDonorFeedback
 );
 
-// Donor views NGO reviews and own feedback status
+// Donor rates an NGO that requested their donation
+router.post(
+  "/donor/rating",
+  protect,
+  restrictTo("donor"),
+  feedbackController.submitDonorNgoRating
+);
+
+// Donor views NGO requests, feedback status and ratings
 router.get(
   "/donor/ngo-reviews",
   protect,
@@ -29,10 +37,9 @@ router.get(
 );
 
 // ======================================================
-// NGO -> DONOR FEEDBACK
+// NGO -> DONOR
 // ======================================================
 
-// NGO submits feedback about Donor
 router.post(
   "/",
   protect,
@@ -41,10 +48,9 @@ router.post(
 );
 
 // ======================================================
-// ADMIN FEEDBACK MANAGEMENT
+// ADMIN
 // ======================================================
 
-// Admin views all feedback
 router.get(
   "/admin",
   protect,
@@ -52,7 +58,6 @@ router.get(
   feedbackController.getAdminFeedback
 );
 
-// Admin approves or declines feedback
 router.patch(
   "/:id/status",
   protect,
@@ -64,7 +69,6 @@ router.patch(
 // NGO FEEDBACK VIEW
 // ======================================================
 
-// NGO views its own feedback and Admin-approved Donor feedback
 router.get(
   "/ngo/:ngoId",
   protect,
@@ -72,7 +76,6 @@ router.get(
   feedbackController.getNgoFeedbacks
 );
 
-// NGO views feedback without passing NGO ID
 router.get(
   "/ngo",
   protect,
@@ -80,10 +83,7 @@ router.get(
   feedbackController.getNgoFeedbacks
 );
 
-// ======================================================
-// DEFAULT ADMIN FEEDBACK ROUTE
-// ======================================================
-
+// Default admin feedback route
 router.get(
   "/",
   protect,

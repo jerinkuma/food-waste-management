@@ -1,6 +1,16 @@
 
 import React, { useEffect, useState } from "react";
-import { UserRound, Mail, ShieldCheck, MapPin, Phone, Leaf } from "lucide-react";
+import {
+  UserRound,
+  Mail,
+  ShieldCheck,
+  MapPin,
+  Phone,
+  Leaf,
+  UserCog,
+  CheckCircle2,
+  Sparkles,
+} from "lucide-react";
 import "./Settings.css";
 
 const Settings = () => {
@@ -29,13 +39,14 @@ const Settings = () => {
     }
   }, []);
 
-  const initials = profile.name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
+  const initials =
+    profile.name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase() || "A";
 
   return (
     <main className="settings-page">
@@ -43,27 +54,45 @@ const Settings = () => {
 
       <section className="settings-card">
         <div className="settings-cover">
-          <div className="settings-cover-circle settings-cover-circle-one" />
-          <div className="settings-cover-circle settings-cover-circle-two" />
+          <div className="settings-cover-decoration settings-decoration-one" />
+          <div className="settings-cover-decoration settings-decoration-two" />
+          <div className="settings-cover-decoration settings-decoration-three" />
 
-          <div className="settings-cover-label">
-            <span className="settings-status-dot" />
-            Account Overview
+          <div className="settings-cover-content">
+            <span className="settings-cover-tag">
+              <ShieldCheck size={15} />
+              Verified Administrator
+            </span>
+
+            <h2>Welcome to FeedLink</h2>
+            <p>Your account, your contribution to a better community.</p>
           </div>
         </div>
 
         <div className="settings-profile-content">
           <div className="settings-profile-header">
-            <div className="settings-avatar">{initials || "A"}</div>
+            <div className="settings-avatar-wrapper">
+              <div className="settings-avatar">{initials}</div>
+              <span className="settings-avatar-status" />
+            </div>
 
             <div className="settings-profile-identity">
+              <span className="settings-profile-label">ADMIN PROFILE</span>
               <h2>{profile.name}</h2>
-              <p>{profile.email}</p>
+              <p className="settings-profile-email">
+                <Mail size={15} />
+                {profile.email}
+              </p>
 
               <span className="settings-role-badge">
                 <ShieldCheck size={15} />
                 {profile.role}
               </span>
+            </div>
+
+            <div className="settings-profile-verified">
+              <CheckCircle2 size={17} />
+              Verified Account
             </div>
           </div>
 
@@ -77,15 +106,16 @@ const Settings = () => {
 
               <div>
                 <h3>Personal Information</h3>
-                <p>Your account information at a glance</p>
+                <p>Your registered account details</p>
               </div>
             </div>
 
             <div className="settings-info-grid">
               <div className="settings-info-item">
                 <div className="settings-info-icon">
-                  <UserRound size={19} />
+                  <UserRound size={20} />
                 </div>
+
                 <div className="settings-info-text">
                   <span>Full Name</span>
                   <p>{profile.name}</p>
@@ -94,8 +124,9 @@ const Settings = () => {
 
               <div className="settings-info-item">
                 <div className="settings-info-icon">
-                  <Mail size={19} />
+                  <Mail size={20} />
                 </div>
+
                 <div className="settings-info-text">
                   <span>Email Address</span>
                   <p>{profile.email}</p>
@@ -104,8 +135,9 @@ const Settings = () => {
 
               <div className="settings-info-item">
                 <div className="settings-info-icon">
-                  <Phone size={19} />
+                  <Phone size={20} />
                 </div>
+
                 <div className="settings-info-text">
                   <span>Phone Number</span>
                   <p>{profile.phone}</p>
@@ -114,8 +146,9 @@ const Settings = () => {
 
               <div className="settings-info-item">
                 <div className="settings-info-icon">
-                  <MapPin size={19} />
+                  <MapPin size={20} />
                 </div>
+
                 <div className="settings-info-text">
                   <span>Region / Address</span>
                   <p>{profile.region}</p>
@@ -125,22 +158,29 @@ const Settings = () => {
           </div>
 
           <div className="settings-account-footer">
-            <div className="settings-footer-icon">
-              <Leaf size={20} />
-            </div>
+            <div className="settings-footer-brand">
+              <div className="settings-footer-icon">
+                <Leaf size={22} />
+              </div>
 
-            <div>
-              <h4>FeedLink Administrator</h4>
-              <p>Helping communities reduce food waste and share food.</p>
+              <div>
+                <h4>FeedLink Administrator</h4>
+                <p>Helping communities reduce food waste and share food.</p>
+              </div>
             </div>
 
             <span className="settings-account-active">
               <span />
-              Active
+              Account Active
             </span>
           </div>
         </div>
       </section>
+
+      <div className="settings-bottom-note">
+        <ShieldCheck size={15} />
+        Your administrator profile information is securely displayed.
+      </div>
     </main>
   );
 };

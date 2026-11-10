@@ -3,17 +3,193 @@ const Restaurant = require("../models/Restaurant");
 const Ngo = require("../models/Ngo");
 const Donation = require("../models/Donation");
 const Feedback = require("../models/Feedback");
-const Notification = require("../models/Notification"); // 👉 নোটিফিকেশন মডেল ইমপোর্ট করা হলো
-const { getIO, rooms } = require("../utils/socket");
+const Notification = require("../models/Notification");
 
+const { getIO, rooms } = require("../utils/socket");
 const { createNotification } = require("../utils/notificationUtils");
 
-// =====================================
-// GET ALL USERS (merged Restaurant + NGO + plain User profiles)
-// =====================================
+// ======================================================
+// HELPERS
+// ======================================================
+
+const normalizeStatus = (donation) => {
+  const statuses = [
+    donation.pipelineStatus,
+    donation.status,
+  ].map((value) =>
+    String(value || "").trim().toLowerCase()
+  );
+
+  if (
+    statuses.some((status) =>
+      ["completed", "delivered"].includes(status)
+    )
+  ) {
+    return "Completed";
+  }
+
+  if (statuses.includes("rejected")) {
+    return "Rejected";
+  }
+
+  if (
+    statuses.some((status) =>
+      [
+        "out for delivery",
+        "delivery man assigned",
+        "food picked up",
+        "in transit",
+      ].includes(status)
+    )
+  ) {
+    return "Out for Delivery";
+  }
+
+  if (
+    statuses.some((status) =>
+      ["accepted", "ngo requested"].includes(status)
+    )
+  ) {
+    return "Accepted";
+  }
+
+  return "Pending";
+};
+
+const getId = (value) => {
+  if (!value) return null;
+
+  return String(value._id || value.id || value);
+};
+
+const getDonationCompletedAt = (donation) => {
+  const historyCompletedAt = [
+    ...(donation.statusHistory || []),
+  ]
+    .reverse()
+    .find(
+      (item) =>
+        String(item.status || "")
+          .trim()
+          .toLowerCase() === "completed" &&
+        item.changedAt
+    )?.changedAt;
+
+  return (
+    donation.verification?.verifiedAt ||
+    historyCompletedAt ||
+    null
+  );
+};
+
+// Completed donation-এর জন্য প্রকৃত completion date ব্যবহার হবে।
+// Pending/Accepted donation-এর ক্ষেত্রে createdAt ব্যবহার হবে।
+const getDonationReportDate = (donation) => {
+  const status = normalizeStatus(donation);
+
+  if (status === "Completed") {
+    return getDonationCompletedAt(donation);
+  }
+
+  return donation.createdAt || null;
+};
+
+const getAcceptedNgoIds = (donation) => {
+  const ids = new Set();
+
+  // Selected NGO
+  const selectedNgoId = getId(donation.selectedNgo);
+
+  if (selectedNgoId) {
+    ids.add(selectedNgoId);
+  }
+
+  // Multiple NGO request support
+  (donation.ngoRequests || []).forEach((request) => {
+    const requestStatus = String(
+      request.status || ""
+    ).trim().toLowerCase();
+
+    if (
+      [
+        "accepted",
+        "completed",
+        "out for delivery",
+      ].includes(requestStatus)
+    ) {
+      const ngoId = getId(request.requestedBy);
+
+      if (ngoId) {
+        ids.add(ngoId);
+      }
+    }
+  });
+
+  // Legacy single NGO request support
+  if (donation.ngoRequest?.requestedBy) {
+    const legacyStatus = normalizeStatus(donation);
+
+    if (
+      [
+        "Accepted",
+        "Out for Delivery",
+        "Completed",
+      ].includes(legacyStatus)
+    ) {
+      const ngoId = getId(
+        donation.ngoRequest.requestedBy
+      );
+
+      if (ngoId) {
+        ids.add(ngoId);
+      }
+    }
+  }
+
+  return [...ids];
+};
+
+const makeEmptyStats = () => ({
+  donations: 0,
+  quantity: 0,
+  completed: 0,
+  completedQuantity: 0,
+  pending: 0,
+  accepted: 0,
+  outForDelivery: 0,
+  rejected: 0,
+});
+
+const addDonationToStats = (stats, donation) => {
+  const quantity = Number(donation.quantity) || 0;
+  const status = normalizeStatus(donation);
+
+  stats.donations += 1;
+  stats.quantity += quantity;
+
+  if (status === "Completed") {
+    stats.completed += 1;
+    stats.completedQuantity += quantity;
+  } else if (status === "Pending") {
+    stats.pending += 1;
+  } else if (status === "Accepted") {
+    stats.accepted += 1;
+  } else if (status === "Out for Delivery") {
+    stats.outForDelivery += 1;
+  } else if (status === "Rejected") {
+    stats.rejected += 1;
+  }
+};
+
+// ======================================================
+// GET ALL DONORS
+// ======================================================
+
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({ role: "donor" })
+    const users = await User.find({
+      role: "donor",
+    })
       .select("-password")
       .sort({ createdAt: -1 })
       .lean();
@@ -32,19 +208,26 @@ const getAllUsers = async (req, res) => {
     );
 
     const donors = users.map((user) => {
-      const restaurant = restaurantByUser.get(String(user._id));
+      const restaurant = restaurantByUser.get(
+        String(user._id)
+      );
 
       return {
         id: String(user._id),
         name: user.name || "N/A",
         email: user.email || "N/A",
         role: user.role,
-        status: user.isBlocked ? "Blocked" : (user.status || "Active"),
-        isBlocked: user.isBlocked || false,
+        status: user.isBlocked
+          ? "Blocked"
+          : user.status || "Active",
+        isBlocked: Boolean(user.isBlocked),
         createdAt: user.createdAt || null,
-        location: restaurant?.address || "Not provided",
-        phone: restaurant?.phone || "Not provided",
-        tradeLicense: restaurant?.tradeLicense || "Not provided",
+        location:
+          restaurant?.address || "Not provided",
+        phone:
+          restaurant?.phone || "Not provided",
+        tradeLicense:
+          restaurant?.tradeLicense || "Not provided",
       };
     });
 
@@ -55,20 +238,26 @@ const getAllUsers = async (req, res) => {
     });
   } catch (error) {
     console.error("Get all donors error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to load donor information.",
+      error: error.message,
     });
   }
 };
 
-// =====================================
+// ======================================================
 // GET ALL NGOS
-// =====================================
+// ======================================================
+
 const getAllNgos = async (req, res) => {
   try {
     const ngos = await Ngo.find()
-      .populate("user", "name email role status isBlocked createdAt")
+      .populate(
+        "user",
+        "name email role status isBlocked createdAt"
+      )
       .sort({ createdAt: -1 })
       .lean();
 
@@ -80,17 +269,36 @@ const getAllNgos = async (req, res) => {
 
       return {
         id: String(ngo._id),
-        userId: user._id ? String(user._id) : null,
+
+        userId: user._id
+          ? String(user._id)
+          : null,
+
         name: user.name || ngo.name || "N/A",
+
         email: user.email || ngo.email || "N/A",
+
         role: user.role || "ngo",
-        status: user.isBlocked ? "Blocked" : (user.status || "Active"),
-        isBlocked: user.isBlocked || false,
-        createdAt: user.createdAt || ngo.createdAt || null,
+
+        status: user.isBlocked
+          ? "Blocked"
+          : user.status || "Active",
+
+        isBlocked: Boolean(user.isBlocked),
+
+        createdAt:
+          user.createdAt ||
+          ngo.createdAt ||
+          null,
+
         phone: ngo.phone || "Not provided",
+
         address: ngo.address || "Not provided",
+
         location: ngo.address || "Not provided",
-        organizationId: ngo.organizationId || "N/A",
+
+        organizationId:
+          ngo.organizationId || "N/A",
       };
     });
 
@@ -101,78 +309,136 @@ const getAllNgos = async (req, res) => {
     });
   } catch (error) {
     console.error("Get all NGOs error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to load NGO information.",
+      error: error.message,
     });
   }
 };
 
-// =====================================
-// UPDATE A USER'S STATUS / BLOCK STATUS
-// =====================================
+// ======================================================
+// UPDATE USER STATUS / BLOCK STATUS
+// ======================================================
+
 const updateUserStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body; // "Active" বা "Blocked"
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: "User status is required.",
+      });
+    }
 
     let user = await User.findById(id);
 
     if (!user) {
       const ngoRecord = await Ngo.findById(id);
-      if (ngoRecord) user = await User.findById(ngoRecord.user);
 
-      const restRecord = await Restaurant.findById(id);
-      if (restRecord) user = await User.findById(restRecord.user);
+      if (ngoRecord) {
+        user = await User.findById(ngoRecord.user);
+      }
     }
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found." });
+      const restaurantRecord =
+        await Restaurant.findById(id);
+
+      if (restaurantRecord) {
+        user = await User.findById(
+          restaurantRecord.user
+        );
+      }
     }
 
-    const isBlocked = status.toLowerCase() === "blocked";
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    const isBlocked =
+      String(status).trim().toLowerCase() ===
+      "blocked";
+
     user.isBlocked = isBlocked;
-    user.status = isBlocked ? "Blocked" : "Active";
+    user.status = isBlocked
+      ? "Blocked"
+      : "Active";
+
     await user.save();
 
-    // নোটিফিকেশন তৈরি করা
+    // Create notification
     try {
       await Notification.create({
         recipient: user._id,
-        title: user.isBlocked ? "🚫 Account Blocked" : "✨ Account Activated",
-        message: user.isBlocked
+
+        title: isBlocked
+          ? "🚫 Account Blocked"
+          : "✨ Account Activated",
+
+        message: isBlocked
           ? "Your account has been blocked by the admin. You are restricted from logging in."
           : "Your account has been activated by the admin.",
+
         type: "ADMIN_STATUS",
       });
-    } catch (notifErr) {
-      console.error("Notification creation warning:", notifErr.message);
+    } catch (notificationError) {
+      console.error(
+        "Notification creation warning:",
+        notificationError.message
+      );
     }
 
-    // রিয়েল-টাইম সকেট আপডেট পাঠানো
-    const io = getIO();
-    if (io && rooms && rooms.admin) {
-      io.to(rooms.admin()).emit("user:updated", user);
+    // Real-time admin update
+    try {
+      const io = getIO();
+
+      if (io && rooms?.admin) {
+        io.to(rooms.admin()).emit(
+          "user:updated",
+          {
+            id: String(user._id),
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            status: user.status,
+            isBlocked: user.isBlocked,
+          }
+        );
+      }
+    } catch (socketError) {
+      console.error(
+        "User status socket warning:",
+        socketError.message
+      );
     }
 
     return res.status(200).json({
       success: true,
       message: `User status updated to ${user.status}`,
-      user
+      user,
     });
   } catch (error) {
     console.error("Update User Status Error:", error);
-    return res.status(500).json({ success: false, message: "Failed to update user status.", error: error.message });
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update user status.",
+      error: error.message,
+    });
   }
 };
 
-// =====================================
-// ADMIN TO RESTAURANT/NGO FEEDBACK & WARNING NOTIFICATION
-// =====================================
+// ======================================================
+// ADMIN WARNING / FEEDBACK NOTIFICATION
+// ======================================================
 
-// =====================================
-// ADMIN TO DONOR / NGO WARNING NOTIFICATION
-// =====================================
 const sendAdminFeedback = async (req, res) => {
   try {
     const { feedbackId, message } = req.body;
@@ -180,12 +446,14 @@ const sendAdminFeedback = async (req, res) => {
     if (!feedbackId || !message?.trim()) {
       return res.status(400).json({
         success: false,
-        message: "Feedback ID and warning message are required.",
+        message:
+          "Feedback ID and warning message are required.",
       });
     }
 
-    // Find original feedback
-    const feedback = await Feedback.findById(feedbackId);
+    const feedback = await Feedback.findById(
+      feedbackId
+    );
 
     if (!feedback) {
       return res.status(404).json({
@@ -198,48 +466,48 @@ const sendAdminFeedback = async (req, res) => {
     let recipientRole = null;
     let recipientUser = null;
 
-    // =====================================
-    // DONOR SUBMITTED FEEDBACK
-    // =====================================
+    // Donor feedback
     if (
-      String(feedback.submittedBy).toLowerCase() === "donor"
+      String(feedback.submittedBy).toLowerCase() ===
+      "donor"
     ) {
       recipientId = feedback.donor;
       recipientRole = "donor";
 
       if (recipientId) {
-        recipientUser = await User.findById(recipientId);
+        recipientUser = await User.findById(
+          recipientId
+        );
       }
     }
 
-    // =====================================
-    // NGO SUBMITTED FEEDBACK
-    // NGO profile ID -> NGO User ID
-    // =====================================
+    // NGO feedback
     else if (
-      String(feedback.submittedBy).toLowerCase() === "ngo"
+      String(feedback.submittedBy).toLowerCase() ===
+      "ngo"
     ) {
-      const ngo = await Ngo.findById(feedback.ngo)
-        .select("user");
+      const ngo = await Ngo.findById(
+        feedback.ngo
+      ).select("user");
 
       recipientId = ngo?.user || null;
       recipientRole = "ngo";
 
       if (recipientId) {
-        recipientUser = await User.findById(recipientId);
+        recipientUser = await User.findById(
+          recipientId
+        );
       }
     }
 
     if (!recipientUser) {
       return res.status(404).json({
         success: false,
-        message: "Recipient user could not be found for this feedback.",
+        message:
+          "Recipient user could not be found for this feedback.",
       });
     }
 
-    // =====================================
-    // CREATE NOTIFICATION
-    // =====================================
     const notification = await createNotification({
       recipient: recipientUser._id,
 
@@ -274,9 +542,11 @@ const sendAdminFeedback = async (req, res) => {
       message: `Warning notification successfully sent to ${recipientRole}.`,
       notification,
     });
-
   } catch (error) {
-    console.error("Send Admin Feedback Error:", error);
+    console.error(
+      "Send Admin Feedback Error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -286,11 +556,9 @@ const sendAdminFeedback = async (req, res) => {
   }
 };
 
-
-// =====================================
-// GET ALL DONATIONS (ADMIN VIEW)
-// =====================================
-
+// ======================================================
+// GET ALL DONATIONS - ADMIN
+// ======================================================
 
 const getAllDonations = async (req, res) => {
   try {
@@ -317,7 +585,10 @@ const getAllDonations = async (req, res) => {
           select: "name email",
         },
       })
-      .populate("statusHistory.changedBy", "name email")
+      .populate(
+        "statusHistory.changedBy",
+        "name email"
+      )
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
@@ -326,7 +597,10 @@ const getAllDonations = async (req, res) => {
       donations,
     });
   } catch (error) {
-    console.error("Get All Donations Error:", error);
+    console.error(
+      "Get All Donations Error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -336,10 +610,10 @@ const getAllDonations = async (req, res) => {
   }
 };
 
+// ======================================================
+// ADMIN DASHBOARD OVERVIEW STATS
+// ======================================================
 
-// =====================================
-// DASHBOARD OVERVIEW STATS
-// =====================================
 const getDashboardStats = async (req, res) => {
   try {
     const [
@@ -347,65 +621,140 @@ const getDashboardStats = async (req, res) => {
       totalDonations,
       pendingDonations,
       feedbackCount,
-      deliveredDonations,
+      completedDonations,
+      recentDonations,
     ] = await Promise.all([
       User.countDocuments({
-        role: { $in: ["donor", "ngo"] },
+        role: {
+          $in: ["donor", "ngo"],
+        },
       }),
+
       Donation.countDocuments(),
+
       Donation.countDocuments({
-        pipelineStatus: "Pending",
+        $or: [
+          {
+            pipelineStatus: {
+              $in: ["Pending", "pending"],
+            },
+          },
+          {
+            status: {
+              $in: [
+                "Pending",
+                "pending",
+                "Waiting for NGO Acceptance",
+              ],
+            },
+          },
+        ],
       }),
+
       Feedback.countDocuments(),
+
       Donation.find({
-        pipelineStatus: "Completed",
-      }).select("quantity"),
+        $or: [
+          {
+            pipelineStatus: {
+              $in: [
+                "Completed",
+                "completed",
+                "Delivered",
+                "delivered",
+              ],
+            },
+          },
+          {
+            status: {
+              $in: [
+                "Completed",
+                "completed",
+                "Delivered",
+                "delivered",
+              ],
+            },
+          },
+        ],
+      })
+        .select("quantity")
+        .lean(),
+
+      Donation.find()
+        .sort({ createdAt: -1 })
+        .limit(6)
+        .populate("donor", "name")
+        .lean(),
     ]);
 
-    const availableFoodKg = deliveredDonations.reduce(
-      (sum, donation) =>
-        sum + (Number(donation.quantity) || 0),
-      0
-    );
+    const totalFoodDistributed =
+      completedDonations.reduce(
+        (sum, donation) =>
+          sum + (Number(donation.quantity) || 0),
+        0
+      );
 
-    const recentDonations = await Donation.find()
-      .sort({ createdAt: -1 })
-      .limit(6)
-      .populate("donor", "name");
+    const recentActivities = recentDonations.map(
+      (donation) => ({
+        id: donation._id,
 
-    const recentActivities = recentDonations.map((donation) => ({
-      id: donation._id,
-      text: `🍽️ ${donation.donor?.name || "A restaurant"
-        } posted ${donation.quantity || 0} kg of ${donation.foodName || "food"
+        text: `🍽️ ${
+          donation.donor?.name || "A restaurant"
+        } posted ${
+          donation.quantity || 0
+        } kg of ${
+          donation.foodName || "food"
         }`,
-      time: donation.createdAt,
-    }));
+
+        time: donation.createdAt,
+      })
+    );
 
     return res.status(200).json({
       success: true,
+
       totalUsers,
+
       totalDonations,
+
       pendingDonations,
+
+      completedDonations:
+        completedDonations.length,
+
       feedbackCount,
-      availableFood: `${availableFoodKg} kg`,
+
+      availableFood: `${totalFoodDistributed} kg`,
+
+      totalFoodDistributed,
+
       recentActivities,
     });
   } catch (error) {
-    console.error("Get dashboard stats error:", error);
+    console.error(
+      "Get dashboard stats error:",
+      error
+    );
+
     return res.status(500).json({
       success: false,
-      message: "Failed to load dashboard statistics.",
+      message:
+        "Failed to load dashboard statistics.",
+      error: error.message,
     });
   }
 };
 
-
-// =====================================
+// ======================================================
 // ADVANCED ADMIN REPORTS & ANALYTICS
-// =====================================
+// ======================================================
+
 const getAdvancedReports = async (req, res) => {
   try {
-    const selectedYear = Number(req.query.year) || new Date().getFullYear();
+    const selectedYear =
+      Number(req.query.year) ||
+      new Date().getFullYear();
+
     const selectedMonth = req.query.month
       ? Number(req.query.month)
       : null;
@@ -425,200 +774,223 @@ const getAdvancedReports = async (req, res) => {
       });
     }
 
-    const [donors, ngos, donations] = await Promise.all([
-      User.find({ role: "donor" })
-        .select("name email createdAt")
-        .lean(),
-
-      Ngo.find()
-        .populate("user", "name email createdAt")
-        .lean(),
-
-      Donation.find()
-        .populate("donor", "name email")
-        .populate("selectedNgo", "user")
-        .populate({
-          path: "ngoRequests.requestedBy",
-          select: "user",
+    const [donors, ngos, donations] =
+      await Promise.all([
+        User.find({
+          role: "donor",
         })
-        .populate({
-          path: "ngoRequest.requestedBy",
-          select: "user",
-        })
-        .select(
-          "donor selectedNgo ngoRequests ngoRequest quantity pipelineStatus status createdAt foodName"
-        )
-        .lean(),
-    ]);
+          .select("name email createdAt")
+          .lean(),
 
-    const ngoMap = new Map(
-      ngos.map((ngo) => [String(ngo._id), ngo])
-    );
+        Ngo.find()
+          .populate(
+            "user",
+            "name email createdAt"
+          )
+          .lean(),
 
-    const getNgoProfileId = (value) => {
-      if (!value) return null;
-      return String(value._id || value);
-    };
+        Donation.find()
+          .populate("donor", "name email")
+          .populate("selectedNgo", "user")
+          .populate({
+            path: "ngoRequests.requestedBy",
+            select: "user",
+          })
+          .populate({
+            path: "ngoRequest.requestedBy",
+            select: "user",
+          })
+          .select(
+            [
+              "donor",
+              "selectedNgo",
+              "ngoRequests",
+              "ngoRequest",
+              "quantity",
+              "pipelineStatus",
+              "status",
+              "createdAt",
+              "verification",
+              "statusHistory",
+              "foodName",
+            ].join(" ")
+          )
+          .lean(),
+      ]);
+
+    // --------------------------------------------------
+    // NGO MAP
+    // --------------------------------------------------
 
     const getNgoName = (ngo) =>
-      ngo?.user?.name || ngo?.name || "Unknown NGO";
+      ngo?.user?.name ||
+      ngo?.name ||
+      "Unknown NGO";
 
-    const getDonorName = (donor) =>
-      donor?.name || "Unknown Donor";
+    const ngoMap = new Map(
+      ngos.map((ngo) => [
+        String(ngo._id),
+        ngo,
+      ])
+    );
 
-    const normalizeStatus = (donation) => {
-      const pipeline = donation.pipelineStatus;
+    // --------------------------------------------------
+    // DATE FILTER
+    // --------------------------------------------------
 
-      if (pipeline) return pipeline;
+    const yearStart = new Date(
+      selectedYear,
+      0,
+      1
+    );
 
-      const status = String(donation.status || "").toLowerCase();
+    const nextYearStart = new Date(
+      selectedYear + 1,
+      0,
+      1
+    );
 
-      if (status === "completed" || status === "delivered") {
-        return "Completed";
-      }
+    const yearDonations = donations.filter(
+      (donation) => {
+        const reportDate =
+          getDonationReportDate(donation);
 
-      if (status === "rejected") return "Rejected";
+        if (!reportDate) return false;
 
-      if (status === "accepted") return "Accepted";
+        const date = new Date(reportDate);
 
-      return "Pending";
-    };
-
-    const getAcceptedNgoIds = (donation) => {
-      const ids = new Set();
-
-      const selectedId = getNgoProfileId(donation.selectedNgo);
-      if (selectedId) ids.add(selectedId);
-
-      (donation.ngoRequests || []).forEach((request) => {
-        if (request.status === "Accepted") {
-          const id = getNgoProfileId(request.requestedBy);
-          if (id) ids.add(id);
-        }
-      });
-
-      if (donation.ngoRequest?.requestedBy) {
-        const oldRequestId = getNgoProfileId(
-          donation.ngoRequest.requestedBy
+        return (
+          !Number.isNaN(date.getTime()) &&
+          date >= yearStart &&
+          date < nextYearStart
         );
-
-        if (
-          oldRequestId &&
-          (donation.pipelineStatus === "Accepted" ||
-            donation.pipelineStatus === "Out for Delivery" ||
-            donation.pipelineStatus === "Completed")
-        ) {
-          ids.add(oldRequestId);
-        }
       }
-
-      return [...ids];
-    };
-
-    const makeEmptyStats = () => ({
-      donations: 0,
-      quantity: 0,
-      completed: 0,
-      completedQuantity: 0,
-      pending: 0,
-      accepted: 0,
-      outForDelivery: 0,
-      rejected: 0,
-    });
-
-    const addDonation = (stats, donation) => {
-      const quantity = Number(donation.quantity) || 0;
-      const status = normalizeStatus(donation);
-
-      stats.donations += 1;
-      stats.quantity += quantity;
-
-      if (status === "Completed") {
-        stats.completed += 1;
-        stats.completedQuantity += quantity;
-      } else if (status === "Pending") {
-        stats.pending += 1;
-      } else if (status === "Accepted") {
-        stats.accepted += 1;
-      } else if (status === "Out for Delivery") {
-        stats.outForDelivery += 1;
-      } else if (status === "Rejected") {
-        stats.rejected += 1;
-      }
-    };
-
-    const yearStart = new Date(selectedYear, 0, 1);
-    const nextYearStart = new Date(selectedYear + 1, 0, 1);
-
-    const yearDonations = donations.filter((donation) => {
-      const date = new Date(donation.createdAt);
-      return date >= yearStart && date < nextYearStart;
-    });
+    );
 
     const filteredDonations = selectedMonth
-      ? yearDonations.filter(
-          (donation) =>
-            new Date(donation.createdAt).getMonth() + 1 ===
-            selectedMonth
-        )
+      ? yearDonations.filter((donation) => {
+          const reportDate =
+            getDonationReportDate(donation);
+
+          if (!reportDate) return false;
+
+          const date = new Date(reportDate);
+
+          return (
+            !Number.isNaN(date.getTime()) &&
+            date.getMonth() + 1 ===
+              selectedMonth
+          );
+        })
       : yearDonations;
 
+    // --------------------------------------------------
     // DONOR REPORTS
+    // --------------------------------------------------
+
     const donorStats = new Map();
 
     donors.forEach((donor) => {
       donorStats.set(String(donor._id), {
         id: String(donor._id),
+
         name: donor.name || "Unknown Donor",
+
         email: donor.email || "",
+
         joinedAt: donor.createdAt,
+
         ...makeEmptyStats(),
       });
     });
 
+    // --------------------------------------------------
     // NGO REPORTS
+    // --------------------------------------------------
+
     const ngoStats = new Map();
 
     ngos.forEach((ngo) => {
       ngoStats.set(String(ngo._id), {
         id: String(ngo._id),
+
         userId: ngo.user?._id
           ? String(ngo.user._id)
           : null,
+
         name: getNgoName(ngo),
-        email: ngo.user?.email || ngo.email || "",
-        joinedAt: ngo.user?.createdAt || ngo.createdAt,
+
+        email:
+          ngo.user?.email ||
+          ngo.email ||
+          "",
+
+        joinedAt:
+          ngo.user?.createdAt ||
+          ngo.createdAt,
+
         ...makeEmptyStats(),
       });
     });
 
-    // Monthly report for the selected year
-    const monthlyTrend = Array.from({ length: 12 }, (_, index) => ({
-      month: index + 1,
-      label: new Date(selectedYear, index, 1).toLocaleString(
-        "en-US",
-        { month: "short" }
-      ),
-      donations: 0,
-      quantity: 0,
-      completed: 0,
-      donorQuantity: 0,
-      ngoQuantity: 0,
-    }));
+    // --------------------------------------------------
+    // MONTHLY TREND
+    // --------------------------------------------------
 
-    // Yearly trend: last 5 years including selected year
-    const yearlyTrend = Array.from({ length: 5 }, (_, index) => {
-      const year = selectedYear - 4 + index;
+    const monthlyTrend = Array.from(
+      { length: 12 },
+      (_, index) => ({
+        month: index + 1,
 
-      return {
-        year,
+        label: new Date(
+          selectedYear,
+          index,
+          1
+        ).toLocaleString("en-US", {
+          month: "short",
+        }),
+
         donations: 0,
+
         quantity: 0,
+
         completed: 0,
+
         donorQuantity: 0,
+
         ngoQuantity: 0,
-      };
-    });
+      })
+    );
+
+    // --------------------------------------------------
+    // YEARLY TREND
+    // --------------------------------------------------
+
+    const yearlyTrend = Array.from(
+      { length: 5 },
+      (_, index) => {
+        const year =
+          selectedYear - 4 + index;
+
+        return {
+          year,
+
+          donations: 0,
+
+          quantity: 0,
+
+          completed: 0,
+
+          donorQuantity: 0,
+
+          ngoQuantity: 0,
+        };
+      }
+    );
+
+    // --------------------------------------------------
+    // STATUS BREAKDOWN
+    // --------------------------------------------------
 
     const overallStatus = {
       Pending: 0,
@@ -628,172 +1000,348 @@ const getAdvancedReports = async (req, res) => {
       Rejected: 0,
     };
 
-    // Process all donation records
+    // --------------------------------------------------
+    // PROCESS ALL DONATIONS
+    // --------------------------------------------------
+
     donations.forEach((donation) => {
-      const donorId = donation.donor?._id
-        ? String(donation.donor._id)
-        : String(donation.donor || "");
+      const donorId = getId(donation.donor);
 
-      const status = normalizeStatus(donation);
-      const quantity = Number(donation.quantity) || 0;
-      const date = new Date(donation.createdAt);
-      const donationYear = date.getFullYear();
-      const donationMonth = date.getMonth();
+      const status =
+        normalizeStatus(donation);
 
-      const donorRecord = donorStats.get(donorId);
+      const quantity =
+        Number(donation.quantity) || 0;
+
+      const reportDate =
+        getDonationReportDate(donation);
+
+      const date = reportDate
+        ? new Date(reportDate)
+        : null;
+
+      const validDate =
+        date &&
+        !Number.isNaN(date.getTime());
+
+      const donationYear = validDate
+        ? date.getFullYear()
+        : null;
+
+      const donationMonth = validDate
+        ? date.getMonth()
+        : null;
+
+      // Donor totals
+      const donorRecord =
+        donorStats.get(donorId);
 
       if (donorRecord) {
-        addDonation(donorRecord, donation);
+        addDonationToStats(
+          donorRecord,
+          donation
+        );
       }
 
-      const acceptedNgoIds = getAcceptedNgoIds(donation);
+      // NGO totals
+      const acceptedNgoIds =
+        getAcceptedNgoIds(donation);
 
       acceptedNgoIds.forEach((ngoId) => {
-        const ngoRecord = ngoStats.get(ngoId);
-        if (ngoRecord) addDonation(ngoRecord, donation);
+        const ngoRecord =
+          ngoStats.get(ngoId);
+
+        if (ngoRecord) {
+          addDonationToStats(
+            ngoRecord,
+            donation
+          );
+        }
       });
 
+      // Yearly trend
       if (
+        donationYear !== null &&
         donationYear >= selectedYear - 4 &&
         donationYear <= selectedYear
       ) {
-        const yearlyRecord = yearlyTrend.find(
-          (item) => item.year === donationYear
-        );
+        const yearlyRecord =
+          yearlyTrend.find(
+            (item) =>
+              item.year === donationYear
+          );
 
         if (yearlyRecord) {
           yearlyRecord.donations += 1;
+
           yearlyRecord.quantity += quantity;
-          if (status === "Completed") yearlyRecord.completed += 1;
-          yearlyRecord.donorQuantity += quantity;
+
+          yearlyRecord.donorQuantity +=
+            quantity;
+
+          if (status === "Completed") {
+            yearlyRecord.completed += 1;
+          }
 
           if (acceptedNgoIds.length > 0) {
-            yearlyRecord.ngoQuantity += quantity;
+            yearlyRecord.ngoQuantity +=
+              quantity;
           }
         }
       }
 
-      if (donationYear === selectedYear) {
-        const monthRecord = monthlyTrend[donationMonth];
+      // Monthly trend
+      if (
+        donationYear === selectedYear &&
+        donationMonth !== null
+      ) {
+        const monthRecord =
+          monthlyTrend[donationMonth];
 
         monthRecord.donations += 1;
+
         monthRecord.quantity += quantity;
-        monthRecord.donorQuantity += quantity;
+
+        monthRecord.donorQuantity +=
+          quantity;
 
         if (status === "Completed") {
           monthRecord.completed += 1;
         }
 
         if (acceptedNgoIds.length > 0) {
-          monthRecord.ngoQuantity += quantity;
+          monthRecord.ngoQuantity +=
+            quantity;
         }
       }
     });
 
-    // Only selected year/month contributes to summary KPIs
+    // --------------------------------------------------
+    // SELECTED PERIOD DONOR STATS
+    // --------------------------------------------------
+
     const selectedDonorStats = new Map();
-    const selectedNgoStats = new Map();
 
     donors.forEach((donor) => {
-      selectedDonorStats.set(String(donor._id), {
-        ...makeEmptyStats(),
-        id: String(donor._id),
-        name: donor.name || "Unknown Donor",
-        email: donor.email || "",
-      });
+      selectedDonorStats.set(
+        String(donor._id),
+        {
+          ...makeEmptyStats(),
+
+          id: String(donor._id),
+
+          name:
+            donor.name || "Unknown Donor",
+
+          email: donor.email || "",
+        }
+      );
     });
+
+    // --------------------------------------------------
+    // SELECTED PERIOD NGO STATS
+    // --------------------------------------------------
+
+    const selectedNgoStats = new Map();
 
     ngos.forEach((ngo) => {
-      selectedNgoStats.set(String(ngo._id), {
-        ...makeEmptyStats(),
-        id: String(ngo._id),
-        name: getNgoName(ngo),
-        email: ngo.user?.email || "",
-      });
+      selectedNgoStats.set(
+        String(ngo._id),
+        {
+          ...makeEmptyStats(),
+
+          id: String(ngo._id),
+
+          name: getNgoName(ngo),
+
+          email: ngo.user?.email || "",
+        }
+      );
     });
 
+    // --------------------------------------------------
+    // PROCESS SELECTED YEAR / MONTH
+    // --------------------------------------------------
+
     filteredDonations.forEach((donation) => {
-      const donorId = donation.donor?._id
-        ? String(donation.donor._id)
-        : String(donation.donor || "");
+      const donorId = getId(donation.donor);
 
-      const donorRecord = selectedDonorStats.get(donorId);
+      const donorRecord =
+        selectedDonorStats.get(donorId);
 
-      if (donorRecord) addDonation(donorRecord, donation);
+      if (donorRecord) {
+        addDonationToStats(
+          donorRecord,
+          donation
+        );
+      }
 
-      getAcceptedNgoIds(donation).forEach((ngoId) => {
-        const ngoRecord = selectedNgoStats.get(ngoId);
-        if (ngoRecord) addDonation(ngoRecord, donation);
-      });
+      getAcceptedNgoIds(donation).forEach(
+        (ngoId) => {
+          const ngoRecord =
+            selectedNgoStats.get(ngoId);
 
-      const status = normalizeStatus(donation);
-      if (Object.prototype.hasOwnProperty.call(overallStatus, status)) {
+          if (ngoRecord) {
+            addDonationToStats(
+              ngoRecord,
+              donation
+            );
+          }
+        }
+      );
+
+      const status =
+        normalizeStatus(donation);
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          overallStatus,
+          status
+        )
+      ) {
         overallStatus[status] += 1;
       }
     });
 
+    // --------------------------------------------------
+    // SUMMARY
+    // --------------------------------------------------
+
     const sumStats = (records) =>
       [...records.values()].reduce(
         (total, item) => {
-          Object.keys(makeEmptyStats()).forEach((key) => {
-            total[key] += Number(item[key]) || 0;
-          });
+          Object.keys(makeEmptyStats()).forEach(
+            (key) => {
+              total[key] +=
+                Number(item[key]) || 0;
+            }
+          );
+
           return total;
         },
         makeEmptyStats()
       );
 
-    const donorSummary = sumStats(selectedDonorStats);
-    const ngoSummary = sumStats(selectedNgoStats);
+    const donorSummary = sumStats(
+      selectedDonorStats
+    );
 
-    const topDonors = [...selectedDonorStats.values()]
-      .filter((item) => item.donations > 0)
-      .sort((a, b) => b.quantity - a.quantity)
+    const ngoSummary = sumStats(
+      selectedNgoStats
+    );
+
+    // --------------------------------------------------
+    // TOP DONORS
+    // --------------------------------------------------
+
+    const topDonors = [
+      ...selectedDonorStats.values(),
+    ]
+      .filter(
+        (item) => item.donations > 0
+      )
+      .sort(
+        (a, b) => b.quantity - a.quantity
+      )
       .slice(0, 5);
 
-    const topNgos = [...selectedNgoStats.values()]
-      .filter((item) => item.donations > 0)
-      .sort((a, b) => b.completedQuantity - a.completedQuantity)
+    // --------------------------------------------------
+    // TOP NGOS
+    // --------------------------------------------------
+
+    const topNgos = [
+      ...selectedNgoStats.values(),
+    ]
+      .filter(
+        (item) => item.donations > 0
+      )
+      .sort(
+        (a, b) =>
+          b.completedQuantity -
+          a.completedQuantity
+      )
       .slice(0, 5);
+
+    // --------------------------------------------------
+    // OVERALL SUMMARY
+    // --------------------------------------------------
 
     const overall = {
-      totalUsers: donors.length + ngos.length,
+      totalUsers:
+        donors.length + ngos.length,
+
       totalDonors: donors.length,
+
       totalNgos: ngos.length,
-      totalDonations: filteredDonations.length,
-      totalFoodDonated: donorSummary.quantity,
-      totalFoodReceived: ngoSummary.quantity,
-      totalFoodDistributed: ngoSummary.completedQuantity,
-      completedDonations: overallStatus.Completed,
-      pendingDonations: overallStatus.Pending,
-      feedbackCount: await Feedback.countDocuments(),
+
+      totalDonations:
+        filteredDonations.length,
+
+      totalFoodDonated:
+        donorSummary.quantity,
+
+      totalFoodReceived:
+        ngoSummary.quantity,
+
+      totalFoodDistributed:
+        ngoSummary.completedQuantity,
+
+      completedDonations:
+        overallStatus.Completed,
+
+      pendingDonations:
+        overallStatus.Pending,
+
+      feedbackCount:
+        await Feedback.countDocuments(),
     };
+
+    // --------------------------------------------------
+    // RESPONSE
+    // --------------------------------------------------
 
     return res.status(200).json({
       success: true,
+
       filters: {
         year: selectedYear,
         month: selectedMonth,
       },
+
       overall,
+
       donor: {
         registered: donors.length,
+
         ...donorSummary,
+
         topPerformers: topDonors,
       },
+
       ngo: {
         registered: ngos.length,
+
         ...ngoSummary,
+
         topPerformers: topNgos,
       },
+
       monthlyTrend,
+
       yearlyTrend,
-      statusBreakdown: Object.entries(overallStatus).map(
-        ([status, count]) => ({ status, count })
-      ),
+
+      statusBreakdown: Object.entries(
+        overallStatus
+      ).map(([status, count]) => ({
+        status,
+        count,
+      })),
     });
   } catch (error) {
-    console.error("Advanced reports error:", error);
+    console.error(
+      "Advanced reports error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -803,6 +1351,9 @@ const getAdvancedReports = async (req, res) => {
   }
 };
 
+// ======================================================
+// EXPORTS
+// ======================================================
 
 module.exports = {
   getAllUsers,

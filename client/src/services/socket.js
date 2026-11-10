@@ -21,7 +21,13 @@ export function getSocket() {
   const identify = () => {
     const user = getCurrentUser();
     if (user) {
-      socket.emit("identify", { role: user.role, userId: user.id });
+      const userId = user.id || user._id;
+      if (userId && user.role) {
+        socket.emit("identify", {
+          role: String(user.role).toLowerCase(),
+          userId: String(userId),
+        });
+      }
     }
   };
 

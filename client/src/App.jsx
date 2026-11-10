@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import {
   BrowserRouter,
@@ -39,7 +40,7 @@ import Partners from "./pages/ngo/partners/Partners";
 import Settings from "./pages/ngo/setting/Settings";
 import NGODashboard from "./pages/ngo/NGODashboard";
 import DistributionForm from "./pages/ngo/DistributionForm/DistributionForm";
-import Reports from "./pages/ngo/report/Reports"; // অ্যানালিটিক্স ও রিপোর্টস পেজটি ইমপোর্ট করা হলো
+import Reports from "./pages/ngo/report/Reports";
 
 // Admin
 import AdminNavbar from "./components/Admindashboard/Navbar";
@@ -52,11 +53,14 @@ import AdminDonations from "./pages/Admindashboard/Donations";
 import AdminOrphanages from "./pages/Admindashboard/Orphanages";
 import AdminFeedback from "./pages/Admindashboard/Feedback";
 import AdminReports from "./pages/Admindashboard/Reports";
-
 import AdminSettings from "./pages/Admindashboard/Settings";
 import AdminContactMessages from "./pages/Admindashboard/ContactMessages";
 
 import "./App.css";
+
+// =========================
+// INITIAL NGO REQUESTS
+// =========================
 
 const initialRequests = [
   {
@@ -102,7 +106,7 @@ const initialRequests = [
 ];
 
 // =========================
-// NGO Layout
+// NGO LAYOUT
 // =========================
 
 function NGOLayout({
@@ -114,10 +118,11 @@ function NGOLayout({
 }) {
   return (
     <div
-      className={`flex h-screen font-sans transition-colors duration-300 ${themeMode === "dark"
-        ? "bg-[#0f172a] text-slate-100"
-        : "bg-[#F8FAFC] text-slate-800"
-        }`}
+      className={`flex h-screen font-sans transition-colors duration-300 ${
+        themeMode === "dark"
+          ? "bg-[#0f172a] text-slate-100"
+          : "bg-[#F8FAFC] text-slate-800"
+      }`}
     >
       <NGOSidebar />
 
@@ -153,7 +158,6 @@ function NGOLayout({
               element={<ActiveRequests requests={requests} />}
             />
 
-            {/* ডিস্ট্রিবিউশন প্রুফ রাউট */}
             <Route
               path="distribution"
               element={
@@ -163,7 +167,6 @@ function NGOLayout({
               }
             />
 
-            {/* নতুন অ্যানালিটিক্স ও রিপোর্টস রাউট যুক্ত করা হলো */}
             <Route
               path="reports"
               element={<Reports />}
@@ -207,10 +210,11 @@ function NGOLayout({
         </main>
 
         <footer
-          className={`text-center py-3 text-[11px] border-t mt-auto transition-colors ${themeMode === "dark"
-            ? "text-slate-500 border-slate-800"
-            : "text-slate-400 border-slate-200/60"
-            }`}
+          className={`text-center py-3 text-[11px] border-t mt-auto transition-colors ${
+            themeMode === "dark"
+              ? "text-slate-500 border-slate-800"
+              : "text-slate-400 border-slate-200/60"
+          }`}
         >
           FeedLink NGO Portal, Chattogram · FeedLink © 2026
         </footer>
@@ -220,7 +224,7 @@ function NGOLayout({
 }
 
 // =========================
-// Admin Layout
+// ADMIN LAYOUT
 // =========================
 
 function AdminLayout() {
@@ -240,65 +244,70 @@ function AdminLayout() {
           onClose={() => setMobileSidebarOpen(false)}
         />
 
-        <div className="content">
-          <Routes>
-            <Route
-              index
-              element={<Navigate to="dashboard" replace />}
-            />
+        {/* MAIN CONTENT AREA */}
+        <div className="content admin-content-layout">
 
-            <Route
-              path="dashboard"
-              element={<AdminDashboard />}
-            />
+          {/* ADMIN PAGE CONTENT */}
+          <main className="admin-page-content">
+            <Routes>
+              <Route
+                index
+                element={<Navigate to="dashboard" replace />}
+              />
 
-            <Route
-              path="users"
-              element={<AdminUsers />}
-            />
+              <Route
+                path="dashboard"
+                element={<AdminDashboard />}
+              />
 
-            <Route
-              path="donations"
-              element={<AdminDonations />}
-            />
+              <Route
+                path="users"
+                element={<AdminUsers />}
+              />
 
-            <Route
-              path="orphanages"
-              element={<AdminOrphanages />}
-            />
+              <Route
+                path="donations"
+                element={<AdminDonations />}
+              />
 
-            <Route
-              path="feedback"
-              element={<AdminFeedback />}
-            />
+              <Route
+                path="orphanages"
+                element={<AdminOrphanages />}
+              />
 
-            <Route
-              path="contact-messages"
-              element={<AdminContactMessages />}
-            />
+              <Route
+                path="feedback"
+                element={<AdminFeedback />}
+              />
 
-            <Route
-              path="reports"
-              element={<AdminReports />}
-            />
+              <Route
+                path="contact-messages"
+                element={<AdminContactMessages />}
+              />
 
-            
+              <Route
+                path="reports"
+                element={<AdminReports />}
+              />
 
-            <Route
-              path="settings"
-              element={<AdminSettings />}
-            />
-          </Routes>
+              <Route
+                path="settings"
+                element={<AdminSettings />}
+              />
+            </Routes>
+          </main>
+
+          {/* FOOTER NOW STAYS INSIDE MAIN CONTENT */}
+          <AdminFooter />
+
         </div>
       </div>
-
-      <AdminFooter />
     </div>
   );
 }
 
 // =========================
-// Main App
+// MAIN APP
 // =========================
 
 function App() {
@@ -329,31 +338,32 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* ================= HOME ================= */}
+
+        {/* HOME */}
         <Route
           path="/"
           element={<Home />}
         />
 
-        {/* ================= AUTH ================= */}
+        {/* AUTH */}
         <Route
           path="/auth"
           element={<Auth />}
         />
 
-        {/* ================= FORGOT PASSWORD ================= */}
+        {/* FORGOT PASSWORD */}
         <Route
           path="/forgot-password"
           element={<ForgotPassword />}
         />
 
-        {/* ================= RESET PASSWORD ================= */}
+        {/* RESET PASSWORD */}
         <Route
           path="/reset-password/:token"
           element={<ResetPassword />}
         />
 
-        {/* ================= RESTAURANT / DONOR ================= */}
+        {/* RESTAURANT / DONOR */}
         <Route
           path="/restaurant/dashboard"
           element={<Dashboard />}
@@ -388,24 +398,23 @@ function App() {
           path="/restaurant/ngo-reviews"
           element={<NGOReviews />}
         />
+
         <Route
           path="/restaurant/feedback"
           element={<DonorFeedback />}
         />
-
-
 
         <Route
           path="/restaurant/profile"
           element={<Profile />}
         />
 
-
         <Route
           path="/restaurant/distribution-proofs"
           element={<DistributionProof />}
         />
-        {/* ================= NGO ================= */}
+
+        {/* NGO */}
         <Route
           path="/ngo/*"
           element={
@@ -419,23 +428,24 @@ function App() {
           }
         />
 
-        {/* ================= ADMIN ================= */}
+        {/* ADMIN */}
         <Route
           path="/admin/*"
           element={<AdminLayout />}
         />
 
-        {/* ================= DELIVERY ================= */}
+        {/* DELIVERY */}
         <Route
           path="/delivery/safety/:donationId"
           element={<SafetyVerification />}
         />
 
-        {/* ================= UNKNOWN ROUTE ================= */}
+        {/* UNKNOWN ROUTE */}
         <Route
           path="*"
           element={<Navigate to="/" replace />}
         />
+
       </Routes>
     </BrowserRouter>
   );

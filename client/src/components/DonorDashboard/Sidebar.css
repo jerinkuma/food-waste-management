@@ -86,12 +86,33 @@
    NAVIGATION
 ========================= */
 
+/* =========================
+   NAVIGATION - NO SCROLLBAR
+========================= */
+
 .donor-sidebar-nav {
   flex: 1;
+  min-height: 0;
+  padding: 18px 8px;
 
-  padding: 24px 8px;
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
 
-  overflow-y: auto;
+.donor-sidebar-nav::-webkit-scrollbar {
+  display: none;
+  width: 0;
+}
+
+.donor-sidebar-nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.donor-sidebar-nav li {
+  margin-bottom: 9px;
 }
 
 

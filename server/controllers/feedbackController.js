@@ -1,8 +1,9 @@
+
 const Donation = require("../models/Donation");
 const Feedback = require("../models/Feedback");
+const Ngo = require("../models/Ngo");
 const mongoose = require("mongoose");
 const { createNotification } = require("../utils/notificationUtils");
-
 
 // ======================================================
 // HELPER: FORMAT DATE
@@ -34,8 +35,31 @@ const findDonation = async (donationId) => {
 };
 
 // ======================================================
+// HELPER: CHECK WHETHER NGO REQUESTED THIS DONATION
+// ======================================================
+const hasNgoRequestedDonation = (donation, ngoId) => {
+  const targetId = String(ngoId);
+
+  const newRequestExists = (donation.ngoRequests || []).some(
+    (request) =>
+      String(
+        request.requestedBy?._id ||
+        request.requestedBy
+      ) === targetId
+  );
+
+  const legacyRequestExists =
+    String(
+      donation.ngoRequest?.requestedBy?._id ||
+      donation.ngoRequest?.requestedBy ||
+      ""
+    ) === targetId;
+
+  return newRequestExists || legacyRequestExists;
+};
+
+// ======================================================
 // 1. NGO -> DONOR: SUBMIT FEEDBACK
-// Existing NGO feedback functionality
 // ======================================================
 const submitFeedback = async (req, res) => {
   try {
@@ -70,30 +94,22 @@ const submitFeedback = async (req, res) => {
     const newFeedback = await Feedback.create({
       donation: donation._id,
       donationId: donation.donationId || donationId,
-
       ngo: ngoId,
-
       restaurant: donorId,
       donor: donorId,
-
       donorName: donorName || "Donor",
-
       category,
       priority: priority || "Normal",
       message: message.trim(),
-
       submittedBy: "NGO",
       date: getFormattedDate(),
-
       status: "Awaiting Response",
-
       routedTo: {
         admin: true,
         restaurant: !!donorId,
       },
     });
 
-    // Notify Donor
     if (donorId) {
       await createNotification({
         recipient: donorId,
@@ -129,21 +145,20 @@ const submitFeedback = async (req, res) => {
 
 // ======================================================
 // 2. DONOR -> NGO: SUBMIT TEXT FEEDBACK
-// No rating is accepted from Donor
 // ======================================================
+
 const submitDonorFeedback = async (req, res) => {
   try {
-    const { donationId, message } = req.body;
+    const { donationId, ngoId, message } = req.body;
     const donorId = req.user.id;
 
-    if (!donationId || !message?.trim()) {
+    if (!donationId || !ngoId || !message?.trim()) {
       return res.status(400).json({
         success: false,
-        message: "Donation ID and feedback message are required.",
+        message: "Donation ID, NGO ID and feedback message are required.",
       });
     }
 
-    // Find donation
     const donation = await findDonation(donationId);
 
     if (!donation) {
@@ -153,7 +168,6 @@ const submitDonorFeedback = async (req, res) => {
       });
     }
 
-    // Ensure this donation belongs to the logged-in Donor
     if (String(donation.donor) !== String(donorId)) {
       return res.status(403).json({
         success: false,
@@ -161,48 +175,48 @@ const submitDonorFeedback = async (req, res) => {
       });
     }
 
-    // Get NGO from the donation request
-    const ngoId = donation.ngoRequest?.requestedBy;
-
-    if (!ngoId) {
-      return res.status(400).json({
+    if (!hasNgoRequestedDonation(donation, ngoId)) {
+      return res.status(403).json({
         success: false,
-        message: "No NGO is associated with this donation.",
+        message: "This NGO did not request this donation.",
       });
     }
 
-    // Get Donor name from database
-    const populatedDonation = await Donation.findById(donation._id)
-      .populate("donor", "name");
+    const existingFeedback = await Feedback.findOne({
+      donation: donation._id,
+      ngo: ngoId,
+      donor: donorId,
+      submittedBy: "Donor",
+      category: "NGO Feedback",
+    });
+
+    if (existingFeedback) {
+      return res.status(409).json({
+        success: false,
+        message: "You have already submitted feedback for this NGO and donation.",
+      });
+    }
+
+    const populatedDonation = await Donation.findById(
+      donation._id
+    ).populate("donor", "name");
 
     const finalDonorName =
       populatedDonation?.donor?.name || "Donor";
 
-    // Create Donor -> NGO feedback
     const newFeedback = await Feedback.create({
       donation: donation._id,
       donationId: donation.donationId || donationId,
-
       ngo: ngoId,
-
       donor: donorId,
       restaurant: donorId,
-
       donorName: finalDonorName,
-
       category: "NGO Feedback",
       priority: "Normal",
-
       message: message.trim(),
-
-      // Important: identifies feedback direction
       submittedBy: "Donor",
-
       date: getFormattedDate(),
-
-      // Admin must approve before NGO can see it
       status: "Pending",
-
       routedTo: {
         admin: true,
         restaurant: false,
@@ -211,7 +225,8 @@ const submitDonorFeedback = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Feedback submitted successfully. Waiting for admin approval.",
+      message:
+        "Feedback submitted successfully. Waiting for admin approval.",
       feedback: newFeedback,
     });
   } catch (error) {
@@ -225,8 +240,134 @@ const submitDonorFeedback = async (req, res) => {
   }
 };
 
+
 // ======================================================
-// 3. ADMIN: GET ALL FEEDBACK
+// 3. DONOR -> NGO: SUBMIT STAR RATING
+// ======================================================
+const submitDonorNgoRating = async (req, res) => {
+  try {
+    const donorId = req.user.id;
+    const { donationId, ngoId, rating, comment } = req.body;
+
+    const score = Number(rating);
+
+    if (!donationId || !ngoId || !Number.isInteger(score)) {
+      return res.status(400).json({
+        success: false,
+        message: "Donation, NGO and rating are required.",
+      });
+    }
+
+    if (score < 1 || score > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Rating must be between 1 and 5.",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(ngoId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid NGO profile.",
+      });
+    }
+
+    const donation = await findDonation(donationId);
+
+    if (!donation) {
+      return res.status(404).json({
+        success: false,
+        message: "Donation not found.",
+      });
+    }
+
+    // Only the owner of this donation can rate an NGO.
+    if (String(donation.donor) !== String(donorId)) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot rate an NGO for another donor's donation.",
+      });
+    }
+
+    // The NGO must actually have requested this donation.
+    if (!hasNgoRequestedDonation(donation, ngoId)) {
+      return res.status(403).json({
+        success: false,
+        message: "This NGO did not request this donation.",
+      });
+    }
+
+    const ngoExists = await Ngo.findById(ngoId).select("_id");
+
+    if (!ngoExists) {
+      return res.status(404).json({
+        success: false,
+        message: "NGO profile not found.",
+      });
+    }
+
+    // One rating per donor + donation + NGO.
+    const existingRating = await Feedback.findOne({
+      donation: donation._id,
+      donor: donorId,
+      ngo: ngoId,
+      submittedBy: "Donor",
+      category: "NGO Rating",
+    });
+
+    if (existingRating) {
+      return res.status(409).json({
+        success: false,
+        message: "You have already rated this NGO for this donation.",
+      });
+    }
+
+    const donor = await mongoose.model("User")
+      .findById(donorId)
+      .select("name");
+
+    const newRating = await Feedback.create({
+      donation: donation._id,
+      donationId: donation.donationId || donationId,
+      ngo: ngoId,
+      donor: donorId,
+      restaurant: donorId,
+      donorName: donor?.name || "Donor",
+      category: "NGO Rating",
+      priority: "Normal",
+      rating: score,
+      comment: typeof comment === "string" ? comment.trim() : "",
+      message:
+        typeof comment === "string" && comment.trim()
+          ? comment.trim()
+          : `Donor rated this NGO ${score} out of 5 stars.`,
+      submittedBy: "Donor",
+      date: getFormattedDate(),
+      status: "Approved",
+      routedTo: {
+        admin: false,
+        restaurant: false,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "NGO rating submitted successfully.",
+      rating: newRating,
+    });
+  } catch (error) {
+    console.error("Donor NGO rating error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to submit NGO rating.",
+      error: error.message,
+    });
+  }
+};
+
+// ======================================================
+// 4. ADMIN: GET ALL FEEDBACK
 // ======================================================
 const getAdminFeedback = async (req, res) => {
   try {
@@ -255,15 +396,13 @@ const getAdminFeedback = async (req, res) => {
 };
 
 // ======================================================
-// 4. NGO: GET OWN FEEDBACK + APPROVED DONOR FEEDBACK
-// NGO must never receive Pending or Declined Donor feedback
+// 5. NGO: GET OWN FEEDBACK + APPROVED DONOR FEEDBACK
 // ======================================================
 const getNgoFeedbacks = async (req, res) => {
   try {
     const loggedInNgoId = req.user.id;
     const requestedNgoId = req.params.ngoId;
 
-    // Prevent one NGO from accessing another NGO's feedback
     if (
       requestedNgoId &&
       String(requestedNgoId) !== String(loggedInNgoId)
@@ -276,15 +415,16 @@ const getNgoFeedbacks = async (req, res) => {
 
     const list = await Feedback.find({
       ngo: loggedInNgoId,
-
       $or: [
-        // NGO's own submitted feedback about Donors
         { submittedBy: "NGO" },
-
-        // Donor's feedback only after Admin approval
         {
           submittedBy: "Donor",
           status: "Approved",
+          category: { $ne: "NGO Rating" },
+        },
+        {
+          submittedBy: "Donor",
+          category: "NGO Rating",
         },
       ],
     })
@@ -309,22 +449,25 @@ const getNgoFeedbacks = async (req, res) => {
 };
 
 // ======================================================
-// 5. DONOR: GET NGO REVIEWS + OWN FEEDBACK STATUS
+// 6. DONOR: GET NGO REQUESTS + FEEDBACK + RATINGS
 // ======================================================
-// =====================================
-// GET DONOR NGO REVIEWS
-// =====================================
-// =====================================
-// GET DONOR NGO REVIEWS
-// =====================================
 const getDonorNgoReviews = async (req, res) => {
   try {
     const donorId = req.user.id;
 
-    // Donor's donations with NGO profile and associated User
     const donations = await Donation.find({
       donor: donorId,
-      "ngoRequest.requestedBy": { $exists: true, $ne: null },
+      $or: [
+        {
+          "ngoRequest.requestedBy": {
+            $exists: true,
+            $ne: null,
+          },
+        },
+        {
+          "ngoRequests.0": { $exists: true },
+        },
+      ],
     })
       .populate({
         path: "ngoRequest.requestedBy",
@@ -333,12 +476,19 @@ const getDonorNgoReviews = async (req, res) => {
           select: "name fullName",
         },
       })
+      .populate({
+        path: "ngoRequests.requestedBy",
+        populate: {
+          path: "user",
+          select: "name fullName",
+        },
+      })
       .sort({ createdAt: -1 });
 
-    // Donor -> NGO feedback
     const feedbacks = await Feedback.find({
       donor: donorId,
       submittedBy: "Donor",
+      category: { $ne: "NGO Rating" },
     })
       .populate({
         path: "ngo",
@@ -349,7 +499,20 @@ const getDonorNgoReviews = async (req, res) => {
       })
       .sort({ createdAt: -1 });
 
-    // NGO -> Donor feedback (only Admin-approved)
+    const ratings = await Feedback.find({
+      donor: donorId,
+      submittedBy: "Donor",
+      category: "NGO Rating",
+    })
+      .populate({
+        path: "ngo",
+        populate: {
+          path: "user",
+          select: "name fullName",
+        },
+      })
+      .sort({ createdAt: -1 });
+
     const ngoFeedbacks = await Feedback.find({
       donor: donorId,
       submittedBy: "NGO",
@@ -368,6 +531,7 @@ const getDonorNgoReviews = async (req, res) => {
       success: true,
       donations,
       feedbacks,
+      ratings,
       ngoFeedbacks,
     });
   } catch (error) {
@@ -382,7 +546,7 @@ const getDonorNgoReviews = async (req, res) => {
 };
 
 // ======================================================
-// 6. ADMIN: UPDATE FEEDBACK STATUS
+// 7. ADMIN: UPDATE FEEDBACK STATUS
 // ======================================================
 const updateFeedbackStatus = async (req, res) => {
   try {
@@ -413,14 +577,18 @@ const updateFeedbackStatus = async (req, res) => {
       });
     }
 
+    // NGO ratings do not go through admin approval.
+    if (feedback.category === "NGO Rating") {
+      return res.status(400).json({
+        success: false,
+        message: "NGO ratings cannot be moderated through this endpoint.",
+      });
+    }
+
     const previousStatus = feedback.status;
 
     feedback.status = status;
     await feedback.save();
-
-    // =====================================
-    // SEND NOTIFICATION ON APPROVE / DECLINE
-    // =====================================
 
     if (
       ["Approved", "Declined"].includes(status) &&
@@ -429,14 +597,10 @@ const updateFeedbackStatus = async (req, res) => {
       let recipient = null;
       let recipientRole = null;
 
-      // Donor submitted feedback
       if (feedback.submittedBy === "Donor") {
         recipient = feedback.donor;
         recipientRole = "donor";
-      }
-
-      // NGO submitted feedback
-      else if (feedback.submittedBy === "NGO") {
+      } else if (feedback.submittedBy === "NGO") {
         const ngo = await Ngo.findById(feedback.ngo)
           .select("user");
 
@@ -450,18 +614,14 @@ const updateFeedbackStatus = async (req, res) => {
         await createNotification({
           recipient,
           type: "FEEDBACK_RESPONSE",
-
           title: isApproved
             ? "Feedback Approved"
             : "Feedback Declined",
-
           message: isApproved
             ? "Your submitted feedback has been approved by Admin."
             : "Your submitted feedback has been declined by Admin.",
-
           donation: feedback.donation || null,
           feedback: feedback._id,
-
           data: {
             role: recipientRole,
             feedbackId: feedback._id.toString(),
@@ -478,7 +638,6 @@ const updateFeedbackStatus = async (req, res) => {
       message: "Feedback status updated successfully.",
       feedback,
     });
-
   } catch (error) {
     console.error("Update feedback status error:", error);
 
@@ -493,6 +652,7 @@ const updateFeedbackStatus = async (req, res) => {
 module.exports = {
   submitFeedback,
   submitDonorFeedback,
+  submitDonorNgoRating,
   getAdminFeedback,
   getNgoFeedbacks,
   getDonorNgoReviews,
