@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -13,14 +14,18 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-const API_BASE = "http://localhost:5000/api";
+import { API_URL } from "../../config";
 
 const getToken = () => {
-  return (
-    localStorage.getItem("token") ||
-    JSON.parse(localStorage.getItem("user") || "{}")?.token ||
-    ""
-  );
+  try {
+    return (
+      localStorage.getItem("token") ||
+      JSON.parse(localStorage.getItem("user") || "{}")?.token ||
+      ""
+    );
+  } catch {
+    return localStorage.getItem("token") || "";
+  }
 };
 
 const getNotificationIcon = (type) => {
@@ -29,17 +34,22 @@ const getNotificationIcon = (type) => {
     case "DONATION_COMPLETED":
     case "PICKUP_COMPLETED":
       return CheckCircle2;
+
     case "DRIVER_ASSIGNED":
     case "PICKUP_STARTED":
       return Truck;
+
     case "RATING_RECEIVED":
     case "FEEDBACK_RECEIVED":
       return Star;
+
     case "DONATION_REJECTED":
       return AlertCircle;
+
     case "ADMIN_FEEDBACK":
     case "ADMIN_STATUS":
-      return AlertTriangle; // 👉 অ্যাডমিন ওয়ার্নিংয়ের জন্য বিশেষ আইকন
+      return AlertTriangle;
+
     default:
       return Package;
   }
@@ -76,9 +86,10 @@ export default function Notifications() {
     }
 
     try {
+      setLoading(true);
       setError("");
 
-      const response = await fetch(`${API_BASE}/notifications`, {
+      const response = await fetch(`${API_URL}/notifications`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -114,7 +125,7 @@ export default function Notifications() {
     if (!notification.read && token) {
       try {
         const response = await fetch(
-          `${API_BASE}/notifications/${notification._id}/read`,
+          `${API_URL}/notifications/${notification._id}/read`,
           {
             method: "PATCH",
             headers: {
@@ -137,8 +148,11 @@ export default function Notifications() {
       }
     }
 
-    // অ্যাডমিন ফিডব্যাক বা ওয়ার্নিং হলে কোথাও রিডাইরেক্ট করার প্রয়োজন নেই
-    if (notification.type === "ADMIN_FEEDBACK" || notification.type === "ADMIN_STATUS") {
+    // Admin feedback or warning does not require redirection.
+    if (
+      notification.type === "ADMIN_FEEDBACK" ||
+      notification.type === "ADMIN_STATUS"
+    ) {
       return;
     }
 
@@ -147,7 +161,7 @@ export default function Notifications() {
       notification.title?.includes("Distribution Proof") ||
       notification.message?.includes("proof")
     ) {
-      navigate("/restaurant/ratings"); 
+      navigate("/restaurant/ratings");
       return;
     }
 
@@ -175,7 +189,7 @@ export default function Notifications() {
     try {
       setMarkingAll(true);
 
-      const response = await fetch(`${API_BASE}/notifications/read-all`, {
+      const response = await fetch(`${API_URL}/notifications/read-all`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -185,7 +199,9 @@ export default function Notifications() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || "Could not mark notifications as read.");
+        throw new Error(
+          result.message || "Could not mark notifications as read."
+        );
       }
 
       setNotifications((previous) =>
@@ -211,9 +227,11 @@ export default function Notifications() {
               <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
                 Notifications
               </h1>
+
               <p className="mt-1 text-sm text-slate-500">
                 Stay updated on your donations and admin updates.
               </p>
+
               <p className="mt-1 text-xs font-medium text-emerald-700">
                 {unreadCount} unread notification
                 {unreadCount === 1 ? "" : "s"}
@@ -241,9 +259,13 @@ export default function Notifications() {
             <button
               type="button"
               onClick={loadNotifications}
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
             >
-              <RefreshCw size={15} />
+              <RefreshCw
+                size={15}
+                className={loading ? "animate-spin" : ""}
+              />
               Refresh
             </button>
           </div>
@@ -255,8 +277,13 @@ export default function Notifications() {
             </div>
           ) : error ? (
             <div className="px-5 py-12 text-center">
-              <AlertCircle className="mx-auto mb-3 text-red-500" size={30} />
+              <AlertCircle
+                className="mx-auto mb-3 text-red-500"
+                size={30}
+              />
+
               <p className="text-sm text-red-600">{error}</p>
+
               <button
                 type="button"
                 onClick={loadNotifications}
@@ -267,10 +294,15 @@ export default function Notifications() {
             </div>
           ) : notifications.length === 0 ? (
             <div className="px-5 py-16 text-center">
-              <Bell className="mx-auto mb-3 text-slate-300" size={38} />
+              <Bell
+                className="mx-auto mb-3 text-slate-300"
+                size={38}
+              />
+
               <h3 className="font-semibold text-slate-700">
                 No notifications yet
               </h3>
+
               <p className="mt-1 text-sm text-slate-500">
                 Updates about your donations and alerts will appear here.
               </p>
@@ -279,6 +311,7 @@ export default function Notifications() {
             <div className="divide-y divide-slate-100">
               {notifications.map((notification) => {
                 const Icon = getNotificationIcon(notification.type);
+
                 const isAdminWarning =
                   notification.type === "ADMIN_FEEDBACK" ||
                   notification.type === "ADMIN_STATUS";
@@ -310,7 +343,9 @@ export default function Notifications() {
                       <div className="flex flex-wrap items-center gap-2">
                         <h3
                           className={`text-sm font-semibold ${
-                            isAdminWarning ? "text-red-900 font-bold" : "text-slate-900"
+                            isAdminWarning
+                              ? "text-red-900 font-bold"
+                              : "text-slate-900"
                           }`}
                         >
                           {notification.title}
@@ -331,7 +366,9 @@ export default function Notifications() {
 
                       <p
                         className={`mt-1 text-sm leading-6 ${
-                          isAdminWarning ? "text-red-800 font-medium" : "text-slate-600"
+                          isAdminWarning
+                            ? "text-red-800 font-medium"
+                            : "text-slate-600"
                         }`}
                       >
                         {notification.message}

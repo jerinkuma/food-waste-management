@@ -7,6 +7,18 @@ import {
   Store,
 } from "lucide-react";
 
+import { API_URL, API_BASE_URL } from "../../../config";
+
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return "";
+
+  if (/^https?:\/\//i.test(imagePath)) {
+    return imagePath;
+  }
+
+  return `${API_BASE_URL}${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
+};
+
 const EditProfileModal = ({
   isOpen,
   onClose,
@@ -24,10 +36,7 @@ const EditProfileModal = ({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // =====================================
   // LOAD CURRENT PROFILE DATA
-  // =====================================
-
   useEffect(() => {
     if (profile && isOpen) {
       setName(profile.name || "");
@@ -36,31 +45,29 @@ const EditProfileModal = ({
       setAddress(profile.address || "");
 
       setImage(null);
-
-      setPreview(
-        profile.profileImage
-          ? `http://localhost:5000${profile.profileImage}`
-          : ""
-      );
-
+      setPreview(getImageUrl(profile.profileImage));
       setError("");
     }
   }, [profile, isOpen]);
+
+  // Cleanup temporary image preview URL
+  useEffect(() => {
+    return () => {
+      if (preview?.startsWith("blob:")) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
 
   if (!isOpen) {
     return null;
   }
 
-  // =====================================
   // SELECT IMAGE
-  // =====================================
-
   const handleImageChange = (e) => {
     const selectedFile = e.target.files?.[0];
 
-    if (!selectedFile) {
-      return;
-    }
+    if (!selectedFile) return;
 
     const allowedTypes = [
       "image/jpeg",
@@ -73,25 +80,22 @@ const EditProfileModal = ({
       setError(
         "Please select a JPG, JPEG, PNG or WEBP image."
       );
+      e.target.value = "";
       return;
     }
 
     if (selectedFile.size > 5 * 1024 * 1024) {
       setError("Image size must be less than 5 MB.");
+      e.target.value = "";
       return;
     }
 
     setError("");
     setImage(selectedFile);
-
-    const imagePreview = URL.createObjectURL(selectedFile);
-    setPreview(imagePreview);
+    setPreview(URL.createObjectURL(selectedFile));
   };
 
-  // =====================================
   // SAVE PROFILE
-  // =====================================
-
   const handleSave = async () => {
     setError("");
 
@@ -117,10 +121,7 @@ const EditProfileModal = ({
 
     try {
       const userData = localStorage.getItem("user");
-
-      const user = userData
-        ? JSON.parse(userData)
-        : null;
+      const user = userData ? JSON.parse(userData) : null;
 
       if (!user?.id) {
         setError(
@@ -135,10 +136,7 @@ const EditProfileModal = ({
 
       formData.append("name", name.trim());
       formData.append("phone", phone.trim());
-      formData.append(
-        "tradeLicense",
-        tradeLicense.trim()
-      );
+      formData.append("tradeLicense", tradeLicense.trim());
       formData.append("address", address.trim());
 
       if (image) {
@@ -146,7 +144,7 @@ const EditProfileModal = ({
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/restaurants/profile/${user.id}`,
+        `${API_URL}/restaurants/profile/${user.id}`,
         {
           method: "PUT",
           body: formData,
@@ -157,26 +155,18 @@ const EditProfileModal = ({
 
       if (!response.ok) {
         throw new Error(
-          data.message ||
-            "Failed to update profile."
+          data.message || "Failed to update profile."
         );
       }
 
-      // =====================================
       // UPDATE PROFILE STATE
-      // =====================================
-
       setProfile(data.restaurant);
 
-      // =====================================
       // UPDATE LOCAL STORAGE
-      // =====================================
-
       const updatedUser = {
         ...user,
         name: data.restaurant.name,
-        profileImage:
-          data.restaurant.profileImage || "",
+        profileImage: data.restaurant.profileImage || "",
       };
 
       localStorage.setItem(
@@ -185,17 +175,12 @@ const EditProfileModal = ({
       );
 
       setImage(null);
-
       onClose();
     } catch (error) {
-      console.error(
-        "Profile update error:",
-        error
-      );
+      console.error("Profile update error:", error);
 
       setError(
-        error.message ||
-          "Failed to update profile."
+        error.message || "Failed to update profile."
       );
     } finally {
       setSaving(false);
@@ -213,9 +198,11 @@ const EditProfileModal = ({
           </h2>
 
           <button
+            type="button"
             onClick={onClose}
             disabled={saving}
             className="rounded-lg p-2 transition hover:bg-gray-100 disabled:opacity-50"
+            aria-label="Close edit profile"
           >
             <X size={22} />
           </button>
@@ -229,6 +216,9 @@ const EditProfileModal = ({
                 <img
                   src={preview}
                   alt="Profile preview"
+                  onError={() => {
+                    if (!image) setPreview("");
+                  }}
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -247,6 +237,7 @@ const EditProfileModal = ({
                 type="file"
                 accept="image/jpeg,image/jpg,image/png,image/webp"
                 onChange={handleImageChange}
+                disabled={saving}
                 className="hidden"
               />
             </label>
@@ -280,9 +271,8 @@ const EditProfileModal = ({
             <input
               type="text"
               value={name}
-              onChange={(e) =>
-                setName(e.target.value)
-              }
+              onChange={(e) => setName(e.target.value)}
+              disabled={saving}
               className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-green-500"
             />
           </div>
@@ -296,9 +286,8 @@ const EditProfileModal = ({
             <input
               type="text"
               value={phone}
-              onChange={(e) =>
-                setPhone(e.target.value)
-              }
+              onChange={(e) => setPhone(e.target.value)}
+              disabled={saving}
               className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-green-500"
             />
           </div>
@@ -312,9 +301,8 @@ const EditProfileModal = ({
             <input
               type="text"
               value={tradeLicense}
-              onChange={(e) =>
-                setTradeLicense(e.target.value)
-              }
+              onChange={(e) => setTradeLicense(e.target.value)}
+              disabled={saving}
               className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-green-500"
             />
           </div>
@@ -328,9 +316,8 @@ const EditProfileModal = ({
             <textarea
               rows={3}
               value={address}
-              onChange={(e) =>
-                setAddress(e.target.value)
-              }
+              onChange={(e) => setAddress(e.target.value)}
+              disabled={saving}
               className="w-full resize-none rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-green-500"
             />
           </div>
@@ -339,6 +326,7 @@ const EditProfileModal = ({
         {/* Buttons */}
         <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-4">
           <button
+            type="button"
             onClick={onClose}
             disabled={saving}
             className="rounded-xl border border-gray-300 px-6 py-3 font-medium transition hover:bg-gray-100 disabled:opacity-50"
@@ -347,6 +335,7 @@ const EditProfileModal = ({
           </button>
 
           <button
+            type="button"
             onClick={handleSave}
             disabled={saving}
             className="flex items-center justify-center gap-2 rounded-xl bg-green-600 px-6 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"

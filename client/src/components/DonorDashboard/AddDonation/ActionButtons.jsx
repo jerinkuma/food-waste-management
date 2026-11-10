@@ -2,6 +2,7 @@
 import { X, QrCode, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { API_URL } from "../../../config";
 
 const ActionButtons = ({
   donationData,
@@ -21,7 +22,6 @@ const ActionButtons = ({
   const handlePublish = async () => {
     setError("");
 
-    // Safety declaration check
     if (!donationData.safetyConfirmed) {
       setError(
         "Please confirm the safety declaration before publishing."
@@ -29,7 +29,6 @@ const ActionButtons = ({
       return;
     }
 
-    // Get logged-in user
     let user;
 
     try {
@@ -38,14 +37,15 @@ const ActionButtons = ({
       console.error("User data error:", error);
     }
 
-    if (!user?.id) {
+    if (!user?.id && !user?._id) {
       setError(
         "User information not found. Please login again."
       );
       return;
     }
 
-    // Required fields
+    const userId = user.id || user._id;
+
     const requiredFields = [
       ["foodName", "Food Name"],
       ["foodType", "Food Type"],
@@ -75,7 +75,6 @@ const ActionButtons = ({
       return;
     }
 
-    // Quantity validation
     if (Number(donationData.quantity) <= 0) {
       setError("Quantity must be greater than 0.");
       return;
@@ -84,39 +83,38 @@ const ActionButtons = ({
     try {
       setPublishing(true);
 
+      const token =
+        localStorage.getItem("token") ||
+        user?.token ||
+        "";
+
       const response = await fetch(
-        "http://localhost:5000/api/donations",
+        `${API_URL}/donations`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            ...(token
+              ? { Authorization: `Bearer ${token}` }
+              : {}),
           },
           body: JSON.stringify({
-            donor: user.id,
-
+            donor: userId,
             foodName: donationData.foodName,
             foodType: donationData.foodType,
-
             quantity: Number(donationData.quantity),
-
             cookingTime: donationData.cookingTime,
             bestBefore: donationData.bestBefore,
-
             condition: donationData.condition,
             foodCategory: donationData.foodCategory,
-
             pickupAddress: donationData.pickupAddress,
             pickupDate: donationData.pickupDate,
             pickupTime: donationData.pickupTime,
-
             contactNumber: donationData.contactNumber,
             pickupDuration: donationData.pickupDuration,
-
             specialInstructions:
               donationData.specialInstructions || "",
-
-            safetyConfirmed:
-              donationData.safetyConfirmed,
+            safetyConfirmed: donationData.safetyConfirmed,
           }),
         }
       );
@@ -129,13 +127,11 @@ const ActionButtons = ({
         );
       }
 
-      // Store the latest published donation
       localStorage.setItem(
         "lastDonation",
         JSON.stringify(data.donation)
       );
 
-      // Go to success page with actual backend data
       navigate("/restaurant/donation-success", {
         state: {
           donation: data.donation,
@@ -155,7 +151,6 @@ const ActionButtons = ({
 
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-      {/* Error Message */}
       {error && (
         <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {error}
@@ -163,7 +158,6 @@ const ActionButtons = ({
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-        {/* Cancel */}
         <button
           type="button"
           onClick={handleCancel}
@@ -174,7 +168,6 @@ const ActionButtons = ({
           Cancel
         </button>
 
-        {/* Publish Donation */}
         <button
           type="button"
           onClick={handlePublish}

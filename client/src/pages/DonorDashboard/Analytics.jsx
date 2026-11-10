@@ -6,8 +6,6 @@ import AnalyticsCards from "../../components/DonorDashboard/Analytics/AnalyticsC
 import MonthlyChart from "../../components/DonorDashboard/Analytics/MonthlyChart";
 import StatusChart from "../../components/DonorDashboard/Analytics/StatusChart";
 import FoodTypeChart from "../../components/DonorDashboard/Analytics/FoodTypeChart";
-
-
 import NgoAnalytics from "../../components/DonorDashboard/Analytics/NgoAnalytics";
 
 import html2canvas from "html2canvas-pro";
@@ -19,6 +17,8 @@ import {
   FileText,
   X,
 } from "lucide-react";
+
+import { API_URL } from "../../config";
 
 const getDonationDate = (donation) => {
   if (!donation?.createdAt) return null;
@@ -39,9 +39,6 @@ const Analytics = () => {
   const [dateRange, setDateRange] = useState("all");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
-
-
-
 
   const [ngoAnalytics, setNgoAnalytics] = useState(null);
   const [ngoLoading, setNgoLoading] = useState(true);
@@ -67,7 +64,14 @@ const Analytics = () => {
 
       // Existing donor donations
       const response = await fetch(
-        `http://localhost:5000/api/donations/donor/${user.id}`
+        `${API_URL}/donations/donor/${user.id}`,
+        {
+          headers: {
+            ...(token
+              ? { Authorization: `Bearer ${token}` }
+              : {}),
+          },
+        }
       );
 
       const data = await response.json();
@@ -85,7 +89,7 @@ const Analytics = () => {
         }
 
         const ngoResponse = await fetch(
-          `http://localhost:5000/api/donations/donor/${user.id}/ngo-analytics`,
+          `${API_URL}/donations/donor/${user.id}/ngo-analytics`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -107,7 +111,6 @@ const Analytics = () => {
         setNgoError(ngoErr.message || "Failed to load NGO analytics.");
         setNgoAnalytics(null);
       }
-
     } catch (err) {
       console.error("Analytics error:", err);
       setError(err.message || "Something went wrong.");
@@ -116,7 +119,6 @@ const Analytics = () => {
       setNgoLoading(false);
     }
   }, []);
-
 
   useEffect(() => {
     loadDonations();
@@ -360,27 +362,20 @@ const Analytics = () => {
   return (
     <DashboardLayout>
       <div className="analytics-print-area min-h-full bg-slate-50/50 transition-colors duration-300 dark:bg-slate-900 print:bg-white">
-
         <div className="mx-auto w-full max-w-[1600px] space-y-6 pb-8 print:space-y-3 print:pb-0">
 
-          {/* =====================================
-              PDF PAGE 1
-              HEADER + OVERVIEW
-          ===================================== */}
+          {/* PDF PAGE 1 */}
 
           <div
             className="analytics-pdf-page space-y-6 print:space-y-3"
             data-pdf-page="1"
           >
-
             {/* HEADER + FILTER CARD */}
 
             <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors duration-300 dark:border-slate-700 dark:bg-slate-800 sm:p-6 print:rounded-lg print:border-slate-300 print:p-3 print:shadow-none">
-
               <div className="absolute -right-12 -top-20 h-64 w-64 rounded-full bg-emerald-50/80 blur-3xl dark:bg-emerald-500/10 print:hidden" />
 
               <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-
                 <div className="min-w-0">
                   <h1 className="text-xl font-bold tracking-tight text-slate-1000 dark:text-slate-100 sm:text-2xl">
                     Analytics Dashboard
@@ -392,7 +387,6 @@ const Analytics = () => {
                 </div>
 
                 <div className="pdf-hide flex flex-col gap-3 sm:flex-row sm:items-end print:hidden">
-
                   <div className="w-full sm:w-48">
                     <select
                       value={dateRange}
@@ -415,7 +409,6 @@ const Analytics = () => {
                     <FileText size={17} />
                     Export PDF
                   </button>
-
                 </div>
               </div>
 
@@ -423,7 +416,6 @@ const Analytics = () => {
 
               {dateRange === "custom" && (
                 <div className="pdf-hide relative mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 dark:border-slate-700 sm:flex-row sm:items-end print:hidden">
-
                   <div className="w-full sm:w-44">
                     <label className="mb-1.5 block text-xs font-semibold text-slate-500 dark:text-slate-400">
                       Start Date
@@ -451,14 +443,12 @@ const Analytics = () => {
                       className={inputStyle}
                     />
                   </div>
-
                 </div>
               )}
 
               {/* FILTER SUMMARY */}
 
               <div className="pdf-hide relative mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-700 print:hidden">
-
                 <p className="text-xs text-slate-400 dark:text-slate-500">
                   {loading
                     ? "Loading donation records..."
@@ -474,7 +464,6 @@ const Analytics = () => {
                     Clear Filter
                   </button>
                 )}
-
               </div>
             </section>
 
@@ -482,7 +471,6 @@ const Analytics = () => {
 
             {error && (
               <div className="pdf-hide flex flex-col gap-4 rounded-2xl border border-red-200 bg-red-50 p-5 dark:border-red-500/30 dark:bg-red-950/30 sm:flex-row sm:items-center sm:justify-between">
-
                 <div className="flex items-start gap-3">
                   <AlertCircle
                     className="mt-0.5 shrink-0 text-red-600 dark:text-red-400"
@@ -511,13 +499,11 @@ const Analytics = () => {
                   />
                   Try Again
                 </button>
-
               </div>
             )}
 
             {!error && (
               <section className="space-y-3 print:space-y-2">
-
                 <div className="flex items-center gap-2">
                   <div className="h-5 w-1 rounded-full bg-emerald-500 print:h-4" />
 
@@ -530,29 +516,21 @@ const Analytics = () => {
                   donations={filteredDonations}
                   loading={loading}
                 />
-
               </section>
             )}
-
           </div>
 
-          {/* =====================================
-              PDF PAGE 2
-              DONATION ANALYTICS + FOOD INSIGHTS
-          ===================================== */}
+          {/* PDF PAGE 2 */}
 
           {!error && (
             <div
               className="analytics-pdf-page space-y-6 print:space-y-3"
               data-pdf-page="2"
             >
-
               {/* DONATION ANALYTICS */}
 
               <section className="space-y-3 print:space-y-2">
-
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-
                   <div>
                     <div className="flex items-center gap-2">
                       <div className="h-5 w-1 rounded-full bg-emerald-500 print:h-4" />
@@ -567,7 +545,7 @@ const Analytics = () => {
                     </p>
                   </div>
 
-                  {/* YEAR SELECTOR: 2026 + 2025 + DATABASE YEARS */}
+                  {/* YEAR SELECTOR */}
 
                   <select
                     value={selectedYear}
@@ -581,16 +559,9 @@ const Analytics = () => {
                       </option>
                     ))}
                   </select>
-
                 </div>
 
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 print:grid-cols-2 print:gap-2">
-
-                  {/* IMPORTANT:
-                      MonthlyChart receives ALL donations.
-                      Date range filter should not hide yearly comparison data.
-                  */}
-
                   <MonthlyChart
                     donations={donations}
                     loading={loading}
@@ -601,7 +572,6 @@ const Analytics = () => {
                     donations={filteredDonations}
                     loading={loading}
                   />
-
                 </div>
               </section>
 
@@ -616,7 +586,6 @@ const Analytics = () => {
               {/* FOOD CATEGORY INSIGHTS */}
 
               <section className="space-y-3 print:space-y-2">
-
                 <div>
                   <div className="flex items-center gap-2">
                     <div className="h-5 w-1 rounded-full bg-emerald-500 print:h-4" />
@@ -635,7 +604,6 @@ const Analytics = () => {
                   donations={filteredDonations}
                   loading={loading}
                 />
-
               </section>
 
               <div className="border-t border-slate-200 pt-4 text-center dark:border-slate-700 print:hidden">
@@ -643,10 +611,8 @@ const Analytics = () => {
                   Analytics are based on your donation history.
                 </p>
               </div>
-
             </div>
           )}
-
         </div>
       </div>
 
@@ -721,7 +687,6 @@ const Analytics = () => {
           }
         }
       `}</style>
-
     </DashboardLayout>
   );
 };

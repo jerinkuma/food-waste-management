@@ -1,6 +1,8 @@
+
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_URL } from "../../config";
 
 const LoginForm = ({ setIsSignup }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -24,19 +26,16 @@ const LoginForm = ({ setIsSignup }) => {
     try {
       setLoading(true);
 
-      const response = await fetch(
-        "http://localhost:5000/api/auth/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            password,
-          }),
-        }
-      );
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
+      });
 
       const data = await response.json();
 
@@ -45,37 +44,45 @@ const LoginForm = ({ setIsSignup }) => {
         return;
       }
 
-      // টোকেন সেভ করা
+      if (!data.token || !data.user) {
+        setMessage("Invalid server response. Please try again.");
+        return;
+      }
+
+      // Save authentication token.
       localStorage.setItem("token", data.token);
 
-      // 👉 এনজিও বা অন্যান্য ইউজারের জন্য avatar ও সঠিক নাম লোকালস্টোরেজে পার্মানেন্টলি সেভ করার ফিক্স
+      // Save user information.
       const userDataToStore = {
         id: data.user.id || data.user._id,
-        name: data.user.ngoName || data.user.name, // এনজিও হলে ngoName বা নাম
+        name: data.user.ngoName || data.user.name,
         fullName: data.user.ngoName || data.user.name,
         ngoName: data.user.ngoName || data.user.name,
         email: data.user.email,
-        role: data.user.role,
-        avatar: data.user.avatar || null, // ইউজারের নিজস্ব ছবি সিঙ্ক করা হলো
-        image: data.user.avatar || null
+        role: String(data.user.role || "").toLowerCase(),
+        avatar: data.user.avatar || null,
+        image: data.user.avatar || null,
       };
 
       localStorage.setItem("user", JSON.stringify(userDataToStore));
 
-      // রোল অনুযায়ী রিডাইরেক্ট করা
-      if (data.user.role === "admin") {
+      // Redirect according to user role.
+      if (userDataToStore.role === "admin") {
         navigate("/admin/dashboard");
-      } else if (data.user.role === "ngo") {
+      } else if (userDataToStore.role === "ngo") {
         navigate("/ngo/dashboard");
-      } else if (data.user.role === "donor") {
+      } else if (userDataToStore.role === "donor") {
         navigate("/restaurant/dashboard");
       } else {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
         setMessage("Invalid user role");
       }
-
     } catch (error) {
       console.error("Login error:", error);
-      setMessage("Cannot connect to server");
+      setMessage(
+        "Cannot connect to server. Please check your internet connection and try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -83,7 +90,6 @@ const LoginForm = ({ setIsSignup }) => {
 
   return (
     <div className="w-full max-w-md mx-auto p-4 sm:p-6">
-
       {/* Logo */}
       <h1 className="text-center text-4xl font-extrabold tracking-tight text-gray-900">
         Feed<span className="text-green-600">Link</span>
@@ -94,11 +100,7 @@ const LoginForm = ({ setIsSignup }) => {
       </p>
 
       {/* Form */}
-      <form
-        onSubmit={handleLogin}
-        className="w-full mx-auto"
-      >
-
+      <form onSubmit={handleLogin} className="w-full mx-auto">
         {/* Email */}
         <div className="relative mt-5 text-left">
           <Mail
@@ -111,6 +113,8 @@ const LoginForm = ({ setIsSignup }) => {
             placeholder="Email Address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
             className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-12 pr-4 text-gray-900 placeholder-gray-500 outline-none focus:border-green-500"
           />
         </div>
@@ -127,6 +131,8 @@ const LoginForm = ({ setIsSignup }) => {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
             className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-12 pr-12 text-gray-900 placeholder-gray-500 outline-none focus:border-green-500"
           />
 
@@ -134,6 +140,7 @@ const LoginForm = ({ setIsSignup }) => {
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600"
+            aria-label={showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
@@ -161,11 +168,10 @@ const LoginForm = ({ setIsSignup }) => {
         <button
           type="submit"
           disabled={loading}
-          className="mt-5 w-full rounded-xl bg-green-600 py-3 text-lg font-semibold text-white transition hover:bg-green-700 disabled:opacity-60"
+          className="mt-5 w-full rounded-xl bg-green-600 py-3 text-lg font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? "Logging in..." : "Login"}
         </button>
-
       </form>
 
       {/* Divider */}
@@ -191,7 +197,6 @@ const LoginForm = ({ setIsSignup }) => {
           Sign Up
         </button>
       </p>
-
     </div>
   );
 };

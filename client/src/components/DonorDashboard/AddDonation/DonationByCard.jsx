@@ -1,59 +1,64 @@
+
 import { useEffect, useState } from "react";
 
 import {
   BadgeCheck,
   Store,
   MapPin,
-  Phone,
   Hash,
 } from "lucide-react";
+
+import { API_URL } from "../../../config";
 
 const DonationByCard = () => {
   const [restaurant, setRestaurant] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     const getRestaurantProfile = async () => {
       try {
         const user = JSON.parse(
-          localStorage.getItem("user")
+          localStorage.getItem("user") || "{}"
         );
 
         if (!user?.id) {
           console.error("User not found");
-          setLoading(false);
+          if (!cancelled) setLoading(false);
           return;
         }
 
         const response = await fetch(
-          `http://localhost:5000/api/restaurants/profile/${user.id}`
+          `${API_URL}/restaurants/profile/${user.id}`
         );
 
         const data = await response.json();
 
         if (!response.ok) {
-          console.error(
+          throw new Error(
             data.message || "Failed to load restaurant"
           );
-          setLoading(false);
-          return;
         }
 
-        setRestaurant(data.restaurant);
-
+        if (!cancelled) {
+          setRestaurant(data.restaurant);
+        }
       } catch (error) {
-        console.error(
-          "Restaurant profile error:",
-          error
-        );
+        console.error("Restaurant profile error:", error);
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     getRestaurantProfile();
-  }, []);
 
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -65,19 +70,15 @@ const DonationByCard = () => {
     );
   }
 
-
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-
       <h2 className="mb-5 text-xl font-bold text-gray-900">
         Donation By
       </h2>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-center">
-
         {/* Left Side */}
         <div className="flex items-center gap-4">
-
           <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-green-100">
             <Store
               size={30}
@@ -98,23 +99,18 @@ const DonationByCard = () => {
               </span>
             </div>
           </div>
-
         </div>
-
 
         {/* Right Side */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-
           {/* Donor ID */}
           <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
-
             <Hash
               size={18}
               className="text-green-600"
             />
 
             <div className="min-w-0">
-
               <p className="text-xs text-gray-500">
                 Donor ID
               </p>
@@ -122,22 +118,17 @@ const DonationByCard = () => {
               <p className="truncate text-sm font-semibold text-gray-800">
                 {restaurant?.userId || "N/A"}
               </p>
-
             </div>
-
           </div>
-
 
           {/* Location */}
           <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
-
             <MapPin
               size={18}
               className="shrink-0 text-red-500"
             />
 
             <div className="min-w-0">
-
               <p className="text-xs text-gray-500">
                 Location
               </p>
@@ -145,14 +136,10 @@ const DonationByCard = () => {
               <p className="truncate text-sm font-semibold text-gray-800">
                 {restaurant?.address || "N/A"}
               </p>
-
             </div>
           </div>
-
         </div>
-
       </div>
-
     </div>
   );
 };

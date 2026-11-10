@@ -11,12 +11,13 @@ import {
   BadgeCheck,
   Warehouse,
 } from "lucide-react";
+import { API_URL } from "../../config";
 
 const SignupForm = ({ setIsSignup }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const initialFormData = {
     name: "",
     email: "",
     password: "",
@@ -27,7 +28,9 @@ const SignupForm = ({ setIsSignup }) => {
     tradeLicense: "",
     phone: "",
     address: "",
-  });
+  };
+
+  const [formData, setFormData] = useState(initialFormData);
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -42,14 +45,15 @@ const SignupForm = ({ setIsSignup }) => {
     }));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
     setMessage("");
     setMessageType("");
 
-    // Basic validation
     if (
-      !formData.name ||
-      !formData.email ||
+      !formData.name.trim() ||
+      !formData.email.trim() ||
       !formData.password ||
       !formData.role
     ) {
@@ -58,20 +62,18 @@ const SignupForm = ({ setIsSignup }) => {
       return;
     }
 
-    // Password match check
     if (formData.password !== formData.confirmPassword) {
       setMessage("Passwords do not match");
       setMessageType("error");
       return;
     }
 
-    // NGO validation
     if (formData.role === "ngo") {
       if (
-        !formData.organizationId ||
+        !formData.organizationId.trim() ||
         !formData.maximumCapacity ||
-        !formData.phone ||
-        !formData.address
+        !formData.phone.trim() ||
+        !formData.address.trim()
       ) {
         setMessage("Please fill in all NGO information");
         setMessageType("error");
@@ -79,12 +81,11 @@ const SignupForm = ({ setIsSignup }) => {
       }
     }
 
-    // Donor validation
     if (formData.role === "donor") {
       if (
-        !formData.tradeLicense ||
-        !formData.phone ||
-        !formData.address
+        !formData.tradeLicense.trim() ||
+        !formData.phone.trim() ||
+        !formData.address.trim()
       ) {
         setMessage("Please fill in all donor information");
         setMessageType("error");
@@ -95,26 +96,23 @@ const SignupForm = ({ setIsSignup }) => {
     setLoading(true);
 
     try {
-      const response = await fetch(
-        "http://localhost:5000/api/auth/signup",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: formData.name,
-            email: formData.email,
-            password: formData.password,
-            role: formData.role,
-            organizationId: formData.organizationId,
-            maximumCapacity: Number(formData.maximumCapacity),
-            tradeLicense: formData.tradeLicense,
-            phone: formData.phone,
-            address: formData.address,
-          }),
-        }
-      );
+      const response = await fetch(`${API_URL}/auth/signup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          password: formData.password,
+          role: formData.role,
+          organizationId: formData.organizationId,
+          maximumCapacity: Number(formData.maximumCapacity),
+          tradeLicense: formData.tradeLicense,
+          phone: formData.phone,
+          address: formData.address,
+        }),
+      });
 
       const data = await response.json();
 
@@ -129,26 +127,12 @@ const SignupForm = ({ setIsSignup }) => {
 
       console.log("User created:", data);
 
-      // Clear form after successful signup
-      setFormData({
-        name: "",
-        email: "",
-        password: "",
-        confirmPassword: "",
-        role: "",
-        organizationId: "",
-        maximumCapacity: "",
-        tradeLicense: "",
-        phone: "",
-        address: "",
-      });
-
+      setFormData(initialFormData);
     } catch (error) {
       console.error("Signup error:", error);
 
       setMessage("Unable to connect to server");
       setMessageType("error");
-
     } finally {
       setLoading(false);
     }
@@ -156,9 +140,7 @@ const SignupForm = ({ setIsSignup }) => {
 
   return (
     <div className="w-full max-w-lg p-3 sm:p-6">
-
       {/* Logo */}
-
       <h1 className="text-center text-4xl font-extrabold tracking-tight text-gray-900">
         Feed<span className="text-green-600">Link</span>
       </h1>
@@ -167,11 +149,8 @@ const SignupForm = ({ setIsSignup }) => {
         Create Your Account
       </p>
 
-
       {/* Full Name */}
-
       <div className="relative mt-5">
-
         <User
           size={20}
           className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
@@ -183,16 +162,13 @@ const SignupForm = ({ setIsSignup }) => {
           value={formData.name}
           onChange={handleChange}
           placeholder="Full Name"
+          required
           className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-12 pr-4 text-gray-900 placeholder-gray-500 outline-none transition focus:border-green-500"
         />
-
       </div>
 
-
       {/* Email */}
-
       <div className="relative mt-4">
-
         <Mail
           size={20}
           className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
@@ -204,55 +180,35 @@ const SignupForm = ({ setIsSignup }) => {
           value={formData.email}
           onChange={handleChange}
           placeholder="Email Address"
+          required
           className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-12 pr-4 text-gray-900 placeholder-gray-500 outline-none transition focus:border-green-500"
         />
-
       </div>
 
-
       {/* Role */}
-
       <div className="mt-4">
-
         <select
           name="role"
           value={formData.role}
           onChange={handleChange}
+          required
           className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition focus:border-green-500"
         >
-          <option value="">
-            Select Role
-          </option>
-
-          <option value="donor">
-            Food Donor / Restaurant
-          </option>
-
-          <option value="ngo">
-            NGO
-          </option>
-
+          <option value="">Select Role</option>
+          <option value="donor">Food Donor / Restaurant</option>
+          <option value="ngo">NGO</option>
         </select>
-
       </div>
 
-
       {/* NGO Fields */}
-
       {formData.role === "ngo" && (
-
         <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-
           <h3 className="mb-3 text-lg font-semibold text-gray-900">
             NGO Information
           </h3>
 
           <div className="space-y-3">
-
-            {/* Organization ID */}
-
             <div className="relative">
-
               <BadgeCheck
                 size={20}
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
@@ -266,14 +222,9 @@ const SignupForm = ({ setIsSignup }) => {
                 placeholder="Organization ID Number"
                 className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-12 pr-4 text-gray-900 placeholder-gray-500 outline-none transition focus:border-green-500"
               />
-
             </div>
 
-
-            {/* Maximum Capacity */}
-
             <div className="relative">
-
               <Warehouse
                 size={20}
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
@@ -285,16 +236,12 @@ const SignupForm = ({ setIsSignup }) => {
                 value={formData.maximumCapacity}
                 onChange={handleChange}
                 placeholder="Maximum Food Capacity"
+                min="1"
                 className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-12 pr-4 text-gray-900 placeholder-gray-500 outline-none transition focus:border-green-500"
               />
-
             </div>
 
-
-            {/* Phone */}
-
             <div className="relative">
-
               <Phone
                 size={20}
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
@@ -308,14 +255,9 @@ const SignupForm = ({ setIsSignup }) => {
                 placeholder="Phone Number"
                 className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-12 pr-4 text-gray-900 placeholder-gray-500 outline-none transition focus:border-green-500"
               />
-
             </div>
 
-
-            {/* Address */}
-
             <div className="relative">
-
               <MapPin
                 size={20}
                 className="absolute left-4 top-4 text-gray-500"
@@ -329,32 +271,20 @@ const SignupForm = ({ setIsSignup }) => {
                 placeholder="Address"
                 className="w-full resize-none rounded-xl border border-gray-300 bg-white p-3 pl-12 text-gray-900 placeholder-gray-500 outline-none transition focus:border-green-500"
               />
-
             </div>
-
           </div>
-
         </div>
-
       )}
 
-
       {/* Donor Fields */}
-
       {formData.role === "donor" && (
-
         <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-
           <h3 className="mb-3 text-lg font-semibold text-gray-900">
             Food Donor Information
           </h3>
 
           <div className="space-y-3">
-
-            {/* Trade License */}
-
             <div className="relative">
-
               <BadgeCheck
                 size={20}
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
@@ -368,14 +298,9 @@ const SignupForm = ({ setIsSignup }) => {
                 placeholder="Trade License Number"
                 className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-12 pr-4 text-gray-900 placeholder-gray-500 outline-none transition focus:border-green-500"
               />
-
             </div>
 
-
-            {/* Phone */}
-
             <div className="relative">
-
               <Phone
                 size={20}
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
@@ -389,14 +314,9 @@ const SignupForm = ({ setIsSignup }) => {
                 placeholder="Phone Number"
                 className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-12 pr-4 text-gray-900 placeholder-gray-500 outline-none transition focus:border-green-500"
               />
-
             </div>
 
-
-            {/* Address */}
-
             <div className="relative">
-
               <MapPin
                 size={20}
                 className="absolute left-4 top-4 text-gray-500"
@@ -410,20 +330,13 @@ const SignupForm = ({ setIsSignup }) => {
                 placeholder="Address"
                 className="w-full resize-none rounded-xl border border-gray-300 bg-white p-3 pl-12 text-gray-900 placeholder-gray-500 outline-none transition focus:border-green-500"
               />
-
             </div>
-
           </div>
-
         </div>
-
       )}
 
-
       {/* Password */}
-
       <div className="relative mt-4">
-
         <Lock
           size={20}
           className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
@@ -435,6 +348,7 @@ const SignupForm = ({ setIsSignup }) => {
           value={formData.password}
           onChange={handleChange}
           placeholder="Password"
+          required
           className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-12 pr-12 text-gray-900 placeholder-gray-500 outline-none transition focus:border-green-500"
         />
 
@@ -442,17 +356,14 @@ const SignupForm = ({ setIsSignup }) => {
           type="button"
           onClick={() => setShowPassword(!showPassword)}
           className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600"
+          aria-label={showPassword ? "Hide password" : "Show password"}
         >
           {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
         </button>
-
       </div>
 
-
       {/* Confirm Password */}
-
       <div className="relative mt-4">
-
         <Lock
           size={20}
           className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
@@ -464,6 +375,7 @@ const SignupForm = ({ setIsSignup }) => {
           value={formData.confirmPassword}
           onChange={handleChange}
           placeholder="Confirm Password"
+          required
           className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-12 pr-12 text-gray-900 placeholder-gray-500 outline-none transition focus:border-green-500"
         />
 
@@ -471,15 +383,13 @@ const SignupForm = ({ setIsSignup }) => {
           type="button"
           onClick={() => setShowConfirm(!showConfirm)}
           className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600"
+          aria-label={showConfirm ? "Hide password" : "Show password"}
         >
           {showConfirm ? <EyeOff size={20} /> : <Eye size={20} />}
         </button>
-
       </div>
 
-
       {/* Message */}
-
       {message && (
         <p
           className={`mt-4 text-center text-sm font-medium ${
@@ -492,9 +402,7 @@ const SignupForm = ({ setIsSignup }) => {
         </p>
       )}
 
-
       {/* Create Button */}
-
       <button
         type="button"
         onClick={handleSubmit}
@@ -504,11 +412,8 @@ const SignupForm = ({ setIsSignup }) => {
         {loading ? "Creating Account..." : "Create Account"}
       </button>
 
-
       {/* Divider */}
-
       <div className="my-5 flex items-center">
-
         <div className="h-px flex-1 bg-gray-300"></div>
 
         <span className="mx-4 text-sm font-medium text-gray-600">
@@ -516,14 +421,10 @@ const SignupForm = ({ setIsSignup }) => {
         </span>
 
         <div className="h-px flex-1 bg-gray-300"></div>
-
       </div>
 
-
       {/* Login Link */}
-
       <p className="text-center text-gray-700">
-
         Already have an account?
 
         <button
@@ -533,12 +434,9 @@ const SignupForm = ({ setIsSignup }) => {
         >
           Login
         </button>
-
       </p>
-
     </div>
   );
 };
 
 export default SignupForm;
-

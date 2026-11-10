@@ -20,14 +20,23 @@ import {
 
 import { getCurrentUser } from "../../services/auth";
 import { getSocket } from "../../services/socket";
-
-const API_BASE = "http://localhost:5000/api";
+import { API_URL, API_BASE_URL } from "../../config";
 
 const getToken = () =>
   localStorage.getItem("token") ||
   localStorage.getItem("authToken") ||
   JSON.parse(localStorage.getItem("user") || "{}")?.token ||
   "";
+
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return "";
+
+  if (/^https?:\/\//i.test(imagePath)) {
+    return imagePath;
+  }
+
+  return `${API_BASE_URL}${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
+};
 
 const Topbar = ({ isDark, setIsDark }) => {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -38,9 +47,7 @@ const Topbar = ({ isDark, setIsDark }) => {
   const [markingAll, setMarkingAll] = useState(false);
 
   const userData = localStorage.getItem("user");
-  const user = userData
-    ? JSON.parse(userData)
-    : getCurrentUser();
+  const user = userData ? JSON.parse(userData) : getCurrentUser();
 
   const [profileImage, setProfileImage] = useState("");
 
@@ -55,22 +62,17 @@ const Topbar = ({ isDark, setIsDark }) => {
         return;
       }
 
-      // Login data-তে image থাকলে প্রথমে সেটি দেখাবে
       const savedImage =
         currentUser.profileImage ||
         currentUser.restaurant?.profileImage;
 
       if (savedImage) {
-        setProfileImage(
-          savedImage.startsWith("http")
-            ? savedImage
-            : `http://localhost:5000${savedImage}`
-        );
+        setProfileImage(getImageUrl(savedImage));
       }
 
       try {
         const response = await fetch(
-          `http://localhost:5000/api/restaurants/profile/${currentUser.id}`
+          `${API_URL}/restaurants/profile/${currentUser.id}`
         );
 
         if (!response.ok) {
@@ -80,20 +82,13 @@ const Topbar = ({ isDark, setIsDark }) => {
         const result = await response.json();
         const restaurant = result.restaurant;
 
-        // API response-এ image যে field-এ আছে, সেখান থেকে নেবে
         const latestImage =
           restaurant?.profileImage ||
           restaurant?.user?.profileImage ||
           restaurant?.image;
 
         if (!cancelled) {
-          setProfileImage(
-            latestImage
-              ? latestImage.startsWith("http")
-                ? latestImage
-                : `http://localhost:5000${latestImage}`
-              : ""
-          );
+          setProfileImage(getImageUrl(latestImage));
         }
       } catch (error) {
         console.error("Topbar profile image error:", error);
@@ -141,7 +136,7 @@ const Topbar = ({ isDark, setIsDark }) => {
       setLoadingNotifications(true);
       setNotificationError("");
 
-      const response = await fetch(`${API_BASE}/notifications`, {
+      const response = await fetch(`${API_URL}/notifications`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -174,7 +169,7 @@ const Topbar = ({ isDark, setIsDark }) => {
 
     try {
       const response = await fetch(
-        `${API_BASE}/notifications/unread-count`,
+        `${API_URL}/notifications/unread-count`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -252,7 +247,7 @@ const Topbar = ({ isDark, setIsDark }) => {
 
     try {
       const response = await fetch(
-        `${API_BASE}/notifications/${notificationId}/read`,
+        `${API_URL}/notifications/${notificationId}/read`,
         {
           method: "PATCH",
           headers: {
@@ -292,7 +287,7 @@ const Topbar = ({ isDark, setIsDark }) => {
     try {
       setMarkingAll(true);
 
-      const response = await fetch(`${API_BASE}/notifications/read-all`, {
+      const response = await fetch(`${API_URL}/notifications/read-all`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -374,24 +369,27 @@ const Topbar = ({ isDark, setIsDark }) => {
 
   return (
     <header
-      className={`fixed top-0 right-0 left-[72px] z-[9999] border-b px-3 py-3 shadow-sm transition-colors duration-300 sm:px-5 sm:py-4 md:left-64 lg:px-8 ${isDark
-        ? "border-slate-700 bg-slate-900"
-        : "border-gray-200 bg-white"
-        }`}
+      className={`fixed top-0 right-0 left-[72px] z-[9999] border-b px-3 py-3 shadow-sm transition-colors duration-300 sm:px-5 sm:py-4 md:left-64 lg:px-8 ${
+        isDark
+          ? "border-slate-700 bg-slate-900"
+          : "border-gray-200 bg-white"
+      }`}
     >
       <div className="flex min-h-[64px] items-center justify-between gap-2 sm:gap-4">
         {/* LEFT: GREETING AND DATE */}
         <div className="min-w-0 flex-1">
           <h1
-            className={`truncate text-base font-bold sm:text-xl md:text-2xl lg:text-3xl ${isDark ? "text-white" : "text-gray-800"
-              }`}
+            className={`truncate text-base font-bold sm:text-xl md:text-2xl lg:text-3xl ${
+              isDark ? "text-white" : "text-gray-800"
+            }`}
           >
             {greeting}, {user?.name || "Restaurant"}
           </h1>
 
           <div
-            className={`mt-1 flex min-w-0 items-center gap-1.5 sm:gap-2 ${isDark ? "text-slate-400" : "text-gray-500"
-              }`}
+            className={`mt-1 flex min-w-0 items-center gap-1.5 sm:gap-2 ${
+              isDark ? "text-slate-400" : "text-gray-500"
+            }`}
           >
             <CalendarDays
               size={15}
@@ -409,16 +407,18 @@ const Topbar = ({ isDark, setIsDark }) => {
           <div className="relative hidden xl:block">
             <Search
               size={18}
-              className={`absolute left-4 top-1/2 -translate-y-1/2 ${isDark ? "text-slate-400" : "text-gray-400"
-                }`}
+              className={`absolute left-4 top-1/2 -translate-y-1/2 ${
+                isDark ? "text-slate-400" : "text-gray-400"
+              }`}
             />
             <input
               type="text"
               placeholder="Search donations, NGOs..."
-              className={`w-60 rounded-xl border py-3 pl-11 pr-4 outline-none transition duration-300 2xl:w-72 ${isDark
-                ? "border-slate-700 bg-slate-800 text-white placeholder-slate-400 focus:border-green-500"
-                : "border-gray-200 bg-gray-50 text-gray-800 placeholder-gray-400 focus:border-green-500 focus:bg-white"
-                }`}
+              className={`w-60 rounded-xl border py-3 pl-11 pr-4 outline-none transition duration-300 2xl:w-72 ${
+                isDark
+                  ? "border-slate-700 bg-slate-800 text-white placeholder-slate-400 focus:border-green-500"
+                  : "border-gray-200 bg-gray-50 text-gray-800 placeholder-gray-400 focus:border-green-500 focus:bg-white"
+              }`}
             />
           </div>
 
@@ -426,10 +426,11 @@ const Topbar = ({ isDark, setIsDark }) => {
           <button
             type="button"
             onClick={() => setIsDark(!isDark)}
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition duration-300 sm:h-10 sm:w-10 md:h-11 md:w-11 md:rounded-xl ${isDark
-              ? "bg-slate-800 text-yellow-400 hover:bg-slate-700"
-              : "bg-gray-100 text-gray-700 hover:bg-green-100"
-              }`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition duration-300 sm:h-10 sm:w-10 md:h-11 md:w-11 md:rounded-xl ${
+              isDark
+                ? "bg-slate-800 text-yellow-400 hover:bg-slate-700"
+                : "bg-gray-100 text-gray-700 hover:bg-green-100"
+            }`}
             aria-label="Toggle dark mode"
           >
             {isDark ? <Sun size={19} /> : <Moon size={19} />}
@@ -442,10 +443,11 @@ const Topbar = ({ isDark, setIsDark }) => {
               setShowNotifications(true);
               loadNotifications();
             }}
-            className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition duration-300 sm:h-10 sm:w-10 md:h-11 md:w-11 md:rounded-xl ${isDark
-              ? "bg-slate-800 hover:bg-slate-700"
-              : "bg-gray-100 hover:bg-green-100"
-              }`}
+            className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition duration-300 sm:h-10 sm:w-10 md:h-11 md:w-11 md:rounded-xl ${
+              isDark
+                ? "bg-slate-800 hover:bg-slate-700"
+                : "bg-gray-100 hover:bg-green-100"
+            }`}
             aria-label="Open notifications"
             aria-haspopup="dialog"
             aria-expanded={showNotifications}
@@ -457,10 +459,11 @@ const Topbar = ({ isDark, setIsDark }) => {
 
             {unreadCount > 0 && (
               <span
-                className={`absolute -right-1 -top-1 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white ${isDark
-                  ? "border-2 border-slate-900"
-                  : "border-2 border-white"
-                  }`}
+                className={`absolute -right-1 -top-1 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white ${
+                  isDark
+                    ? "border-2 border-slate-900"
+                    : "border-2 border-white"
+                }`}
               >
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
@@ -470,10 +473,11 @@ const Topbar = ({ isDark, setIsDark }) => {
           {/* Profile */}
           <button
             type="button"
-            className={`shrink-0 rounded-full p-1 transition ${isDark
-              ? "ring-2 ring-slate-700 hover:ring-green-500"
-              : "ring-2 ring-gray-200 hover:ring-green-500"
-              }`}
+            className={`shrink-0 rounded-full p-1 transition ${
+              isDark
+                ? "ring-2 ring-slate-700 hover:ring-green-500"
+                : "ring-2 ring-gray-200 hover:ring-green-500"
+            }`}
             aria-label="Profile"
           >
             {profileImage ? (
@@ -506,15 +510,17 @@ const Topbar = ({ isDark, setIsDark }) => {
             role="dialog"
             aria-modal="true"
             aria-labelledby="notifications-title"
-            className={`my-auto flex max-h-[calc(100dvh-1rem)] w-full max-w-3xl min-w-0 flex-col overflow-hidden rounded-xl border shadow-2xl sm:max-h-[90dvh] sm:rounded-2xl ${isDark
-              ? "border-slate-700 bg-slate-800 text-white"
-              : "border-gray-200 bg-white text-gray-800"
-              }`}
+            className={`my-auto flex max-h-[calc(100dvh-1rem)] w-full max-w-3xl min-w-0 flex-col overflow-hidden rounded-xl border shadow-2xl sm:max-h-[90dvh] sm:rounded-2xl ${
+              isDark
+                ? "border-slate-700 bg-slate-800 text-white"
+                : "border-gray-200 bg-white text-gray-800"
+            }`}
           >
             {/* Modal header */}
             <div
-              className={`flex items-center justify-between border-b px-5 py-4 sm:px-7 sm:py-5 ${isDark ? "border-slate-700" : "border-gray-200"
-                }`}
+              className={`flex items-center justify-between border-b px-5 py-4 sm:px-7 sm:py-5 ${
+                isDark ? "border-slate-700" : "border-gray-200"
+              }`}
             >
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-500/10 text-green-500">
@@ -529,8 +535,9 @@ const Topbar = ({ isDark, setIsDark }) => {
                     All Notifications
                   </h2>
                   <p
-                    className={`mt-1 text-xs sm:text-sm ${isDark ? "text-slate-400" : "text-gray-500"
-                      }`}
+                    className={`mt-1 text-xs sm:text-sm ${
+                      isDark ? "text-slate-400" : "text-gray-500"
+                    }`}
                   >
                     {notifications.length} total · {unreadNotifications} unread
                   </p>
@@ -540,10 +547,11 @@ const Topbar = ({ isDark, setIsDark }) => {
               <button
                 type="button"
                 onClick={() => setShowNotifications(false)}
-                className={`rounded-lg p-2 transition ${isDark
-                  ? "text-slate-400 hover:bg-slate-700 hover:text-white"
-                  : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                  }`}
+                className={`rounded-lg p-2 transition ${
+                  isDark
+                    ? "text-slate-400 hover:bg-slate-700 hover:text-white"
+                    : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                }`}
                 aria-label="Close notifications"
               >
                 <X size={23} />
@@ -552,12 +560,14 @@ const Topbar = ({ isDark, setIsDark }) => {
 
             {/* Modal toolbar */}
             <div
-              className={`flex items-center justify-between gap-3 border-b px-5 py-3 sm:px-7 ${isDark ? "border-slate-700" : "border-gray-100"
-                }`}
+              className={`flex items-center justify-between gap-3 border-b px-5 py-3 sm:px-7 ${
+                isDark ? "border-slate-700" : "border-gray-100"
+              }`}
             >
               <span
-                className={`text-sm font-medium ${isDark ? "text-slate-300" : "text-gray-600"
-                  }`}
+                className={`text-sm font-medium ${
+                  isDark ? "text-slate-300" : "text-gray-600"
+                }`}
               >
                 Recent activity
               </span>
@@ -567,10 +577,11 @@ const Topbar = ({ isDark, setIsDark }) => {
                   type="button"
                   onClick={loadNotifications}
                   disabled={loadingNotifications}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs transition ${isDark
-                    ? "text-slate-300 hover:bg-slate-700"
-                    : "text-gray-600 hover:bg-gray-100"
-                    }`}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs transition ${
+                    isDark
+                      ? "text-slate-300 hover:bg-slate-700"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
                 >
                   <RefreshCw
                     size={14}
@@ -616,25 +627,28 @@ const Topbar = ({ isDark, setIsDark }) => {
               ) : notifications.length === 0 ? (
                 <div className="px-5 py-16 text-center">
                   <div
-                    className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full ${isDark
-                      ? "bg-slate-700 text-slate-400"
-                      : "bg-gray-100 text-gray-400"
-                      }`}
+                    className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full ${
+                      isDark
+                        ? "bg-slate-700 text-slate-400"
+                        : "bg-gray-100 text-gray-400"
+                    }`}
                   >
                     <Bell size={27} />
                   </div>
                   <h3 className="font-semibold">No notifications yet</h3>
                   <p
-                    className={`mt-2 text-sm ${isDark ? "text-slate-400" : "text-gray-500"
-                      }`}
+                    className={`mt-2 text-sm ${
+                      isDark ? "text-slate-400" : "text-gray-500"
+                    }`}
                   >
                     Updates about your donations will appear here.
                   </p>
                 </div>
               ) : (
                 <div
-                  className={`divide-y ${isDark ? "divide-slate-700" : "divide-gray-100"
-                    }`}
+                  className={`divide-y ${
+                    isDark ? "divide-slate-700" : "divide-gray-100"
+                  }`}
                 >
                   {notifications.map((notification) => {
                     const Icon = getNotificationIcon(notification.type);
@@ -644,20 +658,22 @@ const Topbar = ({ isDark, setIsDark }) => {
                         type="button"
                         key={notification._id}
                         onClick={() => handleNotificationClick(notification)}
-                        className={`flex w-full items-start gap-3 px-5 py-4 text-left transition sm:gap-4 sm:px-7 sm:py-5 ${!notification.read
-                          ? isDark
-                            ? "bg-green-500/[0.06] hover:bg-green-500/[0.12]"
-                            : "bg-green-50/70 hover:bg-green-50"
-                          : isDark
-                            ? "hover:bg-slate-700/60"
-                            : "hover:bg-gray-50"
-                          }`}
+                        className={`flex w-full items-start gap-3 px-5 py-4 text-left transition sm:gap-4 sm:px-7 sm:py-5 ${
+                          !notification.read
+                            ? isDark
+                              ? "bg-green-500/[0.06] hover:bg-green-500/[0.12]"
+                              : "bg-green-50/70 hover:bg-green-50"
+                            : isDark
+                              ? "hover:bg-slate-700/60"
+                              : "hover:bg-gray-50"
+                        }`}
                       >
                         <div
-                          className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${isDark
-                            ? "bg-slate-700 text-green-400"
-                            : "bg-green-50 text-green-700"
-                            }`}
+                          className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                            isDark
+                              ? "bg-slate-700 text-green-400"
+                              : "bg-green-50 text-green-700"
+                          }`}
                         >
                           <Icon size={21} />
 
@@ -680,15 +696,17 @@ const Topbar = ({ isDark, setIsDark }) => {
                           </div>
 
                           <p
-                            className={`mt-1 text-sm leading-6 ${isDark ? "text-slate-300" : "text-gray-600"
-                              }`}
+                            className={`mt-1 text-sm leading-6 ${
+                              isDark ? "text-slate-300" : "text-gray-600"
+                            }`}
                           >
                             {notification.message}
                           </p>
 
                           <p
-                            className={`mt-2 flex items-center gap-1.5 text-xs ${isDark ? "text-slate-500" : "text-gray-400"
-                              }`}
+                            className={`mt-2 flex items-center gap-1.5 text-xs ${
+                              isDark ? "text-slate-500" : "text-gray-400"
+                            }`}
                           >
                             <Clock size={13} />
                             {formatNotificationTime(notification.createdAt)}
@@ -710,12 +728,14 @@ const Topbar = ({ isDark, setIsDark }) => {
 
             {/* Modal footer */}
             <div
-              className={`flex items-center justify-between gap-3 border-t px-5 py-3 sm:px-7 sm:py-4 ${isDark ? "border-slate-700" : "border-gray-200"
-                }`}
+              className={`flex items-center justify-between gap-3 border-t px-5 py-3 sm:px-7 sm:py-4 ${
+                isDark ? "border-slate-700" : "border-gray-200"
+              }`}
             >
               <span
-                className={`text-xs ${isDark ? "text-slate-400" : "text-gray-500"
-                  }`}
+                className={`text-xs ${
+                  isDark ? "text-slate-400" : "text-gray-500"
+                }`}
               >
                 {unreadNotifications} unread
               </span>

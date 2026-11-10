@@ -1,9 +1,15 @@
 
 import { useEffect, useState } from "react";
-import { Image, Loader2, CalendarDays, Package, AlertCircle } from "lucide-react";
+import {
+    Image,
+    Loader2,
+    CalendarDays,
+    Package,
+    AlertCircle,
+} from "lucide-react";
 import DashboardLayout from "../../components/DonorDashboard/DashboardLayout";
 
-const API_URL = "http://localhost:5000";
+import { API_URL, API_BASE_URL } from "../../config";
 
 const DistributionProof = () => {
     const [proofs, setProofs] = useState([]);
@@ -11,6 +17,8 @@ const DistributionProof = () => {
     const [error, setError] = useState("");
 
     useEffect(() => {
+        const controller = new AbortController();
+
         const fetchProofs = async () => {
             try {
                 setLoading(true);
@@ -18,12 +26,17 @@ const DistributionProof = () => {
 
                 const token = localStorage.getItem("token");
 
+                if (!token) {
+                    throw new Error("Authentication token not found. Please login again.");
+                }
+
                 const response = await fetch(
-                    `${API_URL}/api/ngo/donor/distribution-proofs`,
+                    `${API_URL}/ngo/donor/distribution-proofs`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,
                         },
+                        signal: controller.signal,
                     }
                 );
 
@@ -37,18 +50,31 @@ const DistributionProof = () => {
 
                 setProofs(data.proofs || []);
             } catch (err) {
-                setError(err.message || "Something went wrong.");
+                if (err.name !== "AbortError") {
+                    setError(err.message || "Something went wrong.");
+                }
             } finally {
-                setLoading(false);
+                if (!controller.signal.aborted) {
+                    setLoading(false);
+                }
             }
         };
 
         fetchProofs();
+
+        return () => {
+            controller.abort();
+        };
     }, []);
 
     const getImageSrc = (url) => {
         if (!url) return "";
-        return url.startsWith("http") ? url : `${API_URL}${url}`;
+
+        if (/^https?:\/\//i.test(url)) {
+            return url;
+        }
+
+        return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
     };
 
     return (

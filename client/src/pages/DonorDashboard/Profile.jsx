@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+
+import { useCallback, useEffect, useState } from "react";
 
 import DashboardLayout from "../../components/DonorDashboard/DashboardLayout";
 
@@ -6,76 +7,79 @@ import ProfileCard from "../../components/DonorDashboard/Profile/ProfileCard";
 import RestaurantInfo from "../../components/DonorDashboard/Profile/RestaurantInfo";
 import AccountInfo from "../../components/DonorDashboard/Profile/AccountInfo";
 
+import { API_URL } from "../../config";
+
 const Profile = () => {
-  const [profile, setProfile] =
-    useState(null);
-
-  const [loading, setLoading] =
-    useState(true);
-
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // =====================================
   // LOAD PROFILE
   // =====================================
 
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async (signal) => {
     try {
-      const userData =
-        localStorage.getItem("user");
+      const userData = localStorage.getItem("user");
 
       const user = userData
         ? JSON.parse(userData)
         : null;
 
-
       if (!user?.id) {
-        console.error(
-          "User information not found."
-        );
-
+        console.error("User information not found.");
+        setProfile(null);
         setLoading(false);
-
         return;
       }
 
+      const token =
+        localStorage.getItem("token") ||
+        user?.token ||
+        "";
 
       const response = await fetch(
-        `http://localhost:5000/api/restaurants/profile/${user.id}`
+        `${API_URL}/restaurants/profile/${user.id}`,
+        {
+          method: "GET",
+          headers: {
+            ...(token
+              ? { Authorization: `Bearer ${token}` }
+              : {}),
+          },
+          signal,
+        }
       );
 
-
-      const data =
-        await response.json();
-
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.message ||
-            "Failed to load profile."
+          data.message || "Failed to load profile."
         );
       }
 
-
-      setProfile(
-        data.restaurant
-      );
-
+      setProfile(data.restaurant || null);
     } catch (error) {
-      console.error(
-        "Restaurant profile error:",
-        error
-      );
-
+      if (error.name !== "AbortError") {
+        console.error("Restaurant profile error:", error);
+        setProfile(null);
+      }
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
-  };
-
-
-  useEffect(() => {
-    loadProfile();
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    loadProfile(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, [loadProfile]);
 
   // =====================================
   // LOADING
@@ -93,7 +97,6 @@ const Profile = () => {
     );
   }
 
-
   // =====================================
   // ERROR
   // =====================================
@@ -108,41 +111,26 @@ const Profile = () => {
     );
   }
 
-
   // =====================================
   // PROFILE PAGE
   // =====================================
 
   return (
     <DashboardLayout>
-
       <div className="space-y-6 sm:space-y-8">
-
-        
-
-
         {/* Profile Card */}
         <ProfileCard
           profile={profile}
           setProfile={setProfile}
         />
 
-
         {/* Information Sections */}
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <RestaurantInfo profile={profile} />
 
-          <RestaurantInfo
-            profile={profile}
-          />
-
-          <AccountInfo
-            profile={profile}
-          />
-
+          <AccountInfo profile={profile} />
         </div>
-
       </div>
-
     </DashboardLayout>
   );
 };

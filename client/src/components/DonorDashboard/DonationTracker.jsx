@@ -9,8 +9,7 @@ import {
   Check,
   X,
 } from "lucide-react";
-
-const API_BASE = "http://localhost:5000/api";
+import { API_URL } from "../../config";
 
 const getToken = () => {
   try {
@@ -37,10 +36,6 @@ const DonationTracker = ({
       : donation
         ? [donation]
         : [];
-
-  // =====================================================
-  // STATUS HELPERS
-  // =====================================================
 
   const getStatus = (item) =>
     String(
@@ -75,10 +70,6 @@ const DonationTracker = ({
     );
   };
 
-  // =====================================================
-  // PENDING NGO REQUEST DONATIONS
-  // =====================================================
-
   const requestDonations = allDonations.filter((item) => {
     const hasPendingRequests =
       Array.isArray(item?.ngoRequests) &&
@@ -94,47 +85,28 @@ const DonationTracker = ({
     );
   });
 
-  // =====================================================
-  // ACTIVE PICKUPS
-  // =====================================================
-
   const activeDonations = allDonations.filter(
     (item) =>
       isActivePickup(item) &&
       !isHistoryStatus(item)
   );
 
-  // =====================================================
-  // COMMON HELPERS
-  // =====================================================
-
   const getDonationName = (item) =>
     item?.foodName ||
     item?.foodType ||
     "Food Donation";
 
-  // Donor যে NGO-কে Accept করেছে, তার নাম দেখাবে
   const getNgoName = (item) => {
-    const selectedNgo =
-      item?.selectedNgo;
+    const selectedNgo = item?.selectedNgo;
+    const acceptedNgo = item?.ngoRequest?.requestedBy;
+    const ngo = item?.ngo;
 
-    const acceptedNgo =
-      item?.ngoRequest?.requestedBy;
-
-    const ngo =
-      item?.ngo;
-
-    // selectedNgo populated থাকলে সেটিই ব্যবহার হবে।
-    // selectedNgo ID হলে populated ngoRequest fallback হবে।
     const ngoInfo =
-      selectedNgo &&
-        typeof selectedNgo === "object"
+      selectedNgo && typeof selectedNgo === "object"
         ? selectedNgo
-        : acceptedNgo &&
-          typeof acceptedNgo === "object"
+        : acceptedNgo && typeof acceptedNgo === "object"
           ? acceptedNgo
-          : ngo &&
-            typeof ngo === "object"
+          : ngo && typeof ngo === "object"
             ? ngo
             : null;
 
@@ -158,10 +130,7 @@ const DonationTracker = ({
     );
   };
 
-  // =====================================================
   // ACCEPT / DECLINE NGO REQUEST
-  // =====================================================
-
   const handleNgoRequest = async (
     item,
     ngoId,
@@ -199,8 +168,8 @@ const DonationTracker = ({
 
       const endpoint =
         action === "accept"
-          ? `${API_BASE}/donations/${donationId}/select-ngo/${ngoId}`
-          : `${API_BASE}/donations/${donationId}/decline-ngo/${ngoId}`;
+          ? `${API_URL}/donations/${donationId}/select-ngo/${ngoId}`
+          : `${API_URL}/donations/${donationId}/decline-ngo/${ngoId}`;
 
       const response = await fetch(endpoint, {
         method: "PATCH",
@@ -236,10 +205,7 @@ const DonationTracker = ({
     }
   };
 
-  // =====================================================
   // NGO REQUEST CARD
-  // =====================================================
-
   const renderRequestDonation = (item) => {
     const pendingRequests =
       (item?.ngoRequests || []).filter(
@@ -368,13 +334,9 @@ const DonationTracker = ({
     );
   };
 
-  // =====================================================
   // ACTIVE DONATION CARD
-  // =====================================================
-
   const renderActiveDonation = (item) => {
     const driver = item?.deliveryMan || null;
-
     const status = getStatus(item);
 
     let progress = 30;
@@ -397,7 +359,6 @@ const DonationTracker = ({
         return;
       }
 
-      // Bangladesh number হলে 01XXXXXXXXX থেকে 8801XXXXXXXXX করবে
       let phone = driver.phone.replace(/\D/g, "");
 
       if (phone.startsWith("01")) {
@@ -429,8 +390,6 @@ const DonationTracker = ({
             </p>
           )}
         </div>
-
-        {/* NGO AND DRIVER INFORMATION */}
 
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
@@ -495,8 +454,6 @@ const DonationTracker = ({
           </div>
         </div>
 
-        {/* PICKUP PROGRESS */}
-
         <div className="mt-5">
           <div className="mb-2 flex justify-between text-xs">
             <span className="text-gray-500 dark:text-gray-400">
@@ -516,24 +473,23 @@ const DonationTracker = ({
           </div>
         </div>
 
-        {/* CALL DRIVER BUTTON */}
-
         <div className="mt-5 flex justify-center">
           <button
             type="button"
             onClick={handleCallDriver}
             disabled={!driver?.phone}
             className={`
-      !flex !w-full !max-w-[320px]
-      !items-center !justify-center !gap-2
-      !rounded-xl !px-5 !py-3
-      !text-sm !font-semibold !text-white
-      !shadow-md
-      ${driver?.phone
-                ? "!bg-green-600 hover:!bg-green-700"
-                : "!bg-gray-400 cursor-not-allowed"
+              !flex !w-full !max-w-[320px]
+              !items-center !justify-center !gap-2
+              !rounded-xl !px-5 !py-3
+              !text-sm !font-semibold !text-white
+              !shadow-md
+              ${
+                driver?.phone
+                  ? "!bg-green-600 hover:!bg-green-700"
+                  : "!bg-gray-400 cursor-not-allowed"
               }
-    `}
+            `}
           >
             <Phone size={17} />
             Call Driver
@@ -543,10 +499,7 @@ const DonationTracker = ({
     );
   };
 
-  // =====================================================
   // MAIN RETURN
-  // =====================================================
-
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-[#111916] sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -577,8 +530,6 @@ const DonationTracker = ({
         )}
       </div>
 
-      {/* NGO REQUESTS */}
-
       {requestDonations.length > 0 && (
         <div className="mt-6 space-y-5">
           <div className="flex items-center gap-2">
@@ -602,8 +553,6 @@ const DonationTracker = ({
         </div>
       )}
 
-      {/* ACTIVE PICKUPS */}
-
       {activeDonations.length > 0 && (
         <div className="mt-7 space-y-5">
           <div className="flex items-center gap-2">
@@ -618,17 +567,16 @@ const DonationTracker = ({
           </div>
 
           <div
-            className={`grid grid-cols-1 gap-5 ${activeDonations.length >= 2
-              ? "md:grid-cols-2"
-              : ""
-              }`}
+            className={`grid grid-cols-1 gap-5 ${
+              activeDonations.length >= 2
+                ? "md:grid-cols-2"
+                : ""
+            }`}
           >
             {activeDonations.map(renderActiveDonation)}
           </div>
         </div>
       )}
-
-      {/* EMPTY STATE */}
 
       {requestDonations.length === 0 &&
         activeDonations.length === 0 && (

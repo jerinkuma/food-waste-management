@@ -10,6 +10,8 @@ import {
   CheckCircle,
 } from "lucide-react";
 
+import { API_URL } from "../../config";
+
 const ResetPassword = () => {
   const { token } = useParams();
   const navigate = useNavigate();
@@ -28,6 +30,11 @@ const ResetPassword = () => {
 
     setError("");
     setMessage("");
+
+    if (!token) {
+      setError("Invalid or missing password reset token.");
+      return;
+    }
 
     if (!newPassword || !confirmPassword) {
       setError("Please fill in both password fields.");
@@ -48,7 +55,7 @@ const ResetPassword = () => {
       setLoading(true);
 
       const response = await fetch(
-        `http://localhost:5000/api/auth/reset-password/${token}`,
+        `${API_URL}/auth/reset-password/${encodeURIComponent(token)}`,
         {
           method: "POST",
           headers: {
@@ -64,11 +71,16 @@ const ResetPassword = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.message || "Unable to reset password. Please try again.");
+        setError(
+          data.message ||
+            "Unable to reset password. Please try again."
+        );
         return;
       }
 
-      setMessage(data.message || "Password reset successfully!");
+      setMessage(
+        data.message || "Password reset successfully!"
+      );
 
       setNewPassword("");
       setConfirmPassword("");
@@ -136,8 +148,15 @@ const ResetPassword = () => {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                aria-label={
+                  showPassword ? "Hide password" : "Show password"
+                }
               >
-                {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                {showPassword ? (
+                  <EyeOff size={19} />
+                ) : (
+                  <Eye size={19} />
+                )}
               </button>
             </div>
           </div>
@@ -170,6 +189,11 @@ const ResetPassword = () => {
                   setShowConfirmPassword(!showConfirmPassword)
                 }
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                aria-label={
+                  showConfirmPassword
+                    ? "Hide confirm password"
+                    : "Show confirm password"
+                }
               >
                 {showConfirmPassword ? (
                   <EyeOff size={19} />

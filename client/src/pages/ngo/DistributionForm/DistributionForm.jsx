@@ -1,7 +1,15 @@
 
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { X, Upload, Store, Calendar, Package } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import {
+  X,
+  Upload,
+  Store,
+  Calendar,
+  Package,
+} from "lucide-react";
+
+import { API_URL } from "../../../config";
 
 export default function DistributionProofPage() {
   const [completedDonations, setCompletedDonations] = useState([]);
@@ -10,24 +18,24 @@ export default function DistributionProofPage() {
   const [showModal, setShowModal] = useState(false);
 
   // Form fields
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState("");
   const [imageFiles, setImageFiles] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
 
   // Fetch completed donations
- useEffect(() => {
-  fetchCompletedDonations();
-}, []);
+  useEffect(() => {
+    fetchCompletedDonations();
+  }, []);
 
   const fetchCompletedDonations = async () => {
     try {
       const response = await axios.get(
-        'http://localhost:5000/api/ngo/completed-donations',
+        `${API_URL}/ngo/completed-donations`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         }
       );
@@ -36,7 +44,7 @@ export default function DistributionProofPage() {
         setCompletedDonations(response.data.donations || []);
       }
     } catch (err) {
-      console.error('Error fetching completed donations:', err);
+      console.error("Error fetching completed donations:", err);
     } finally {
       setLoading(false);
     }
@@ -45,21 +53,25 @@ export default function DistributionProofPage() {
   // Open proof modal
   const handleOpenModal = (donation) => {
     setSelectedDonation(donation);
-    setDescription('');
+    setDescription("");
     setImageFiles([]);
     setImagePreviews([]);
-    setMessage('');
+    setMessage("");
     setShowModal(true);
   };
 
   // Close modal
   const handleCloseModal = () => {
+    imagePreviews.forEach((preview) => {
+      URL.revokeObjectURL(preview);
+    });
+
     setShowModal(false);
     setSelectedDonation(null);
-    setDescription('');
+    setDescription("");
     setImageFiles([]);
     setImagePreviews([]);
-    setMessage('');
+    setMessage("");
   };
 
   // Select images
@@ -71,8 +83,8 @@ export default function DistributionProofPage() {
     const remainingSlots = 30 - imageFiles.length;
 
     if (remainingSlots <= 0) {
-      setMessage('Maximum 30 images allowed.');
-      e.target.value = '';
+      setMessage("Maximum 30 images allowed.");
+      e.target.value = "";
       return;
     }
 
@@ -87,20 +99,27 @@ export default function DistributionProofPage() {
     setImagePreviews((prev) => [...prev, ...newPreviews]);
 
     if (filesArray.length > remainingSlots) {
-      setMessage('Maximum 30 images allowed. Extra images were not added.');
+      setMessage(
+        "Maximum 30 images allowed. Extra images were not added."
+      );
     } else {
-      setMessage('');
+      setMessage("");
     }
 
-    e.target.value = '';
+    e.target.value = "";
   };
 
   // Remove selected image
   const handleRemoveImage = (index) => {
     URL.revokeObjectURL(imagePreviews[index]);
 
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+    setImageFiles((prev) =>
+      prev.filter((_, i) => i !== index)
+    );
+
+    setImagePreviews((prev) =>
+      prev.filter((_, i) => i !== index)
+    );
   };
 
   // Submit distribution proof
@@ -108,17 +127,19 @@ export default function DistributionProofPage() {
     e.preventDefault();
 
     if (!selectedDonation) {
-      setMessage('Please select a donation first.');
+      setMessage("Please select a donation first.");
       return;
     }
 
     if (imageFiles.length === 0) {
-      setMessage('Please select at least one distribution proof image.');
+      setMessage(
+        "Please select at least one distribution proof image."
+      );
       return;
     }
 
     setSubmitting(true);
-    setMessage('');
+    setMessage("");
 
     const formData = new FormData();
 
@@ -126,39 +147,39 @@ export default function DistributionProofPage() {
     // So, do not send ngoId or ngoName from frontend.
 
     formData.append(
-      'restaurantId',
+      "restaurantId",
       selectedDonation.donor?._id ||
         selectedDonation.donor ||
-        ''
+        ""
     );
 
-    formData.append('donationId', selectedDonation._id);
+    formData.append("donationId", selectedDonation._id);
 
     formData.append(
-      'description',
-      `Food: ${selectedDonation.foodName || 'Donation'} | Qty: ${
+      "description",
+      `Food: ${selectedDonation.foodName || "Donation"} | Qty: ${
         selectedDonation.quantity
       } | Details: ${description}`
     );
 
     imageFiles.forEach((file) => {
-      formData.append('images', file);
+      formData.append("images", file);
     });
 
     try {
       const response = await axios.post(
-        'http://localhost:5000/api/ngo/submit-distribution',
+        `${API_URL}/ngo/submit-distribution`,
         formData,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         }
       );
 
       if (response.data && response.data.success) {
         setMessage(
-          'Distribution proof submitted successfully and notification sent to the restaurant!'
+          "Distribution proof submitted successfully and notification sent to the restaurant!"
         );
 
         await fetchCompletedDonations();
@@ -168,10 +189,10 @@ export default function DistributionProofPage() {
         }, 1500);
       }
     } catch (err) {
-      console.error('Submission error:', err);
+      console.error("Submission error:", err);
 
       setMessage(
-        err.response?.data?.message || 'Failed to submit proof.'
+        err.response?.data?.message || "Failed to submit proof."
       );
     } finally {
       setSubmitting(false);
@@ -219,7 +240,7 @@ export default function DistributionProofPage() {
                     {item.donor?.organizationName ||
                       item.donor?.name ||
                       item.restaurantName ||
-                      'Restaurant Partner'}
+                      "Restaurant Partner"}
                   </h4>
 
                   <p className="text-xs text-slate-500 flex items-center mt-1">
@@ -227,7 +248,7 @@ export default function DistributionProofPage() {
 
                     Food:
                     <strong className="text-slate-700 ml-1">
-                      {item.foodName || 'Donation Food'}
+                      {item.foodName || "Donation Food"}
                     </strong>
 
                     ({item.quantity} items)
@@ -269,30 +290,33 @@ export default function DistributionProofPage() {
             </h3>
 
             <p className="text-xs text-slate-500 mb-4">
-              Restaurant:{' '}
+              Restaurant:{" "}
               <strong className="text-emerald-600">
                 {selectedDonation.donor?.organizationName ||
                   selectedDonation.donor?.name ||
-                  'Restaurant'}
+                  "Restaurant"}
               </strong>
 
-              {' | '}Food:{' '}
+              {" | "}Food:{" "}
               <strong>{selectedDonation.foodName}</strong>
             </p>
 
             {message && (
               <div
                 className={`mb-4 p-3 rounded-xl text-xs font-semibold ${
-                  message.includes('successfully')
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-rose-50 text-rose-700 border border-rose-200'
+                  message.includes("successfully")
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-rose-50 text-rose-700 border border-rose-200"
                 }`}
               >
                 {message}
               </div>
             )}
 
-            <form onSubmit={handleSubmitProof} className="space-y-4">
+            <form
+              onSubmit={handleSubmitProof}
+              className="space-y-4"
+            >
               <div>
                 <label className="block text-slate-700 text-xs font-bold mb-1">
                   Distribution Details / Notes
@@ -357,8 +381,8 @@ export default function DistributionProofPage() {
                 className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition text-xs shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting
-                  ? 'Submitting Proof...'
-                  : 'Submit & Send to Restaurant'}
+                  ? "Submitting Proof..."
+                  : "Submit & Send to Restaurant"}
               </button>
             </form>
           </div>

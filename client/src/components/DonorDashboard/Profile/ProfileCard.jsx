@@ -2,26 +2,33 @@
 import { useState } from "react";
 import {
   Store,
-  BadgeCheck,
   SquarePen,
 } from "lucide-react";
 
 import EditProfileModal from "./EditProfileModal";
+import { API_BASE_URL } from "../../../config";
+
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return "";
+
+  if (/^https?:\/\//i.test(imagePath)) {
+    return imagePath;
+  }
+
+  return `${API_BASE_URL}${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
+};
 
 const ProfileCard = ({
   profile,
   setProfile,
 }) => {
-  const [openModal, setOpenModal] =
-    useState(false);
+  const [openModal, setOpenModal] = useState(false);
 
-  const imageUrl = profile.profileImage
-    ? `http://localhost:5000${profile.profileImage}`
-    : "";
+  const imageUrl = getImageUrl(profile?.profileImage);
 
   return (
     <>
-      {/* Profile Header - No Card */}
+      {/* Profile Header */}
       <div className="flex flex-col items-center text-center">
 
         {/* Profile Image */}
@@ -30,8 +37,11 @@ const ProfileCard = ({
           {imageUrl ? (
             <img
               src={imageUrl}
-              alt={profile.name}
+              alt={profile?.name || "Restaurant profile"}
               className="h-full w-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
             />
           ) : (
             <Store
@@ -42,23 +52,15 @@ const ProfileCard = ({
 
         </div>
 
-
         {/* Restaurant Name */}
         <h2 className="mt-5 text-2xl font-bold text-gray-900 sm:text-3xl">
-          {profile.name}
+          {profile?.name || "Restaurant"}
         </h2>
-
-
-        
-
-
-        
 
         {/* Edit Profile */}
         <button
-          onClick={() =>
-            setOpenModal(true)
-          }
+          type="button"
+          onClick={() => setOpenModal(true)}
           className="mt-6 flex items-center gap-2 rounded-xl bg-green-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-green-700"
         >
           <SquarePen size={18} />
@@ -67,13 +69,10 @@ const ProfileCard = ({
 
       </div>
 
-
       {/* Edit Modal */}
       <EditProfileModal
         isOpen={openModal}
-        onClose={() =>
-          setOpenModal(false)
-        }
+        onClose={() => setOpenModal(false)}
         profile={profile}
         setProfile={setProfile}
       />
@@ -82,4 +81,3 @@ const ProfileCard = ({
 };
 
 export default ProfileCard;
-

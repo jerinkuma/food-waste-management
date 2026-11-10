@@ -7,54 +7,71 @@ import HistoryStats from "../../components/DonorDashboard/DonationHistory/Histor
 import SearchFilter from "../../components/DonorDashboard/DonationHistory/SearchFilter";
 import DonationTable from "../../components/DonorDashboard/DonationHistory/DonationTable";
 
+import { API_URL } from "../../config";
+
 const DonationHistory = () => {
   const [donations, setDonations] = useState([]);
-  const [filteredDonations, setFilteredDonations] =
-    useState([]);
+  const [filteredDonations, setFilteredDonations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] =
-    useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   // Load donor donations
   useEffect(() => {
+    const controller = new AbortController();
+
     const loadDonations = async () => {
       try {
         const user = JSON.parse(
           localStorage.getItem("user")
         );
 
+        const token = localStorage.getItem("token");
+
         if (!user?.id) {
-          console.error("User not found.");
-          setLoading(false);
-          return;
+          throw new Error("User not found. Please login again.");
         }
 
         const response = await fetch(
-          `http://localhost:5000/api/donations/donor/${user.id}`
+          `${API_URL}/donations/donor/${user.id}`,
+          {
+            headers: {
+              ...(token
+                ? { Authorization: `Bearer ${token}` }
+                : {}),
+            },
+            signal: controller.signal,
+          }
         );
 
         const data = await response.json();
 
         if (!response.ok) {
           throw new Error(
-            data.message ||
-              "Failed to load donations."
+            data.message || "Failed to load donations."
           );
         }
 
         setDonations(data.donations || []);
       } catch (error) {
-        console.error(
-          "Donation history error:",
-          error
-        );
+        if (error.name !== "AbortError") {
+          console.error(
+            "Donation history error:",
+            error
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     loadDonations();
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   // Search + Status Filter
@@ -75,22 +92,17 @@ const DonationHistory = () => {
       result = result.filter((donation) => {
         if (statusFilter === "Pending") {
           return (
-            donation.status ===
-              "Waiting for NGO Acceptance" ||
+            donation.status === "Waiting for NGO Acceptance" ||
             donation.status === "NGO Requested"
           );
         }
 
         if (statusFilter === "Accepted") {
-          return (
-            donation.status === "NGO Accepted"
-          );
+          return donation.status === "NGO Accepted";
         }
 
         if (statusFilter === "Picked Up") {
-          return (
-            donation.status === "Food Picked Up"
-          );
+          return donation.status === "Food Picked Up";
         }
 
         return donation.status === statusFilter;
