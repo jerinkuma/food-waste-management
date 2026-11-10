@@ -195,55 +195,57 @@ export default function ActiveRequests() {
       );
     }, []);
 
+ 
   // =====================================================
   // LOAD AVAILABLE DONATIONS
   // =====================================================
 
-  const loadAvailableDonations =
-    useCallback(async () => {
-      const loadList = async (
-        latitude,
-        longitude
-      ) => {
-        try {
-          const list =
-            await fetchAvailableDonations(
-              latitude,
-              longitude
-            );
+  const loadAvailableDonations = useCallback(async () => {
+    const loadList = async (latitude, longitude) => {
+      try {
+        const list = await fetchAvailableDonations(
+          latitude,
+          longitude
+        );
 
-          setAvailable(
-            Array.isArray(list)
-              ? list
-              : []
-          );
-        } catch (error) {
-          console.error(
-            "Available donation error:",
-            error
-          );
+        setAvailable(
+          Array.isArray(list) ? list : []
+        );
+      } catch (error) {
+        console.error("Available donation error:", error);
+        setAvailable([]);
+      }
+    };
 
-          setAvailable([]);
-        }
-      };
+    // Location permission is optional.
+    // Always load donations even if location is blocked.
+    if (!navigator.geolocation) {
+      await loadList();
+      return;
+    }
 
-      navigator.geolocation?.getCurrentPosition(
-        async (pos) => {
-          await loadList(
-            pos.coords.latitude,
-            pos.coords.longitude
-          );
-        },
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        await loadList(
+          pos.coords.latitude,
+          pos.coords.longitude
+        );
+      },
+      async (error) => {
+        console.warn(
+          "Location unavailable. Loading donations without location:",
+          error.message
+        );
 
-        async () => {
-          await loadList();
-        },
+        await loadList();
+      },
+      {
+        timeout: 4000,
+        maximumAge: 300000,
+      }
+    );
+  }, []);
 
-        {
-          timeout: 4000,
-        }
-      );
-    }, []);
 
   // =====================================================
   // LOAD EVERYTHING

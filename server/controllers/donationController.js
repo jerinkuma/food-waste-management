@@ -2350,110 +2350,110 @@ const getDonorDashboard = async (
       return partner;
     });
 
- // ==================================================
-// TOP DONATED FOOD TYPES
-// Based on actual foodType from database
-// Only completed donations are counted.
-// ==================================================
+    // ==================================================
+    // TOP DONATED FOOD TYPES
+    // Based on actual foodType from database
+    // Only completed donations are counted.
+    // ==================================================
 
-const categoryMap = new Map();
+    const categoryMap = new Map();
 
-completedDonationList.forEach((donation) => {
-  // Use foodType instead of foodCategory
-  const foodType = String(
-    donation.foodType || ""
-  ).trim();
+    completedDonationList.forEach((donation) => {
+      // Use foodType instead of foodCategory
+      const foodType = String(
+        donation.foodType || ""
+      ).trim();
 
-  // Ignore empty foodType
-  if (!foodType) {
-    return;
-  }
+      // Ignore empty foodType
+      if (!foodType) {
+        return;
+      }
 
-  // Normalize category key to avoid duplicate entries
-  // Example: Rice, rice, RICE = same category
-  const categoryKey = foodType.toLowerCase();
+      // Normalize category key to avoid duplicate entries
+      // Example: Rice, rice, RICE = same category
+      const categoryKey = foodType.toLowerCase();
 
-  if (!categoryMap.has(categoryKey)) {
-    categoryMap.set(categoryKey, {
-      name: foodType,
-      count: 0,
-      quantity: 0,
-      meals: 0,
+      if (!categoryMap.has(categoryKey)) {
+        categoryMap.set(categoryKey, {
+          name: foodType,
+          count: 0,
+          quantity: 0,
+          meals: 0,
+        });
+      }
+
+      const categoryData = categoryMap.get(categoryKey);
+
+      // Total donations of this food type
+      categoryData.count += 1;
+
+      // Total donated quantity in KG
+      categoryData.quantity +=
+        Number(donation.quantity) || 0;
+
+      // Meals calculation
+      const estimatedMeals = Number(
+        donation.estimatedMeals
+      );
+
+      if (
+        Number.isFinite(estimatedMeals) &&
+        estimatedMeals >= 0
+      ) {
+        categoryData.meals += estimatedMeals;
+      } else {
+        categoryData.meals += Math.floor(
+          (Number(donation.quantity) || 0) * 4
+        );
+      }
     });
-  }
 
-  const categoryData = categoryMap.get(categoryKey);
+    // ==================================================
+    // TOTAL DONATED QUANTITY
+    // ==================================================
 
-  // Total donations of this food type
-  categoryData.count += 1;
-
-  // Total donated quantity in KG
-  categoryData.quantity +=
-    Number(donation.quantity) || 0;
-
-  // Meals calculation
-  const estimatedMeals = Number(
-    donation.estimatedMeals
-  );
-
-  if (
-    Number.isFinite(estimatedMeals) &&
-    estimatedMeals >= 0
-  ) {
-    categoryData.meals += estimatedMeals;
-  } else {
-    categoryData.meals += Math.floor(
-      (Number(donation.quantity) || 0) * 4
+    const totalCategoryQuantity = Array.from(
+      categoryMap.values()
+    ).reduce(
+      (total, category) => total + category.quantity,
+      0
     );
-  }
-});
 
-// ==================================================
-// TOTAL DONATED QUANTITY
-// ==================================================
+    // ==================================================
+    // FINAL TOP 5 FOOD TYPES
+    // ==================================================
 
-const totalCategoryQuantity = Array.from(
-  categoryMap.values()
-).reduce(
-  (total, category) => total + category.quantity,
-  0
-);
+    const categories = Array.from(
+      categoryMap.values()
+    )
+      .map((category) => {
+        const percent =
+          totalCategoryQuantity > 0
+            ? (
+              (category.quantity /
+                totalCategoryQuantity) *
+              100
+            ).toFixed(1)
+            : 0;
 
-// ==================================================
-// FINAL TOP 5 FOOD TYPES
-// ==================================================
+        return {
+          name: category.name,
 
-const categories = Array.from(
-  categoryMap.values()
-)
-  .map((category) => {
-    const percent =
-      totalCategoryQuantity > 0
-        ? (
-            (category.quantity /
-              totalCategoryQuantity) *
-            100
-          ).toFixed(1)
-        : 0;
+          count: category.count,
 
-    return {
-      name: category.name,
+          quantity: Number(
+            category.quantity.toFixed(2)
+          ),
 
-      count: category.count,
+          meals: Math.round(category.meals),
 
-      quantity: Number(
-        category.quantity.toFixed(2)
-      ),
-
-      meals: Math.round(category.meals),
-
-      percent: Number(percent),
-    };
-  })
-  .sort(
-    (a, b) => b.quantity - a.quantity
-  )
-  .slice(0, 5);
+          percent: Number(percent),
+        };
+      })
+      .sort(
+        (a, b) => b.quantity - a.quantity
+      )
+      .slice(0, 5);
 
 
     // ==================================================
@@ -2752,11 +2752,7 @@ const listAvailableDonations = async (req, res) => {
     const donations = await Donation.find({
       pipelineStatus: "Pending",
       selectedNgo: null,
-      $or: [
-        { bestBefore: { $gt: now } },
-        { bestBefore: { $exists: false } },
-        { bestBefore: null },
-      ],
+      bestBefore: { $gt: now },
     })
       .populate("donor", "name email role businessName restaurantName")
       .sort({
@@ -3776,7 +3772,7 @@ const getDonorNgoAnalytics = async (req, res) => {
     }
 
 
-   
+
     // Fetch only this donor's completed donations
     const donations = await Donation.find({
       donor: donorId,
@@ -3816,105 +3812,105 @@ const getDonorNgoAnalytics = async (req, res) => {
         );
       })
       .forEach((donation) => {
-      // Selected NGO first, accepted request second, legacy field last.
-      const acceptedRequest = (donation.ngoRequests || []).find(
-        (request) => String(request.status || "").toLowerCase() === "accepted"
-      );
-      const ngo =
-        donation.selectedNgo ||
-        acceptedRequest?.requestedBy ||
-        donation.ngoRequest?.requestedBy;
+        // Selected NGO first, accepted request second, legacy field last.
+        const acceptedRequest = (donation.ngoRequests || []).find(
+          (request) => String(request.status || "").toLowerCase() === "accepted"
+        );
+        const ngo =
+          donation.selectedNgo ||
+          acceptedRequest?.requestedBy ||
+          donation.ngoRequest?.requestedBy;
 
-      if (!ngo?._id) return;
+        if (!ngo?._id) return;
 
-      const ngoId = ngo._id.toString();
+        const ngoId = ngo._id.toString();
 
-      const quantity = Math.max(
-        0,
-        Number(donation.quantity) || 0
-      );
-
-      // Completion date
-      const completedHistory = [...(donation.statusHistory || [])]
-        .reverse()
-        .find((item) =>
-          String(item.status || "").trim().toLowerCase() === "completed" &&
-          item.changedAt
+        const quantity = Math.max(
+          0,
+          Number(donation.quantity) || 0
         );
 
-      const completedDate =
-        donation.verification?.verifiedAt ||
-        completedHistory?.changedAt ||
-        null;
+        // Completion date
+        const completedHistory = [...(donation.statusHistory || [])]
+          .reverse()
+          .find((item) =>
+            String(item.status || "").trim().toLowerCase() === "completed" &&
+            item.changedAt
+          );
 
-      if (!completedDate) return;
-      const date = new Date(completedDate);
-      if (Number.isNaN(date.getTime())) return;
+        const completedDate =
+          donation.verification?.verifiedAt ||
+          completedHistory?.changedAt ||
+          null;
 
-      if (!ngoMap.has(ngoId)) {
-        ngoMap.set(ngoId, {
-          ngoId,
-          ngoName:
-            ngo.organizationName ||
-            ngo.user?.name ||
-            ngo.organizationId ||
-            "NGO",
+        if (!completedDate) return;
+        const date = new Date(completedDate);
+        if (Number.isNaN(date.getTime())) return;
 
-          organizationId: ngo.organizationId || "",
-          totalReceivedKg: 0,
-          completedDonations: 0,
-          monthly: {},
-          yearly: {},
-          donations: [],
+        if (!ngoMap.has(ngoId)) {
+          ngoMap.set(ngoId, {
+            ngoId,
+            ngoName:
+              ngo.organizationName ||
+              ngo.user?.name ||
+              ngo.organizationId ||
+              "NGO",
+
+            organizationId: ngo.organizationId || "",
+            totalReceivedKg: 0,
+            completedDonations: 0,
+            monthly: {},
+            yearly: {},
+            donations: [],
+          });
+        }
+
+        const partner = ngoMap.get(ngoId);
+
+        const year = date.getFullYear();
+        const month = date.getMonth();
+
+        partner.totalReceivedKg += quantity;
+        partner.completedDonations += 1;
+
+        // Monthly aggregation
+        const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
+
+        if (!partner.monthly[monthKey]) {
+          partner.monthly[monthKey] = {
+            year,
+            month: month + 1,
+            monthName: date.toLocaleString("en-US", {
+              month: "short",
+            }),
+            quantity: 0,
+            donations: 0,
+          };
+        }
+
+        partner.monthly[monthKey].quantity += quantity;
+        partner.monthly[monthKey].donations += 1;
+
+        // Yearly aggregation
+        if (!partner.yearly[year]) {
+          partner.yearly[year] = {
+            year,
+            quantity: 0,
+            donations: 0,
+          };
+        }
+
+        partner.yearly[year].quantity += quantity;
+        partner.yearly[year].donations += 1;
+
+        partner.donations.push({
+          donationId: donation.donationId,
+          foodName: donation.foodName,
+          foodType: donation.foodType,
+          quantity,
+          completedAt: date,
         });
-      }
-
-      const partner = ngoMap.get(ngoId);
-
-      const year = date.getFullYear();
-      const month = date.getMonth();
-
-      partner.totalReceivedKg += quantity;
-      partner.completedDonations += 1;
-
-      // Monthly aggregation
-      const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
-
-      if (!partner.monthly[monthKey]) {
-        partner.monthly[monthKey] = {
-          year,
-          month: month + 1,
-          monthName: date.toLocaleString("en-US", {
-            month: "short",
-          }),
-          quantity: 0,
-          donations: 0,
-        };
-      }
-
-      partner.monthly[monthKey].quantity += quantity;
-      partner.monthly[monthKey].donations += 1;
-
-      // Yearly aggregation
-      if (!partner.yearly[year]) {
-        partner.yearly[year] = {
-          year,
-          quantity: 0,
-          donations: 0,
-        };
-      }
-
-      partner.yearly[year].quantity += quantity;
-      partner.yearly[year].donations += 1;
-
-      partner.donations.push({
-        donationId: donation.donationId,
-        foodName: donation.foodName,
-        foodType: donation.foodType,
-        quantity,
-        completedAt: date,
       });
-    });
 
     const ngoAnalytics = Array.from(ngoMap.values())
       .map((ngo) => ({
@@ -3981,14 +3977,14 @@ const getDonorNgoAnalytics = async (req, res) => {
 
     const topMonth = monthlyTotals.length
       ? [...monthlyTotals].sort(
-          (a, b) => b.quantity - a.quantity
-        )[0]
+        (a, b) => b.quantity - a.quantity
+      )[0]
       : null;
 
     const topYear = yearlyTotals.length
       ? [...yearlyTotals].sort(
-          (a, b) => b.quantity - a.quantity
-        )[0]
+        (a, b) => b.quantity - a.quantity
+      )[0]
       : null;
 
     const totalReceivedKg = ngoAnalytics.reduce(
