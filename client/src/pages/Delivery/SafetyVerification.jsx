@@ -1,6 +1,10 @@
 
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import {
+  useNavigate,
+  useParams,
+  useLocation,
+} from "react-router-dom";
 
 import {
   ArrowLeft,
@@ -17,22 +21,18 @@ import {
   Utensils,
 } from "lucide-react";
 
-import { API_URL } from "../../config";
+import client from "../../services/api";
+import {
+  getToken,
+  getCurrentUser,
+} from "../../services/auth";
 
 const SafetyVerification = () => {
   const params = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // SUPPORT BOTH:
-  // /delivery/safety/:id
-  // /delivery/safety/:donationId
-
-  const donationId =
-    params.donationId ||
-    params.id ||
-    "";
-
-  // STATES
+  const donationId = params.donationId || params.id || "";
 
   const [donation, setDonation] = useState(null);
   const [loadingDonation, setLoadingDonation] = useState(true);
@@ -50,18 +50,63 @@ const SafetyVerification = () => {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  // TOKEN
+  const token = getToken();
+  const currentUser = getCurrentUser();
 
-  const token =
-    localStorage.getItem("token") ||
-    localStorage.getItem("authToken");
-
-  // LOAD DONATION
+  // ==========================================
+  // AUTHENTICATION + NGO ROLE CHECK
+  // ==========================================
 
   useEffect(() => {
+    if (!token) {
+      setLoadingDonation(false);
+
+      navigate("/auth", {
+        replace: true,
+        state: {
+          from: `${location.pathname}${location.search}`,
+        },
+      });
+
+      return;
+    }
+
+    if (currentUser?.role !== "ngo") {
+      setLoadingDonation(false);
+      setError(
+        "Only an authenticated NGO account can verify this donation."
+      );
+    }
+  }, [
+    token,
+    currentUser?.role,
+    navigate,
+    location.pathname,
+    location.search,
+  ]);
+
+  // ==========================================
+  // LOAD DONATION
+  // ==========================================
+
+  useEffect(() => {
+    let isMounted = true;
+
     const loadDonation = async () => {
       if (!donationId) {
-        setError("Donation ID is missing.");
+        if (isMounted) {
+          setError("Donation ID is missing.");
+          setLoadingDonation(false);
+        }
+        return;
+      }
+
+      if (!token) {
+        setLoadingDonation(false);
+        return;
+      }
+
+      if (currentUser?.role !== "ngo") {
         setLoadingDonation(false);
         return;
       }
@@ -70,46 +115,50 @@ const SafetyVerification = () => {
         setLoadingDonation(true);
         setError("");
 
-        const response = await fetch(
-          `${API_URL}/donations/donation-id/${encodeURIComponent(
+        const response = await client.get(
+          `/donations/donation-id/${encodeURIComponent(
             donationId
-          )}`,
-          {
-            method: "GET",
-            headers: {
-              ...(token
-                ? {
-                    Authorization: `Bearer ${token}`,
-                  }
-                : {}),
-            },
-          }
+          )}`
         );
 
-        const data = await response.json();
+        const data = response.data;
 
-        if (!response.ok || !data.success) {
+        if (!data.success) {
           throw new Error(
             data.message || "Failed to load donation."
           );
         }
 
-        setDonation(data.donation || data.data || null);
+        if (isMounted) {
+          setDonation(data.donation || data.data || null);
+        }
       } catch (err) {
         console.error("Load donation error:", err);
 
-        setError(
-          err.message || "Failed to load donation details."
-        );
+        if (isMounted) {
+          setError(
+            err.response?.data?.message ||
+              err.message ||
+              "Failed to load donation details."
+          );
+        }
       } finally {
-        setLoadingDonation(false);
+        if (isMounted) {
+          setLoadingDonation(false);
+        }
       }
     };
 
     loadDonation();
-  }, [donationId, token]);
 
+    return () => {
+      isMounted = false;
+    };
+  }, [donationId, token, currentUser?.role]);
+
+  // ==========================================
   // CHECK CHANGE
+  // ==========================================
 
   const handleCheckChange = (key) => {
     if (verifying || rejecting) return;
@@ -123,15 +172,19 @@ const SafetyVerification = () => {
     setSuccessMessage("");
   };
 
+  // ==========================================
   // ALL CHECKS
+  // ==========================================
 
   const allChecked =
-    checks.foodCondition === true &&
-    checks.packaging === true &&
-    checks.temperature === true &&
-    checks.expiry === true;
+    checks.foodCondition &&
+    checks.packaging &&
+    checks.temperature &&
+    checks.expiry;
 
-  // VERIFY
+  // ==========================================
+  // VERIFY DONATION
+  // ==========================================
 
   const handleVerify = async () => {
     if (!donationId) {
@@ -141,6 +194,21 @@ const SafetyVerification = () => {
 
     if (!donation?._id) {
       setError("Donation information is missing.");
+      return;
+    }
+
+    if (!token) {
+      navigate("/auth", {
+        replace: true,
+        state: {
+          from: location.pathname,
+        },
+      });
+      return;
+    }
+
+    if (currentUser?.role !== "ngo") {
+      setError("Only an NGO account can verify this donation.");
       return;
     }
 
@@ -158,52 +226,47 @@ const SafetyVerification = () => {
       setError("");
       setSuccessMessage("");
 
-      const response = await fetch(
-        `${API_URL}/donations/${encodeURIComponent(
+      const response = await client.post(
+        `/donations/${encodeURIComponent(
           donation._id
         )}/verify`,
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token
-              ? {
-                  Authorization: `Bearer ${token}`,
-                }
-              : {}),
+          approved: true,
+          checks: {
+            foodCondition: true,
+            packaging: true,
+            temperature: true,
+            expiry: true,
           },
-          body: JSON.stringify({
-            approved: true,
-            checks: {
-              foodCondition: true,
-              packaging: true,
-              temperature: true,
-              expiry: true,
-            },
-          }),
         }
       );
 
-      const data = await response.json();
+      const data = response.data;
 
-      if (!response.ok || !data.success) {
+      if (!data.success) {
         throw new Error(
           data.message || "Donation verification failed."
         );
       }
 
+      setDonation(data.donation || donation);
+
       setSuccessMessage(
         "Donation verified successfully and marked as Completed."
       );
 
+      // Return to NGO Active Requests after success.
       setTimeout(() => {
-        navigate(-1);
-      }, 1200);
+        navigate("/ngo/active-requests", {
+          replace: true,
+        });
+      }, 1500);
     } catch (err) {
       console.error("Verification error:", err);
 
       setError(
-        err.message ||
+        err.response?.data?.message ||
+          err.message ||
           "Something went wrong during verification."
       );
     } finally {
@@ -211,11 +274,18 @@ const SafetyVerification = () => {
     }
   };
 
-  // REJECT
+  // ==========================================
+  // REJECT DONATION
+  // ==========================================
 
   const handleReject = async () => {
     if (!donation?._id) {
       setError("Donation information is missing.");
+      return;
+    }
+
+    if (!token || currentUser?.role !== "ngo") {
+      setError("Please login with an authorized NGO account.");
       return;
     }
 
@@ -226,45 +296,41 @@ const SafetyVerification = () => {
       setError("");
       setSuccessMessage("");
 
-      const response = await fetch(
-        `${API_URL}/donations/${encodeURIComponent(
+      const response = await client.post(
+        `/donations/${encodeURIComponent(
           donation._id
         )}/verify`,
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token
-              ? {
-                  Authorization: `Bearer ${token}`,
-                }
-              : {}),
-          },
-          body: JSON.stringify({
-            approved: false,
-            checks,
-          }),
+          approved: false,
+          checks,
         }
       );
 
-      const data = await response.json();
+      const data = response.data;
 
-      if (!response.ok || !data.success) {
+      if (!data.success) {
         throw new Error(
           data.message || "Donation rejection failed."
         );
       }
 
-      setSuccessMessage("Donation rejected successfully.");
+      setDonation(data.donation || donation);
+
+      setSuccessMessage(
+        "Donation rejected successfully."
+      );
 
       setTimeout(() => {
-        navigate(-1);
-      }, 1200);
+        navigate("/ngo/active-requests", {
+          replace: true,
+        });
+      }, 1500);
     } catch (err) {
       console.error("Safety rejection error:", err);
 
       setError(
-        err.message ||
+        err.response?.data?.message ||
+          err.message ||
           "Something went wrong while rejecting donation."
       );
     } finally {
@@ -272,7 +338,9 @@ const SafetyVerification = () => {
     }
   };
 
+  // ==========================================
   // CHECK ITEMS
+  // ==========================================
 
   const checkItems = [
     {
@@ -305,7 +373,9 @@ const SafetyVerification = () => {
     },
   ];
 
+  // ==========================================
   // LOADING
+  // ==========================================
 
   if (loadingDonation) {
     return (
@@ -324,7 +394,9 @@ const SafetyVerification = () => {
     );
   }
 
+  // ==========================================
   // PAGE
+  // ==========================================
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
@@ -395,7 +467,6 @@ const SafetyVerification = () => {
               </div>
 
               <div className="space-y-3 text-sm">
-
                 <div className="flex justify-between gap-4">
                   <span className="text-slate-500">
                     Food
@@ -447,7 +518,6 @@ const SafetyVerification = () => {
                       "N/A"}
                   </span>
                 </div>
-
               </div>
             </div>
 
@@ -471,7 +541,6 @@ const SafetyVerification = () => {
               </div>
 
               <div className="space-y-3 text-sm">
-
                 <div className="flex items-center justify-between gap-4">
                   <span className="flex items-center gap-2 text-slate-500">
                     <UserRound size={15} />
@@ -517,7 +586,6 @@ const SafetyVerification = () => {
                       "N/A"}
                   </span>
                 </div>
-
               </div>
             </div>
           </div>
@@ -541,143 +609,148 @@ const SafetyVerification = () => {
 
         {/* SAFETY CHECKS */}
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="mb-5">
-            <h2 className="text-lg font-bold text-slate-900">
-              Safety Checklist
-            </h2>
+        {donation && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="mb-5">
+              <h2 className="text-lg font-bold text-slate-900">
+                Safety Checklist
+              </h2>
 
-            <p className="mt-1 text-sm text-slate-500">
-              Confirm every condition before verifying
-              this donation.
-            </p>
-          </div>
+              <p className="mt-1 text-sm text-slate-500">
+                Confirm every condition before verifying
+                this donation.
+              </p>
+            </div>
 
-          <div className="space-y-3">
-            {checkItems.map((item) => {
-              const Icon = item.icon;
-              const checked = checks[item.key];
+            <div className="space-y-3">
+              {checkItems.map((item) => {
+                const Icon = item.icon;
+                const checked = checks[item.key];
 
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => handleCheckChange(item.key)}
-                  disabled={verifying || rejecting}
-                  className={`flex w-full items-center gap-4 rounded-xl border p-4 text-left transition ${
-                    checked
-                      ? "border-emerald-300 bg-emerald-50"
-                      : "border-slate-200 bg-white hover:border-slate-300"
-                  }`}
-                >
-                  <div
-                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() =>
+                      handleCheckChange(item.key)
+                    }
+                    disabled={verifying || rejecting}
+                    className={`flex w-full items-center gap-4 rounded-xl border p-4 text-left transition ${
                       checked
-                        ? "bg-emerald-600 text-white"
-                        : "bg-slate-100 text-slate-500"
+                        ? "border-emerald-300 bg-emerald-50"
+                        : "border-slate-200 bg-white hover:border-slate-300"
                     }`}
                   >
-                    <Icon size={21} />
-                  </div>
+                    <div
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                        checked
+                          ? "bg-emerald-600 text-white"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      <Icon size={21} />
+                    </div>
 
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-slate-900">
-                      {item.title}
-                    </h3>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-slate-900">
+                        {item.title}
+                      </h3>
 
-                    <p className="mt-1 text-sm text-slate-500">
-                      {item.description}
-                    </p>
-                  </div>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {item.description}
+                      </p>
+                    </div>
 
-                  <div
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
-                      checked
-                        ? "border-emerald-600 bg-emerald-600 text-white"
-                        : "border-slate-300 bg-white"
-                    }`}
-                  >
-                    {checked && <CheckCircle2 size={17} />}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                    <div
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
+                        checked
+                          ? "border-emerald-600 bg-emerald-600 text-white"
+                          : "border-slate-300 bg-white"
+                      }`}
+                    >
+                      {checked && (
+                        <CheckCircle2 size={17} />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
 
-          {/* CHECK STATUS */}
+            {/* CHECK STATUS */}
 
-          <div
-            className={`mt-5 rounded-xl border px-4 py-3 text-sm font-medium ${
-              allChecked
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "border-amber-200 bg-amber-50 text-amber-700"
-            }`}
-          >
-            {allChecked
-              ? "All safety checks passed. The donation is ready for verification."
-              : "Please complete all four safety checks."}
-          </div>
-
-          {/* ACTION BUTTONS */}
-
-          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-
-            {/* REJECT */}
-
-            <button
-              type="button"
-              onClick={handleReject}
-              disabled={
-                verifying ||
-                rejecting ||
-                !donation?._id
-              }
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            <div
+              className={`mt-5 rounded-xl border px-4 py-3 text-sm font-medium ${
+                allChecked
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-amber-200 bg-amber-50 text-amber-700"
+              }`}
             >
-              {rejecting ? (
-                <>
-                  <Loader2
-                    size={19}
-                    className="animate-spin"
-                  />
-                  Rejecting...
-                </>
-              ) : (
-                "Reject Donation"
-              )}
-            </button>
+              {allChecked
+                ? "All safety checks passed. The donation is ready for verification."
+                : "Please complete all four safety checks."}
+            </div>
 
-            {/* VERIFY */}
+            {/* ACTION BUTTONS */}
 
-            <button
-              type="button"
-              onClick={handleVerify}
-              disabled={
-                verifying ||
-                rejecting ||
-                !allChecked ||
-                !donation?._id
-              }
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {verifying ? (
-                <>
-                  <Loader2
-                    size={19}
-                    className="animate-spin"
-                  />
-                  Verifying...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={19} />
-                  Verify Donation
-                </>
-              )}
-            </button>
+            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
 
+              {/* REJECT */}
+
+              <button
+                type="button"
+                onClick={handleReject}
+                disabled={
+                  verifying ||
+                  rejecting ||
+                  !donation?._id
+                }
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {rejecting ? (
+                  <>
+                    <Loader2
+                      size={19}
+                      className="animate-spin"
+                    />
+                    Rejecting...
+                  </>
+                ) : (
+                  "Reject Donation"
+                )}
+              </button>
+
+              {/* VERIFY */}
+
+              <button
+                type="button"
+                onClick={handleVerify}
+                disabled={
+                  verifying ||
+                  rejecting ||
+                  !allChecked ||
+                  !donation?._id
+                }
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {verifying ? (
+                  <>
+                    <Loader2
+                      size={19}
+                      className="animate-spin"
+                    />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={19} />
+                    Verify Donation
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

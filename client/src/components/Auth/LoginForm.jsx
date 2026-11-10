@@ -1,7 +1,7 @@
 
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { API_URL } from "../../config";
 
 const LoginForm = ({ setIsSignup }) => {
@@ -12,6 +12,7 @@ const LoginForm = ({ setIsSignup }) => {
   const [message, setMessage] = useState("");
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -66,13 +67,24 @@ const LoginForm = ({ setIsSignup }) => {
 
       localStorage.setItem("user", JSON.stringify(userDataToStore));
 
+      // Check whether the user came from a QR verification page.
+      const requestedPath = location.state?.from;
+
+      const isSafetyVerification =
+        typeof requestedPath === "string" &&
+        requestedPath.startsWith("/delivery/safety/");
+
       // Redirect according to user role.
-      if (userDataToStore.role === "admin") {
-        navigate("/admin/dashboard");
-      } else if (userDataToStore.role === "ngo") {
-        navigate("/ngo/dashboard");
+      if (userDataToStore.role === "ngo") {
+        if (isSafetyVerification) {
+          navigate(requestedPath, { replace: true });
+        } else {
+          navigate("/ngo/dashboard", { replace: true });
+        }
+      } else if (userDataToStore.role === "admin") {
+        navigate("/admin/dashboard", { replace: true });
       } else if (userDataToStore.role === "donor") {
-        navigate("/restaurant/dashboard");
+        navigate("/restaurant/dashboard", { replace: true });
       } else {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -80,6 +92,7 @@ const LoginForm = ({ setIsSignup }) => {
       }
     } catch (error) {
       console.error("Login error:", error);
+
       setMessage(
         "Cannot connect to server. Please check your internet connection and try again."
       );
