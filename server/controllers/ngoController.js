@@ -3,16 +3,13 @@ const Donation = require("../models/Donation");
 const Distribution = require("../models/Distribution");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
+const Feedback = require("../models/Feedback");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const path = require("path");
 const fs = require("fs");
+const bcrypt = require("bcryptjs");
 const { getIO, rooms } = require("../utils/socket");
-
-
-//rating ngo
-
-const Feedback = require("../models/Feedback");
 
 // ======================================================
 // HELPERS
@@ -137,7 +134,7 @@ const getCurrentNgoDocument = async (req) => {
 
   const ngo = await Ngo.findOne({
     user: userId,
-  }).populate("user", "name email");
+  }).populate("user", "name fullName email role");
 
   return {
     userId,
@@ -222,9 +219,141 @@ const getNgoProfile = async (req, res) => {
 };
 
 // ======================================================
-// GET NGO STATS
+// UPDATE NGO PROFILE (With upsert & avatar support)
 // ======================================================
 
+const updateNgoProfile = async (req, res) => {
+  try {
+    const { userId, ngo } = await getCurrentNgoDocument(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    const { fullName, ngoName, phone, licenseNo, address } = req.body || {};
+
+    if (fullName !== undefined) {
+      await User.findByIdAndUpdate(userId, {
+        fullName: fullName.trim(),
+        name: fullName.trim(),
+      });
+    }
+
+    let avatarUrl = ngo?.avatar;
+
+    if (req.files?.avatar) {
+      const avatarFile = req.files.avatar;
+      const uploadDirectory = path.join(__dirname, "../uploads");
+
+      fs.mkdirSync(uploadDirectory, { recursive: true });
+
+      const safeName = String(avatarFile.name || "avatar").replace(/[^a-zA-Z0-9._-]/g, "_");
+      const fileName = `ngo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
+      const uploadPath = path.join(uploadDirectory, fileName);
+
+      await avatarFile.mv(uploadPath);
+      avatarUrl = `/uploads/${fileName}`;
+    }
+
+    const updateData = {
+      user: userId,
+    };
+
+    if (ngoName !== undefined) updateData.ngoName = ngoName.trim();
+    if (phone !== undefined) updateData.phone = phone.trim();
+    if (licenseNo !== undefined) updateData.licenseNo = licenseNo.trim();
+    if (address !== undefined) updateData.address = address.trim();
+    if (avatarUrl !== undefined) updateData.avatar = avatarUrl;
+
+    const updatedNgo = await Ngo.findOneAndUpdate(
+      { user: userId },
+      { $set: updateData },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    ).populate("user", "name fullName email role");
+
+    return res.status(200).json({
+      success: true,
+      message: "NGO profile updated successfully.",
+      data: updatedNgo,
+    });
+  } catch (error) {
+    console.error("Update NGO Profile Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update profile.",
+      error: error.message,
+    });
+  }
+};
+
+// ======================================================
+// CHANGE NGO PASSWORD
+// ======================================================
+
+const changeNgoPassword = async (req, res) => {
+  try {
+    const userId = getRequestUserId(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    const { currentPassword, newPassword } = req.body || {};
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide both current and new passwords.",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Current password is incorrect.",
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Password changed successfully.",
+    });
+  } catch (error) {
+    console.error("Change Password Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while changing password.",
+      error: error.message,
+    });
+  }
+};
+
+// ======================================================
+// GET NGO STATS
+// ======================================================
 
 const getNgoStats = async (req, res) => {
   try {
@@ -294,13 +423,6 @@ const getNgoStats = async (req, res) => {
       }
     });
 
-    // =====================================
-    // DONOR -> NGO RATINGS
-    // =====================================
-    // Ratings are stored in Feedback collection.
-    // Only ratings submitted by Donors for this NGO
-    // are included in the NGO's trust score.
-
     const donorRatings = await Feedback.find({
       ngo: ngo._id,
       submittedBy: "Donor",
@@ -356,7 +478,6 @@ const getNgoStats = async (req, res) => {
     });
   }
 };
-
 
 // ======================================================
 // GET NGO COMPLETED DONATIONS
@@ -571,7 +692,6 @@ const submitDistributionProof = async (
       }
     }
 
-    // Support the existing dashboard image URL input.
     if (
       !imageUrls.length &&
       typeof imageUrl === "string" &&
@@ -685,7 +805,6 @@ const getDonorDistributionProofs = async (
         proofs.map(async (proof) => {
           let ngo = null;
 
-          // 1. First try: NGO document ID
           if (
             proof.ngoId &&
             mongoose.Types.ObjectId.isValid(
@@ -696,7 +815,6 @@ const getDonorDistributionProofs = async (
               proof.ngoId
             ).populate("user", "name");
 
-            // 2. Legacy: NGO User ID
             if (!ngo) {
               ngo = await Ngo.findOne({
                 user: proof.ngoId,
@@ -704,7 +822,6 @@ const getDonorDistributionProofs = async (
             }
           }
 
-          // 3. Fallback: Find NGO through Donation
           if (!ngo && proof.donationId) {
             let donation = null;
 
@@ -725,14 +842,12 @@ const getDonorDistributionProofs = async (
             }
 
             if (donation) {
-              // First preference: selected NGO
               if (donation.selectedNgo) {
                 ngo = await Ngo.findById(
                   donation.selectedNgo
                 ).populate("user", "name");
               }
 
-              // Second preference: accepted NGO request
               if (
                 !ngo &&
                 donation.ngoRequests?.length
@@ -753,7 +868,6 @@ const getDonorDistributionProofs = async (
                 }
               }
 
-              // Third preference: legacy NGO request
               if (
                 !ngo &&
                 donation.ngoRequest?.requestedBy
@@ -802,6 +916,8 @@ const getDonorDistributionProofs = async (
 
 module.exports = {
   getNgoProfile,
+  updateNgoProfile,
+  changeNgoPassword,
   getNgoStats,
   getNgoCompletedDonations,
   submitDistributionProof,

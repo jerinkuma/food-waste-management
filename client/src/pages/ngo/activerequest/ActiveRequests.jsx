@@ -469,7 +469,7 @@ export default function ActiveRequests() {
       }
 
       pushAlert(
-        "✅ Donation accepted — moved to your Active Pickups."
+        "Donation accepted — moved to your Active Pickups."
       );
 
       try {
@@ -555,7 +555,7 @@ export default function ActiveRequests() {
       );
 
       pushAlert(
-        "⛔ Donation declined."
+        "Donation declined."
       );
 
       await loadEverything();
@@ -676,7 +676,7 @@ export default function ActiveRequests() {
         }
 
         pushAlert(
-          `🚚 Driver assigned to ${
+          `Driver assigned to ${
             driverDonation.foodName
           }.`
         );
@@ -847,15 +847,14 @@ export default function ActiveRequests() {
       <div className="ar-top-banner">
         <div>
           <h2 className="ar-banner-title">
-            ACTIVE PICKUPS: Live Restaurant
-            → NGO Pipeline
+            ACTIVE PICKUPS
           </h2>
 
           <p className="text-xs text-slate-500 mt-1">
             {available.length} donation(s)
             waiting to be claimed
             ·{" "}
-            {activePickups.length} in your
+            {activePickups.length}
             active pipeline
           </p>
         </div>
@@ -874,8 +873,8 @@ export default function ActiveRequests() {
           0 ? (
             <div className="bg-white p-8 rounded-2xl text-center border border-slate-200 mb-4">
               <p className="text-slate-500 text-sm">
-                No pending donations right now.
-                New posts appear here instantly.
+                No pending
+                New posts 
               </p>
             </div>
           ) : (
@@ -1049,7 +1048,7 @@ export default function ActiveRequests() {
           {/* ACTIVE PICKUPS */}
 
           <h3 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider mt-6 mb-2">
-            My Active Pickups
+            Now Active Pickups
           </h3>
 
           {displayedPickups.length ===
@@ -1408,8 +1407,8 @@ export default function ActiveRequests() {
           <div className="mt-6 pt-4 border-t border-slate-700 text-center">
 
             <p className="text-[10px] text-slate-400">
-              Auto-updating live via FeedLink
-              Real-Time Sync
+              Auto-updating 
+              
             </p>
 
           </div>

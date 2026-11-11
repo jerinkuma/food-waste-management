@@ -16,7 +16,6 @@ const NgoFeedback = () => {
       setLoading(true);
       setError("");
 
-      // ব্যাকএন্ড থেকে যেকোনো ফরম্যাটে ডেটা আসলেও যেন হ্যান্ডেল করতে পারে
       const response = ngoId ? await fetchNgoFeedback(ngoId) : await fetchNgoFeedback();
       
       let list = [];
@@ -32,7 +31,7 @@ const NgoFeedback = () => {
     } catch (err) {
       console.error("Failed to load feedback:", err);
       setError("Feedback load করা সম্ভব হয়নি।");
-      setFeedbacks([]); // এরর আসলে ফাঁকা অ্যারে রাখবে যেন ক্র্যাশ না করে
+      setFeedbacks([]);
     } finally {
       setLoading(false);
     }
@@ -41,7 +40,6 @@ const NgoFeedback = () => {
   useEffect(() => {
     loadNgoFeedbacks();
 
-    // অ্যাডমিন প্যানেলের সাথে ৫ সেকেন্ড পর পর অটো-সিঙ্ক
     const interval = setInterval(() => {
       loadNgoFeedbacks();
     }, 5000);
@@ -80,15 +78,11 @@ const NgoFeedback = () => {
 
   return (
     <div className="feedlink-container">
-      {/* Header Section */}
+      {/* Header Section (আইকন ও সাবটাইটেল রিমুভ করা হয়েছে) */}
       <div className="feedlink-header">
         <div className="feedlink-header-title">
-          <span className="feedlink-icon">💬</span>
           <div>
             <h2>FEEDBACK & INCIDENT REPORTING</h2>
-            <p className="feedlink-header-subtitle">
-              Every submission routes to both the Admin panel and the restaurant's own dashboard in real time.
-            </p>
           </div>
         </div>
       </div>
@@ -100,7 +94,7 @@ const NgoFeedback = () => {
         <div className="feedlink-card feedlink-form-section">
           <div className="feedlink-section-header">
             <h3>SUBMIT NEW FEEDBACK / REPORT</h3>
-            <p>Fill in the form below to register your feedback or report an issue</p>
+            {/* সাবটাইটেল রিমুভ করা হয়েছে */}
           </div>
 
           <form onSubmit={handleSubmit} className="feedlink-form">
@@ -180,7 +174,7 @@ const NgoFeedback = () => {
             <div className="feedlink-summary-header">
               <div>
                 <h3>SUBMITTED FEEDBACK SUMMARY</h3>
-                <p>Track status of your reported issues & tickets</p>
+                {/* সাবটাইটেল রিমুভ করা হয়েছে */}
               </div>
               <span className="feedlink-badge-count">{feedbacks.length} Feedback</span>
             </div>
@@ -249,16 +243,16 @@ const NgoFeedback = () => {
             )}
           </div>
 
-          {/* Support Box */}
+          {/* Support Box (আইকন ও ইমেল পরিবর্তন করা হয়েছে) */}
           <div className="feedlink-support-box">
             <div className="feedlink-support-title">
-              <span>⚠️</span> Need Immediate Assistance?
+              Need Immediate Assistance?
             </div>
             <p className="feedlink-support-desc">
               For urgent complaints regarding food safety or severe donor issues, directly contact our admin department via email:
             </p>
-            <a href="mailto:admin@feedlink.org" className="feedlink-support-link">
-              ✉️ admin@feedlink.org
+            <a href="mailto:feedlink.support@gmail.com" className="feedlink-support-link">
+              ✉️ feedlink.support@gmail.com
             </a>
           </div>
 

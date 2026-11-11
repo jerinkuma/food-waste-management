@@ -1,35 +1,11 @@
-
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-} from "react";
-
-import {
-  Search,
-  Bell,
-  Sun,
-  Moon,
-  X,
-  MapPin,
-  Phone,
-  UserPlus,
-  Utensils,
-} from "lucide-react";
-
-import {
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
-
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Search, Bell, X, MapPin, Phone, UserPlus, Utensils } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./Header.css";
-
 import { io } from "socket.io-client";
+import { API_URL, SOCKET_URL, API_BASE_URL } from "../../../config";
 
-import { API_URL, SOCKET_URL } from "../../../config";
-
-export default function Header({ userProfile, themeMode, toggleTheme }) {
+export default function Header({ userProfile, themeMode }) {
   const isDark = themeMode === "dark";
 
   const location = useLocation();
@@ -60,29 +36,26 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
   const notificationRef = useRef(null);
   const searchRef = useRef(null);
 
+  // Helper to resolve image URL correctly
+  const getImageUrl = (image) => {
+    if (!image) return "";
+    if (image.startsWith("http://") || image.startsWith("https://") || image.startsWith("blob:")) {
+      return image;
+    }
+    return `${API_BASE_URL}${image.startsWith("/") ? "" : "/"}${image}`;
+  };
+
   // NGO USER DATA
   const [ngoData, setNgoData] = useState(() => {
     try {
       const storedUser = localStorage.getItem("user");
-
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
-
         return {
           id: parsed.id || parsed._id || userProfile?.id || "",
-          name:
-            parsed.ngoName ||
-            parsed.fullName ||
-            parsed.organizationName ||
-            parsed.name ||
-            userProfile?.ngoName ||
-            "User",
+          name: parsed.ngoName || parsed.fullName || parsed.organizationName || parsed.name || userProfile?.ngoName || "User",
           email: parsed.email || userProfile?.email || "",
-          image:
-            parsed.image ||
-            parsed.avatar ||
-            userProfile?.avatar ||
-            "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&q=80",
+          image: getImageUrl(parsed.image || parsed.avatar || userProfile?.avatar),
         };
       }
     } catch (e) {
@@ -91,43 +64,25 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
 
     return {
       id: userProfile?.id || userProfile?._id || "",
-      name:
-        userProfile?.ngoName ||
-        userProfile?.fullName ||
-        userProfile?.name ||
-        "User",
+      name: userProfile?.ngoName || userProfile?.fullName || userProfile?.name || "User",
       email: userProfile?.email || "",
-      image:
-        userProfile?.avatar ||
-        userProfile?.image ||
-        "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&q=80",
+      image: getImageUrl(userProfile?.avatar || userProfile?.image),
     };
   });
 
-  // SYNC WITH userProfile PROP OR LOCALSTORAGE EVENT
+  // SYNC WITH userProfile PROP OR LOCALSTORAGE EVENT (INSTANT HEADER UPDATE)
   useEffect(() => {
     const loadUserData = () => {
       try {
         const storedUser = localStorage.getItem("user");
-
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
-
           setNgoData({
             id: parsedUser.id || parsedUser._id || "",
-            name:
-              parsedUser.ngoName ||
-              parsedUser.fullName ||
-              parsedUser.organizationName ||
-              parsedUser.name ||
-              "User",
+            name: parsedUser.ngoName || parsedUser.fullName || parsedUser.organizationName || parsedUser.name || "User",
             email: parsedUser.email || "",
-            image:
-              parsedUser.image ||
-              parsedUser.avatar ||
-              "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&q=80",
+            image: getImageUrl(parsedUser.image || parsedUser.avatar),
           });
-
           return;
         }
       } catch (error) {
@@ -137,16 +92,9 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
       if (userProfile && Object.keys(userProfile).length > 0) {
         setNgoData({
           id: userProfile.id || userProfile._id || "",
-          name:
-            userProfile.ngoName ||
-            userProfile.fullName ||
-            userProfile.name ||
-            "User",
+          name: userProfile.ngoName || userProfile.fullName || userProfile.name || "User",
           email: userProfile.email || "",
-          image:
-            userProfile.avatar ||
-            userProfile.image ||
-            "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&q=80",
+          image: getImageUrl(userProfile.avatar || userProfile.image),
         });
       }
     };
@@ -166,7 +114,6 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
   const fetchNotifications = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-
       if (!token) return;
 
       const response = await fetch(`${API_URL}/notifications`, {
@@ -179,15 +126,9 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
       const data = await response.json();
 
       if (response.ok) {
-        const notifs =
-          data.notifications ||
-          data.data ||
-          (Array.isArray(data) ? data : []);
-
+        const notifs = data.notifications || data.data || (Array.isArray(data) ? data : []);
         setNotifications(Array.isArray(notifs) ? notifs : []);
-
         const unread = notifs.filter((n) => !n.read).length;
-
         setUnreadCount(unread);
       }
     } catch (error) {
@@ -206,19 +147,14 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
         restaurants: [],
         donations: [],
       });
-
       setShowSearchDropdown(false);
       return;
     }
 
     const timer = setTimeout(async () => {
       setIsSearching(true);
-
       try {
-        const response = await fetch(
-          `${API_URL}/search?q=${encodeURIComponent(searchQuery)}`
-        );
-
+        const response = await fetch(`${API_URL}/search?q=${encodeURIComponent(searchQuery)}`);
         const data = await response.json();
 
         if (response.ok && data.success) {
@@ -226,7 +162,6 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
             restaurants: data.restaurants || [],
             donations: data.donations || [],
           });
-
           setShowSearchDropdown(true);
         }
       } catch (error) {
@@ -242,42 +177,27 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
   // OUTSIDE CLICK HANDLER
   useEffect(() => {
     function handleClickOutside(event) {
-      if (
-        modalRef.current &&
-        !modalRef.current.contains(event.target)
-      ) {
+      if (modalRef.current && !modalRef.current.contains(event.target)) {
         setShowProfileModal(false);
       }
-
-      if (
-        notificationRef.current &&
-        !notificationRef.current.contains(event.target)
-      ) {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
         setShowNotification(false);
       }
-
-      if (
-        searchRef.current &&
-        !searchRef.current.contains(event.target)
-      ) {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
         setShowSearchDropdown(false);
       }
     }
 
     document.addEventListener("mousedown", handleClickOutside);
-
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // SOCKET.IO (REAL-TIME NOTIFICATIONS)
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
-
     if (!storedUser) return;
 
     let user = null;
-
     try {
       user = JSON.parse(storedUser);
     } catch (error) {
@@ -285,7 +205,6 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
     }
 
     const userId = user.id || user._id;
-
     if (!userId) return;
 
     const socket = io(SOCKET_URL, {
@@ -323,7 +242,6 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
   const handleMarkAsRead = async (notifId) => {
     try {
       const token = localStorage.getItem("token");
-
       if (token) {
         await fetch(`${API_URL}/notifications/${notifId}/read`, {
           method: "PATCH",
@@ -334,11 +252,8 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
       }
 
       setNotifications((prev) =>
-        prev.map((n) =>
-          n._id === notifId ? { ...n, read: true } : n
-        )
+        prev.map((n) => (n._id === notifId ? { ...n, read: true } : n))
       );
-
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
       console.error("Error marking notification as read:", error);
@@ -372,20 +287,13 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
 
       if (response.ok && data.success) {
         window.dispatchEvent(new Event("partner_status_changed"));
-
         const socket = io(SOCKET_URL);
-
         socket.emit("follow:new", {
           followerId: currentUserId,
           followingId: targetId,
         });
 
-        alert(
-          `Successfully followed ${
-            restaurant.organizationName || restaurant.name
-          }!`
-        );
-
+        alert(`Successfully followed ${restaurant.organizationName || restaurant.name}!`);
         setSelectedRestaurant(null);
       } else {
         alert(data.message || "Could not follow this partner.");
@@ -400,10 +308,8 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
 
   const getGreeting = () => {
     const currentHour = new Date().getHours();
-
     if (currentHour < 12) return `Good Morning, ${ngoData.name}`;
     if (currentHour < 17) return `Good Afternoon, ${ngoData.name}`;
-
     return `Good Evening, ${ngoData.name}`;
   };
 
@@ -431,90 +337,35 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
   };
 
   return (
-    <header
-      className={`ngo-header ${
-        isDark ? "ngo-header-dark" : "ngo-header-light"
-      }`}
-    >
+    <header className={`ngo-header ${isDark ? "ngo-header-dark" : "ngo-header-light"}`}>
       <div>
         <h2 className="ngo-header-title">{getPageTitle()}</h2>
-
-        <p
-          className={`ngo-header-subtitle ${
-            isDark
-              ? "ngo-header-subtitle-dark"
-              : "ngo-header-subtitle-light"
-          }`}
-        >
+        <p className={`ngo-header-subtitle ${isDark ? "ngo-header-subtitle-dark" : "ngo-header-subtitle-light"}`}>
           NGO Portal • FeedLink
         </p>
       </div>
 
       <div className="ngo-header-right">
-        {/* THEME TOGGLE */}
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className={`ngo-theme-badge cursor-pointer flex items-center gap-1.5 transition-all duration-200 ${
-            isDark
-              ? "ngo-theme-badge-dark hover:bg-slate-700"
-              : "ngo-theme-badge-light hover:bg-gray-100"
-          }`}
-          title="Toggle Theme"
-        >
-          {isDark ? (
-            <>
-              <Moon className="w-3.5 h-3.5 text-yellow-400" />
-              Dark Mode
-            </>
-          ) : (
-            <>
-              <Sun className="w-3.5 h-3.5 text-amber-500" />
-              Light Mode
-            </>
-          )}
-        </button>
-
         {/* SEARCH BAR & DROPDOWN */}
-        <div
-          ref={searchRef}
-          className="ngo-search-container relative"
-        >
+        <div ref={searchRef} className="ngo-search-container relative">
           <Search className="ngo-search-icon" />
 
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() =>
-              searchQuery.trim() && setShowSearchDropdown(true)
-            }
+            onFocus={() => searchQuery.trim() && setShowSearchDropdown(true)}
             placeholder="Search Cafe 24, Biryani, NGOs..."
-            className={`ngo-search-input ${
-              isDark
-                ? "ngo-search-input-dark"
-                : "ngo-search-input-light"
-            }`}
+            className={`ngo-search-input ${isDark ? "ngo-search-input-dark" : "ngo-search-input-light"}`}
           />
 
           {/* SEARCH RESULTS DROPDOWN */}
           {showSearchDropdown && (
-            <div
-              className={`absolute top-12 left-0 z-50 w-80 sm:w-96 rounded-2xl border p-3 shadow-2xl ${
-                isDark
-                  ? "bg-slate-800 border-slate-700 text-white"
-                  : "bg-white border-gray-200 text-gray-900"
-              }`}
-            >
+            <div className={`absolute top-12 left-0 z-50 w-80 sm:w-96 rounded-2xl border p-3 shadow-2xl ${isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
               {isSearching ? (
-                <div className="py-6 text-center text-xs text-gray-400">
-                  Searching...
-                </div>
-              ) : searchResults.restaurants.length === 0 &&
-                searchResults.donations.length === 0 ? (
-                <div className="py-6 text-center text-xs text-gray-400">
-                  No restaurants or donations found.
-                </div>
+                <div className="py-6 text-center text-xs text-gray-400">Searching...</div>
+              ) : searchResults.restaurants.length === 0 && searchResults.donations.length === 0 ? (
+                <div className="py-6 text-center text-xs text-gray-400">No restaurants or donations found.</div>
               ) : (
                 <div className="max-h-72 overflow-y-auto space-y-3">
                   {/* RESTAURANTS SECTION */}
@@ -523,7 +374,6 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
                       <p className="text-[10px] uppercase font-bold tracking-wider text-emerald-500 mb-1.5 px-2">
                         Restaurants & Cafes
                       </p>
-
                       {searchResults.restaurants.map((res) => (
                         <div
                           key={res._id}
@@ -531,26 +381,14 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
                             setSelectedRestaurant(res);
                             setShowSearchDropdown(false);
                           }}
-                          className={`flex items-center gap-2.5 p-2 rounded-xl cursor-pointer transition ${
-                            isDark
-                              ? "hover:bg-slate-700/60"
-                              : "hover:bg-emerald-50"
-                          }`}
+                          className={`flex items-center gap-2.5 p-2 rounded-xl cursor-pointer transition ${isDark ? "hover:bg-slate-700/60" : "hover:bg-emerald-50"}`}
                         >
                           <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xs shrink-0">
-                            {res.name
-                              ? res.name.charAt(0).toUpperCase()
-                              : "R"}
+                            {res.name ? res.name.charAt(0).toUpperCase() : "R"}
                           </div>
-
                           <div className="overflow-hidden">
-                            <h5 className="font-semibold text-xs truncate">
-                              {res.organizationName || res.name}
-                            </h5>
-
-                            <p className="text-[10px] text-gray-400 truncate">
-                              {res.address || res.email}
-                            </p>
+                            <h5 className="font-semibold text-xs truncate">{res.organizationName || res.name}</h5>
+                            <p className="text-[10px] text-gray-400 truncate">{res.address || res.email}</p>
                           </div>
                         </div>
                       ))}
@@ -563,7 +401,6 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
                       <p className="text-[10px] uppercase font-bold tracking-wider text-amber-500 mb-1.5 px-2">
                         Available Donations
                       </p>
-
                       {searchResults.donations.map((don) => (
                         <div
                           key={don._id}
@@ -571,26 +408,15 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
                             setSelectedDonation(don);
                             setShowSearchDropdown(false);
                           }}
-                          className={`flex items-center gap-2.5 p-2 rounded-xl cursor-pointer transition ${
-                            isDark
-                              ? "hover:bg-slate-700/60"
-                              : "hover:bg-amber-50"
-                          }`}
+                          className={`flex items-center gap-2.5 p-2 rounded-xl cursor-pointer transition ${isDark ? "hover:bg-slate-700/60" : "hover:bg-amber-50"}`}
                         >
                           <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600 font-bold text-xs shrink-0">
                             🍲
                           </div>
-
                           <div className="overflow-hidden">
-                            <h5 className="font-semibold text-xs truncate">
-                              {don.foodName}
-                            </h5>
-
+                            <h5 className="font-semibold text-xs truncate">{don.foodName}</h5>
                             <p className="text-[10px] text-gray-400 truncate">
-                              By{" "}
-                              {don.donor?.organizationName ||
-                                don.donor?.name ||
-                                "Restaurant"}
+                              By {don.donor?.organizationName || don.donor?.name || "Restaurant"}
                             </p>
                           </div>
                         </div>
@@ -607,15 +433,10 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
         <div ref={notificationRef} className="relative">
           <button
             type="button"
-            onClick={() =>
-              setShowNotification(!showNotification)
-            }
-            className={`ngo-bell-btn relative ${
-              isDark ? "ngo-bell-btn-dark" : "ngo-bell-btn-light"
-            }`}
+            onClick={() => setShowNotification(!showNotification)}
+            className={`ngo-bell-btn relative ${isDark ? "ngo-bell-btn-dark" : "ngo-bell-btn-light"}`}
           >
             <Bell className="w-4 h-4" />
-
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
                 {unreadCount}
@@ -624,65 +445,35 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
           </button>
 
           {showNotification && (
-            <div
-              className={`absolute right-0 top-12 z-50 w-[420px] rounded-2xl border p-5 shadow-2xl ${
-                isDark
-                  ? "border-slate-700 bg-slate-800 text-white"
-                  : "border-gray-200 bg-white text-gray-900"
-              }`}
-            >
+            <div className={`absolute right-0 top-12 z-50 w-[420px] rounded-2xl border p-5 shadow-2xl ${isDark ? "border-slate-700 bg-slate-800 text-white" : "border-gray-200 bg-white text-gray-900"}`}>
               <div className="mb-4 flex items-center justify-between border-b pb-3">
                 <div className="flex items-center gap-2.5">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                     🔔
                   </div>
-
                   <div>
-                    <h4 className="font-bold text-sm">
-                      All Notifications
-                    </h4>
-
-                    <p className="text-xs text-gray-400">
-                      {notifications.length} total • {unreadCount} unread
-                    </p>
+                    <h4 className="font-bold text-sm">All Notifications</h4>
+                    <p className="text-xs text-gray-400">{notifications.length} total • {unreadCount} unread</p>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => setShowNotification(false)}
-                  className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-                >
+                <button onClick={() => setShowNotification(false)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700">
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
               <div className="mb-3 flex items-center justify-between text-xs text-gray-500">
                 <span>Recent activity</span>
-
                 <span
                   onClick={async () => {
                     try {
                       const token = localStorage.getItem("token");
-
                       if (token) {
-                        await fetch(
-                          `${API_URL}/notifications/read-all`,
-                          {
-                            method: "PATCH",
-                            headers: {
-                              Authorization: `Bearer ${token}`,
-                            },
-                          }
-                        );
+                        await fetch(`${API_URL}/notifications/read-all`, {
+                          method: "PATCH",
+                          headers: { Authorization: `Bearer ${token}` },
+                        });
                       }
-
-                      setNotifications((prev) =>
-                        prev.map((n) => ({
-                          ...n,
-                          read: true,
-                        }))
-                      );
-
+                      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
                       setUnreadCount(0);
                     } catch (err) {
                       console.error(err);
@@ -696,9 +487,7 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
 
               <div className="max-h-80 overflow-y-auto space-y-2.5 pr-1">
                 {notifications.length === 0 ? (
-                  <div className="py-12 text-center text-sm text-gray-400">
-                    No notifications available.
-                  </div>
+                  <div className="py-12 text-center text-sm text-gray-400">No notifications available.</div>
                 ) : (
                   notifications.map((n) => (
                     <div
@@ -714,31 +503,20 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
                           : "bg-gray-50 border-gray-100 opacity-80"
                       }`}
                     >
-                      {!n.read && (
-                        <span className="absolute top-3.5 right-3.5 h-2 w-2 rounded-full bg-emerald-500" />
-                      )}
-
+                      {!n.read && <span className="absolute top-3.5 right-3.5 h-2 w-2 rounded-full bg-emerald-500" />}
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-semibold text-emerald-600 dark:text-emerald-400 text-sm">
                           {n.title || "Notification"}
                         </span>
-
                         {!n.read && (
                           <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
                             UNREAD
                           </span>
                         )}
                       </div>
-
-                      <p className="text-gray-600 dark:text-gray-300 mb-1.5">
-                        {n.message}
-                      </p>
-
+                      <p className="text-gray-600 dark:text-gray-300 mb-1.5">{n.message}</p>
                       <span className="text-[10px] text-gray-400 block">
-                        🕒{" "}
-                        {n.createdAt
-                          ? new Date(n.createdAt).toLocaleString()
-                          : "Just now"}
+                        🕒 {n.createdAt ? new Date(n.createdAt).toLocaleString() : "Just now"}
                       </span>
                     </div>
                   ))
@@ -761,26 +539,17 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
         {/* PROFILE BOX */}
         <div
           onClick={() => setShowProfileModal(!showProfileModal)}
-          className={`ngo-profile-box cursor-pointer ${
-            isDark
-              ? "ngo-profile-box-dark"
-              : "ngo-profile-box-light"
-          }`}
+          className={`ngo-profile-box cursor-pointer ${isDark ? "ngo-profile-box-dark" : "ngo-profile-box-light"}`}
         >
-          <img
-            src={ngoData.image}
-            alt={ngoData.name}
-            className="ngo-profile-img"
-          />
-
+          {ngoData.image ? (
+            <img src={ngoData.image} alt={ngoData.name} className="ngo-profile-img" />
+          ) : (
+            <div className="h-9 w-9 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+              {ngoData.name ? ngoData.name.charAt(0).toUpperCase() : "A"}
+            </div>
+          )}
           <div className="text-left">
-            <p
-              className={`ngo-profile-text ${
-                isDark
-                  ? "ngo-profile-text-dark"
-                  : "ngo-profile-text-light"
-              }`}
-            >
+            <p className={`ngo-profile-text ${isDark ? "ngo-profile-text-dark" : "ngo-profile-text-light"}`}>
               Welcome, {ngoData.name}!
             </p>
           </div>
@@ -788,54 +557,26 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
 
         {/* NGO PROFILE MODAL */}
         {showProfileModal && (
-          <div
-            ref={modalRef}
-            className={`ngo-profile-modal ${
-              isDark
-                ? "ngo-profile-modal-dark"
-                : "ngo-profile-modal-light"
-            }`}
-          >
+          <div ref={modalRef} className={`ngo-profile-modal ${isDark ? "ngo-profile-modal-dark" : "ngo-profile-modal-light"}`}>
             <div className="ngo-modal-header">
               <div className="flex items-center gap-3">
-                <div className="ngo-modal-avatar">
-                  {ngoData.name
-                    ? ngoData.name.charAt(0).toUpperCase()
-                    : "U"}
-                </div>
-
+                {ngoData.image ? (
+                  <img src={ngoData.image} alt={ngoData.name} className="h-10 w-10 rounded-full object-cover" />
+                ) : (
+                  <div className="h-10 w-10 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-base">
+                    {ngoData.name ? ngoData.name.charAt(0).toUpperCase() : "A"}
+                  </div>
+                )}
                 <div>
-                  <h3 className="font-bold text-sm">
-                    {ngoData.name}
-                  </h3>
-
-                  <p className="ngo-modal-tag">
-                    Verified Partner NGO • Chattogram
-                  </p>
+                  <h3 className="font-bold text-sm">{ngoData.name}</h3>
+                  <p className="ngo-modal-tag">Verified Partner NGO • Chattogram</p>
                 </div>
               </div>
-
-              <button
-                onClick={() => setShowProfileModal(false)}
-                className="ngo-modal-close"
-              >
-                ×
-              </button>
+              <button onClick={() => setShowProfileModal(false)} className="ngo-modal-close">×</button>
             </div>
-
             <div className="ngo-modal-desc mt-3">
-              <p
-                className={
-                  isDark
-                    ? "text-slate-300 text-xs"
-                    : "text-slate-600 text-xs"
-                }
-              >
-                <strong className="text-emerald-500">
-                  {ngoData.name}
-                </strong>{" "}
-                is dedicated to managing surplus food and serving
-                communities.
+              <p className={isDark ? "text-slate-300 text-xs" : "text-slate-600 text-xs"}>
+                <strong className="text-emerald-500">{ngoData.name}</strong> is dedicated to managing surplus food and serving communities.
               </p>
             </div>
           </div>
@@ -845,79 +586,39 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
       {/* SEARCH RESULT DETAILS POPUP MODALS */}
       {selectedRestaurant && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div
-            className={`w-full max-w-md rounded-2xl p-6 shadow-2xl border relative ${
-              isDark
-                ? "bg-slate-800 border-slate-700 text-white"
-                : "bg-white border-gray-200 text-gray-900"
-            }`}
-          >
-            <button
-              onClick={() => setSelectedRestaurant(null)}
-              className="absolute top-4 right-4 p-1 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-            >
+          <div className={`w-full max-w-md rounded-2xl p-6 shadow-2xl border relative ${isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+            <button onClick={() => setSelectedRestaurant(null)} className="absolute top-4 right-4 p-1 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700">
               <X className="h-5 w-5" />
             </button>
-
             <div className="flex items-center gap-3.5 mb-4">
               <div className="h-12 w-12 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold text-lg">
-                {selectedRestaurant.organizationName
-                  ? selectedRestaurant.organizationName
-                      .charAt(0)
-                      .toUpperCase()
-                  : "R"}
+                {selectedRestaurant.organizationName ? selectedRestaurant.organizationName.charAt(0).toUpperCase() : "R"}
               </div>
-
               <div>
-                <h3 className="font-bold text-base">
-                  {selectedRestaurant.organizationName ||
-                    selectedRestaurant.name}
-                </h3>
-
-                <p className="text-xs text-emerald-500 font-medium">
-                  Verified Partner Restaurant
-                </p>
+                <h3 className="font-bold text-base">{selectedRestaurant.organizationName || selectedRestaurant.name}</h3>
+                <p className="text-xs text-emerald-500 font-medium">Verified Partner Restaurant</p>
               </div>
             </div>
-
             <div className="space-y-2.5 text-xs text-gray-600 dark:text-gray-300 mb-6">
               <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-emerald-500 shrink-0" />
-                <span>
-                  {selectedRestaurant.address ||
-                    "Chattogram, Bangladesh"}
-                </span>
+                <span>{selectedRestaurant.address || "Chattogram, Bangladesh"}</span>
               </div>
-
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-emerald-500 shrink-0" />
-                <span>
-                  {selectedRestaurant.phone || "No phone listed"}
-                </span>
+                <span>{selectedRestaurant.phone || "No phone listed"}</span>
               </div>
             </div>
-
             <div className="flex gap-3">
               <button
                 disabled={isFollowingBusy}
-                onClick={() =>
-                  handleFollowRestaurantFromSearch(
-                    selectedRestaurant
-                  )
-                }
+                onClick={() => handleFollowRestaurantFromSearch(selectedRestaurant)}
                 className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold text-xs flex items-center justify-center gap-2 hover:bg-emerald-700 transition"
               >
                 <UserPlus className="h-4 w-4" />
-
-                {isFollowingBusy
-                  ? "Following..."
-                  : "Follow Restaurant"}
+                {isFollowingBusy ? "Following..." : "Follow Restaurant"}
               </button>
-
-              <button
-                onClick={() => setSelectedRestaurant(null)}
-                className="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-slate-600 text-xs font-semibold hover:bg-gray-100 dark:hover:bg-slate-700"
-              >
+              <button onClick={() => setSelectedRestaurant(null)} className="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-slate-600 text-xs font-semibold hover:bg-gray-100 dark:hover:bg-slate-700">
                 Close
               </button>
             </div>
@@ -927,53 +628,23 @@ export default function Header({ userProfile, themeMode, toggleTheme }) {
 
       {selectedDonation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div
-            className={`w-full max-w-md rounded-2xl p-6 shadow-2xl border relative ${
-              isDark
-                ? "bg-slate-800 border-slate-700 text-white"
-                : "bg-white border-gray-200 text-gray-900"
-            }`}
-          >
-            <button
-              onClick={() => setSelectedDonation(null)}
-              className="absolute top-4 right-4 p-1 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-            >
+          <div className={`w-full max-w-md rounded-2xl p-6 shadow-2xl border relative ${isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+            <button onClick={() => setSelectedDonation(null)} className="absolute top-4 right-4 p-1 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700">
               <X className="h-5 w-5" />
             </button>
-
             <div className="mb-4">
               <span className="px-2.5 py-1 rounded-md bg-amber-100 text-amber-700 font-bold text-[10px] uppercase">
                 Active Surplus Food
               </span>
-
-              <h3 className="font-bold text-lg mt-2">
-                {selectedDonation.foodName}
-              </h3>
-
+              <h3 className="font-bold text-lg mt-2">{selectedDonation.foodName}</h3>
               <p className="text-xs text-gray-400">
-                Posted by{" "}
-                <strong className="text-emerald-500">
-                  {selectedDonation.donor?.organizationName ||
-                    selectedDonation.donor?.name ||
-                    "Partner Cafe"}
-                </strong>
+                Posted by <strong className="text-emerald-500">{selectedDonation.donor?.organizationName || selectedDonation.donor?.name || "Partner Cafe"}</strong>
               </p>
             </div>
-
             <div className="space-y-2 text-xs text-gray-600 dark:text-gray-300 mb-6 bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl border border-gray-100 dark:border-slate-600">
-              <p>
-                📍 <strong>Pickup Address:</strong>{" "}
-                {selectedDonation.pickupAddress ||
-                  "Restaurant Location"}
-              </p>
-
-              <p>
-                ⏳ <strong>Status:</strong>{" "}
-                {selectedDonation.status ||
-                  "Waiting for Acceptance"}
-              </p>
+              <p>📍 <strong>Pickup Address:</strong> {selectedDonation.pickupAddress || "Restaurant Location"}</p>
+              <p>⏳ <strong>Status:</strong> {selectedDonation.status || "Waiting for Acceptance"}</p>
             </div>
-
             <div className="flex gap-3">
               <button
                 onClick={() => {
