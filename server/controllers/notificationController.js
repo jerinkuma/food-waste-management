@@ -1,9 +1,12 @@
+
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const Notification = require("../models/Notification");
 
-// =====================================
+// ======================================================
 // GET USER ID FROM JWT
-// =====================================
+// ======================================================
+
 const getUserIdFromReq = (req) => {
   const authHeader = req.headers.authorization;
 
@@ -25,14 +28,16 @@ const getUserIdFromReq = (req) => {
 
     return decoded.id || decoded.userId || null;
   } catch (error) {
+    console.error("JWT verification error:", error.message);
     return null;
   }
 };
 
-// =====================================
+// ======================================================
 // GET MY NOTIFICATIONS
 // GET /api/notifications
-// =====================================
+// ======================================================
+
 const getMyNotifications = async (req, res) => {
   try {
     const userId = getUserIdFromReq(req);
@@ -49,13 +54,15 @@ const getMyNotifications = async (req, res) => {
     })
       .populate("donation")
       .populate("feedback")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     return res.status(200).json({
       success: true,
       count: notifications.length,
       notifications,
     });
+
   } catch (error) {
     console.error("Get notifications error:", error);
 
@@ -67,10 +74,11 @@ const getMyNotifications = async (req, res) => {
   }
 };
 
-// =====================================
+// ======================================================
 // GET UNREAD NOTIFICATION COUNT
 // GET /api/notifications/unread-count
-// =====================================
+// ======================================================
+
 const getUnreadCount = async (req, res) => {
   try {
     const userId = getUserIdFromReq(req);
@@ -91,6 +99,7 @@ const getUnreadCount = async (req, res) => {
       success: true,
       count,
     });
+
   } catch (error) {
     console.error("Get unread count error:", error);
 
@@ -102,10 +111,11 @@ const getUnreadCount = async (req, res) => {
   }
 };
 
-// =====================================
+// ======================================================
 // MARK ONE NOTIFICATION AS READ
 // PATCH /api/notifications/:id/read
-// =====================================
+// ======================================================
+
 const markAsRead = async (req, res) => {
   try {
     const userId = getUserIdFromReq(req);
@@ -119,13 +129,22 @@ const markAsRead = async (req, res) => {
 
     const { id } = req.params;
 
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid notification ID.",
+      });
+    }
+
     const notification = await Notification.findOneAndUpdate(
       {
         _id: id,
         recipient: userId,
       },
       {
-        read: true,
+        $set: {
+          read: true,
+        },
       },
       {
         new: true,
@@ -144,6 +163,7 @@ const markAsRead = async (req, res) => {
       message: "Notification marked as read.",
       notification,
     });
+
   } catch (error) {
     console.error("Mark notification as read error:", error);
 
@@ -155,10 +175,11 @@ const markAsRead = async (req, res) => {
   }
 };
 
-// =====================================
+// ======================================================
 // MARK ALL NOTIFICATIONS AS READ
 // PATCH /api/notifications/read-all
-// =====================================
+// ======================================================
+
 const markAllAsRead = async (req, res) => {
   try {
     const userId = getUserIdFromReq(req);
@@ -176,7 +197,9 @@ const markAllAsRead = async (req, res) => {
         read: false,
       },
       {
-        read: true,
+        $set: {
+          read: true,
+        },
       }
     );
 
@@ -185,6 +208,7 @@ const markAllAsRead = async (req, res) => {
       message: "All notifications marked as read.",
       updatedCount: result.modifiedCount,
     });
+
   } catch (error) {
     console.error("Mark all notifications as read error:", error);
 
@@ -195,6 +219,10 @@ const markAllAsRead = async (req, res) => {
     });
   }
 };
+
+// ======================================================
+// EXPORT CONTROLLERS
+// ======================================================
 
 module.exports = {
   getMyNotifications,

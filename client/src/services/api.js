@@ -198,6 +198,15 @@ export const submitDonorFeedback = async (payload) => {
 };
 
 
+// Fetch previous donation details for re-donation
+export const fetchDonationForRedonation = async (donationId) => {
+  const { data } = await client.get(
+    `/donations/redonate/${donationId}`
+  );
+
+  return data.donation;
+};
+
 export const submitDonorNgoRating = async (payload) => {
   const { data } = await client.post(
     "/feedback/donor/rating",

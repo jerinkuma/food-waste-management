@@ -505,6 +505,53 @@ const getDonationById = async (
   }
 };
 
+//new
+
+const getDonationForRedonation = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    const donation = await Donation.findById(req.params.id)
+      .select(
+        "donor foodName foodType quantity cookingTime condition foodCategory pickupAddress contactNumber pickupDuration specialInstructions"
+      )
+      .lean();
+
+    if (!donation) {
+      return res.status(404).json({
+        success: false,
+        message: "Donation not found.",
+      });
+    }
+
+    if (String(donation.donor) !== String(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to re-donate this food.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      donation,
+    });
+  } catch (error) {
+    console.error("Get Re-donation Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load previous donation.",
+    });
+  }
+};
+
 // ======================================================
 // GET DONATION BY CUSTOM DONATION ID
 // ======================================================
@@ -4039,4 +4086,5 @@ module.exports = {
   getNgoDonations,
   assignDeliveryDriver,
   getDonorNgoAnalytics,
+  getDonationForRedonation,
 };

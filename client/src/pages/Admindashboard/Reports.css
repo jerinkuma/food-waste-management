@@ -428,10 +428,7 @@
   text-align: center;
 }
 
-.chart-panel {
-  margin-bottom: 17px;
-}
-
+/* Chart headings */
 .chart-heading {
   display: flex;
   align-items: flex-start;
@@ -461,6 +458,21 @@
   color: #47855e;
   font-size: 9px;
   font-weight: 800;
+}
+
+/* Monthly and Yearly Graphs Side by Side */
+.report-trends-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 17px;
+  align-items: stretch;
+  margin-bottom: 17px;
+}
+
+.report-trends-grid .chart-panel {
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 0;
 }
 
 .monthly-chart {
@@ -523,6 +535,7 @@
   text-align: center;
 }
 
+/* Yearly Chart */
 .yearly-chart {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -573,6 +586,7 @@
   font-size: 9px;
 }
 
+/* Bottom Reports */
 .report-bottom-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -686,6 +700,7 @@
   letter-spacing: 0.5px;
 }
 
+/* Error */
 .reports-error {
   margin-bottom: 20px;
   padding: 15px;
@@ -708,6 +723,7 @@
   cursor: pointer;
 }
 
+/* Loading */
 .reports-loading {
   display: flex;
   min-height: 220px;
@@ -729,7 +745,9 @@
 }
 
 @keyframes report-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Tablet */
@@ -744,6 +762,13 @@
 
   .report-role-grid,
   .report-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tablet and Smaller Screens: Charts Stack */
+@media (max-width: 900px) {
+  .report-trends-grid {
     grid-template-columns: 1fr;
   }
 }

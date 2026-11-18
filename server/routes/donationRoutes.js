@@ -14,6 +14,7 @@ const {
   getDonorDonations,
   getDonorDashboard,
   getDonorNgoAnalytics,
+  getDonationForRedonation,
 
   listAvailableDonations,
   acceptDonation,
@@ -100,6 +101,16 @@ router.put(
 router.get(
   "/dashboard/:donorId",
   getDonorDashboard
+);
+// ======================================================
+// GET DONATION FOR RE-DONATION
+// DONOR ONLY
+// ======================================================
+router.get(
+  "/redonate/:id",
+  protect,
+  restrictTo("donor"),
+  getDonationForRedonation
 );
 
 // ======================================================

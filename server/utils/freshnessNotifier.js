@@ -1,5 +1,28 @@
+
 const Donation = require("../models/Donation");
+const User = require("../models/User");
+
 const { getIO, rooms } = require("./socket");
+
+const {
+  createFreshnessNotification,
+} = require("./notificationUtils");
+
+// ======================================================
+// CONFIGURATION
+// ======================================================
+
+const ACTIVE_STATUSES = [
+  "Pending",
+  "Accepted",
+  "Out for Delivery",
+];
+
+const ALERT_WINDOW_MINUTES = 120;
+const CHECK_INTERVAL = 60 * 1000;
+
+let freshnessInterval = null;
+let isChecking = false;
 
 // ======================================================
 // FORMAT REMAINING TIME
@@ -21,14 +44,13 @@ const formatRemainingTime = (minutes) => {
 };
 
 // ======================================================
-// FRESHNESS NOTIFICATION HELPER
+// GET URGENCY
 // ======================================================
 
 const getUrgency = (remainingMinutes) => {
-  // Only 0–2 hours should reach this function
   if (
     remainingMinutes >= 0 &&
-    remainingMinutes <= 120
+    remainingMinutes <= ALERT_WINDOW_MINUTES
   ) {
     return {
       level: "critical",
@@ -40,194 +62,289 @@ const getUrgency = (remainingMinutes) => {
 };
 
 // ======================================================
-// CHECK FOOD FRESHNESS
+// CHECK FOOD FRESHNESS NOTIFICATIONS
 // ======================================================
 
 const checkFreshnessNotifications = async () => {
+  // Prevent overlapping checks in the same process
+  if (isChecking) {
+    return;
+  }
+
+  isChecking = true;
+
   try {
     const now = new Date();
 
-    // --------------------------------------------------
-    // FIND ACTIVE DONATIONS
-    // --------------------------------------------------
+    const alertLimit = new Date(
+      now.getTime() +
+        ALERT_WINDOW_MINUTES * 60 * 1000
+    );
+
+    // ================================================
+    // FIND ACTIVE DONATIONS NEAR EXPIRY
+    // ================================================
 
     const donations = await Donation.find({
       pipelineStatus: {
-        $in: [
-          "Pending",
-          "Accepted",
-          "Out for Delivery",
-        ],
+        $in: ACTIVE_STATUSES,
       },
 
       bestBefore: {
-        $exists: true,
-        $ne: null,
+        $gt: now,
+        $lte: alertLimit,
       },
+
+      freshnessAlertSentAt: null,
     }).select(
-      "_id donationId donor foodName quantity bestBefore pipelineStatus"
+      "_id donationId donor foodName quantity bestBefore pipelineStatus freshnessAlertSentAt"
     );
+
+    if (!donations.length) {
+      return;
+    }
+
+    // ================================================
+    // GET ALL NGO USERS
+    // ================================================
+
+    const ngoUsers = await User.find({
+      role: "ngo",
+    }).select("_id");
+
+    // ================================================
+    // INITIALIZE SOCKET.IO
+    // ================================================
 
     const io = getIO();
 
-    // --------------------------------------------------
-    // CHECK EACH DONATION
-    // --------------------------------------------------
+    // ================================================
+    // PROCESS EACH DONATION
+    // ================================================
 
     for (const donation of donations) {
-      // ------------------------------------------------
-      // SAFETY CHECK
-      // ------------------------------------------------
+      try {
+        // --------------------------------------------
+        // VALIDATE DONOR
+        // --------------------------------------------
 
-      if (!donation.donor) {
-        continue;
-      }
+        if (!donation.donor) {
+          continue;
+        }
 
-      // ------------------------------------------------
-      // COMPLETED DONATION SHOULD NEVER ALERT
-      // ------------------------------------------------
+        // --------------------------------------------
+        // VALIDATE DONATION STATUS
+        // --------------------------------------------
 
-      if (
-        donation.pipelineStatus ===
-        "Completed"
-      ) {
-        continue;
-      }
+        if (
+          !ACTIVE_STATUSES.includes(
+            donation.pipelineStatus
+          )
+        ) {
+          continue;
+        }
 
-      // ------------------------------------------------
-      // CONVERT BEST BEFORE TO DATE
-      // ------------------------------------------------
+        // --------------------------------------------
+        // VALIDATE EXPIRY DATE
+        // --------------------------------------------
 
-      const expiryTime = new Date(
-        donation.bestBefore
-      );
+        const expiryTime = new Date(
+          donation.bestBefore
+        );
 
-      // Invalid date হলে skip
-      if (
-        Number.isNaN(
-          expiryTime.getTime()
-        )
-      ) {
-        continue;
-      }
+        if (
+          Number.isNaN(expiryTime.getTime())
+        ) {
+          continue;
+        }
 
-      // ------------------------------------------------
-      // CALCULATE REMAINING TIME
-      // ------------------------------------------------
+        const currentTime = new Date();
 
-      const remainingMinutes =
-        Math.floor(
+        const remainingMinutes = Math.floor(
           (expiryTime.getTime() -
-            now.getTime()) /
-            (1000 * 60)
+            currentTime.getTime()) /
+            60000
         );
 
-      // ==================================================
-      // ONLY SHOW ALERT WHEN 0–2 HOURS ARE REMAINING
-      // ==================================================
+        // --------------------------------------------
+        // CHECK EXPIRY WINDOW
+        // --------------------------------------------
 
-      // More than 2 hours remaining
-      if (remainingMinutes > 120) {
-        continue;
-      }
+        if (
+          remainingMinutes < 0 ||
+          remainingMinutes > ALERT_WINDOW_MINUTES
+        ) {
+          continue;
+        }
 
-      // Expired
-      if (remainingMinutes < 0) {
-        continue;
-      }
+        // --------------------------------------------
+        // GET URGENCY
+        // --------------------------------------------
 
-      // ------------------------------------------------
-      // GET URGENCY
-      // ------------------------------------------------
-
-      const urgency =
-        getUrgency(
+        const urgency = getUrgency(
           remainingMinutes
         );
 
-      // Safety check
-      if (!urgency) {
-        continue;
+        if (!urgency) {
+          continue;
+        }
+
+        // ============================================
+        // ATOMIC DUPLICATE ALERT PREVENTION
+        // ============================================
+
+        const claimedDonation =
+          await Donation.findOneAndUpdate(
+            {
+              _id: donation._id,
+
+              pipelineStatus: {
+                $in: ACTIVE_STATUSES,
+              },
+
+              bestBefore: {
+                $gt: new Date(),
+                $lte: new Date(
+                  Date.now() +
+                    ALERT_WINDOW_MINUTES *
+                      60 *
+                      1000
+                ),
+              },
+
+              freshnessAlertSentAt: null,
+            },
+
+            {
+              $set: {
+                freshnessAlertSentAt: new Date(),
+              },
+            },
+
+            {
+              new: true,
+            }
+          );
+
+        // Already claimed by another check
+        if (!claimedDonation) {
+          continue;
+        }
+
+        // ============================================
+        // PREPARE REAL-TIME ALERT DATA
+        // ============================================
+
+        const notificationData = {
+          type: "freshness",
+
+          donationId: claimedDonation._id,
+
+          customDonationId:
+            claimedDonation.donationId,
+
+          foodName:
+            claimedDonation.foodName,
+
+          quantity:
+            claimedDonation.quantity,
+
+          bestBefore:
+            claimedDonation.bestBefore,
+
+          pipelineStatus:
+            claimedDonation.pipelineStatus,
+
+          remainingMinutes,
+
+          urgency: urgency.level,
+
+          title: urgency.title,
+
+          message:
+            `${claimedDonation.foodName} expires in ` +
+            `${formatRemainingTime(remainingMinutes)}.`,
+        };
+
+        // ============================================
+        // CREATE DONOR DATABASE NOTIFICATION
+        // ============================================
+
+        const donorNotification =
+          await createFreshnessNotification({
+            recipient: claimedDonation.donor,
+            role: "donor",
+            donation: claimedDonation,
+            remainingMinutes,
+          });
+
+        // ============================================
+        // CREATE NGO DATABASE NOTIFICATIONS
+        // ============================================
+
+        for (const ngoUser of ngoUsers) {
+          await createFreshnessNotification({
+            recipient: ngoUser._id,
+            role: "ngo",
+            donation: claimedDonation,
+            remainingMinutes,
+          });
+        }
+
+        // ============================================
+        // EMIT CUSTOM REAL-TIME ALERT
+        // ============================================
+
+        // Donor room
+        io.to(
+          rooms.restaurant(
+            claimedDonation.donor.toString()
+          )
+        ).emit(
+          "donation:freshness-alert",
+          notificationData
+        );
+
+        // All NGO rooms
+        io.to(
+          rooms.ngos()
+        ).emit(
+          "donation:freshness-alert",
+          notificationData
+        );
+
+        // ============================================
+        // SERVER LOG
+        // ============================================
+
+        console.log(
+          `Freshness alert processed: ${
+            claimedDonation.donationId
+          } | ${
+            urgency.level
+          } | ${
+            formatRemainingTime(remainingMinutes)
+          } | Donor notification: ${
+            donorNotification ? "Saved" : "Failed"
+          }`
+        );
+
+      } catch (donationError) {
+        console.error(
+          `Freshness alert error for ${donation.donationId}:`,
+          donationError
+        );
       }
-
-      // ------------------------------------------------
-      // COMMON NOTIFICATION DATA
-      // ------------------------------------------------
-
-      const notification = {
-        type: "freshness",
-
-        donationId:
-          donation._id,
-
-        customDonationId:
-          donation.donationId,
-
-        foodName:
-          donation.foodName,
-
-        quantity:
-          donation.quantity,
-
-        bestBefore:
-          donation.bestBefore,
-
-        pipelineStatus:
-          donation.pipelineStatus,
-
-        remainingMinutes,
-
-        urgency:
-          urgency.level,
-
-        title:
-          urgency.title,
-
-        message:
-          `${donation.foodName} expires in ${formatRemainingTime(
-            remainingMinutes
-          )}.`,
-      };
-
-      // ==================================================
-      // SEND TO DONOR
-      // ==================================================
-
-      io.to(
-        rooms.restaurant(
-          donation.donor.toString()
-        )
-      ).emit(
-        "donation:freshness-alert",
-        notification
-      );
-
-      // ==================================================
-      // SEND TO ALL NGOs
-      // ==================================================
-
-      io.to(
-        rooms.ngos()
-      ).emit(
-        "donation:freshness-alert",
-        notification
-      );
-
-      // --------------------------------------------------
-      // SERVER LOG
-      // --------------------------------------------------
-
-      console.log(
-        `Freshness alert sent: ${donation.foodName} | ${urgency.level} | ${formatRemainingTime(
-          remainingMinutes
-        )}`
-      );
     }
+
   } catch (error) {
     console.error(
-      "Freshness notification error:",
+      "Freshness Monitor Error:",
       error
     );
+
+  } finally {
+    isChecking = false;
   }
 };
 
@@ -236,18 +353,45 @@ const checkFreshnessNotifications = async () => {
 // ======================================================
 
 const startFreshnessMonitor = () => {
+  if (freshnessInterval) {
+    console.log(
+      "Freshness monitor is already running."
+    );
+
+    return;
+  }
+
   console.log(
     "Freshness notification monitor started."
   );
 
-  // First check immediately
+  // Run immediately
   checkFreshnessNotifications();
 
-  // Check every 60 seconds
-  setInterval(
+  // Repeat every 60 seconds
+  freshnessInterval = setInterval(
     checkFreshnessNotifications,
-    60 * 1000
+    CHECK_INTERVAL
   );
+
+  if (freshnessInterval.unref) {
+    freshnessInterval.unref();
+  }
+};
+
+// ======================================================
+// STOP FRESHNESS MONITOR
+// ======================================================
+
+const stopFreshnessMonitor = () => {
+  if (freshnessInterval) {
+    clearInterval(freshnessInterval);
+    freshnessInterval = null;
+
+    console.log(
+      "Freshness notification monitor stopped."
+    );
+  }
 };
 
 // ======================================================
@@ -256,5 +400,8 @@ const startFreshnessMonitor = () => {
 
 module.exports = {
   startFreshnessMonitor,
+  stopFreshnessMonitor,
   checkFreshnessNotifications,
+  formatRemainingTime,
+  getUrgency,
 };

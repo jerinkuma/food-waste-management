@@ -1,8 +1,12 @@
+
 const mongoose = require("mongoose");
 
 const notificationSchema = new mongoose.Schema(
   {
-    // যে User notification পাবে
+    // =====================================
+    // NOTIFICATION RECIPIENT
+    // =====================================
+
     recipient: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -10,7 +14,10 @@ const notificationSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Notification-এর ধরন
+    // =====================================
+    // NOTIFICATION TYPE
+    // =====================================
+
     type: {
       type: String,
       required: true,
@@ -27,48 +34,67 @@ const notificationSchema = new mongoose.Schema(
         "RATING_RECEIVED",
         "FEEDBACK_RECEIVED",
         "FEEDBACK_RESPONSE",
+        "FRESHNESS_ALERT",
         "SYSTEM",
-        "ADMIN_STATUS",   // 👉 এডমিন ব্লক/একটিভ করার জন্য যুক্ত করা হলো
-        "ADMIN_FEEDBACK", // 👉 এডমিন ওয়ার্নিং ও ফিডব্যাকের জন্য যুক্ত করা হলো
+        "ADMIN_STATUS",
+        "ADMIN_FEEDBACK",
       ],
       default: "SYSTEM",
     },
 
-    // ছোট title
+    // =====================================
+    // NOTIFICATION TITLE
+    // =====================================
+
     title: {
       type: String,
       required: true,
       trim: true,
     },
 
-    // Notification-এর বিস্তারিত message
+    // =====================================
+    // NOTIFICATION MESSAGE
+    // =====================================
+
     message: {
       type: String,
       required: true,
       trim: true,
     },
 
-    // কোন donation-এর সাথে notification related
+    // =====================================
+    // RELATED DONATION
+    // =====================================
+
     donation: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Donation",
       default: null,
     },
 
-    // কোন feedback-এর সাথে related
+    // =====================================
+    // RELATED FEEDBACK
+    // =====================================
+
     feedback: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Feedback",
       default: null,
     },
 
-    // Frontend-এ navigation করার জন্য অতিরিক্ত data
+    // =====================================
+    // ADDITIONAL DATA
+    // =====================================
+
     data: {
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
 
-    // Notification পড়া হয়েছে কিনা
+    // =====================================
+    // READ STATUS
+    // =====================================
+
     read: {
       type: Boolean,
       default: false,
@@ -80,4 +106,11 @@ const notificationSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Notification", notificationSchema);
+// =====================================
+// EXPORT NOTIFICATION MODEL
+// =====================================
+
+module.exports = mongoose.model(
+  "Notification",
+  notificationSchema
+);

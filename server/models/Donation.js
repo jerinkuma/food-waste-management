@@ -57,6 +57,15 @@ const donationSchema = new mongoose.Schema(
     },
 
     // =====================================
+    // FOOD FRESHNESS ALERT
+    // =====================================
+
+    freshnessAlertSentAt: {
+      type: Date,
+      default: null,
+    },
+
+    // =====================================
     // PICKUP INFORMATION
     // =====================================
 
@@ -98,8 +107,15 @@ const donationSchema = new mongoose.Schema(
     // =====================================
 
     pickupLocation: {
-      lat: { type: Number, default: null },
-      lng: { type: Number, default: null },
+      lat: {
+        type: Number,
+        default: null,
+      },
+
+      lng: {
+        type: Number,
+        default: null,
+      },
     },
 
     coords: {
@@ -217,14 +233,25 @@ const donationSchema = new mongoose.Schema(
 
     statusHistory: [
       {
-        status: { type: String },
-        changedAt: { type: Date, default: Date.now },
+        status: {
+          type: String,
+        },
+
+        changedAt: {
+          type: Date,
+          default: Date.now,
+        },
+
         changedBy: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "User",
           default: null,
         },
-        note: { type: String, default: "" },
+
+        note: {
+          type: String,
+          default: "",
+        },
       },
     ],
 
@@ -373,7 +400,7 @@ const donationSchema = new mongoose.Schema(
     // FOOD VERIFICATION
     // =====================================
 
-        verification: {
+    verification: {
       scannedAt: {
         type: Date,
         default: null,
@@ -421,6 +448,20 @@ const donationSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// =====================================
+// FRESHNESS ALERT DATABASE INDEX
+// =====================================
+
+donationSchema.index({
+  pipelineStatus: 1,
+  bestBefore: 1,
+  freshnessAlertSentAt: 1,
+});
+
+// =====================================
+// EXPORT DONATION MODEL
+// =====================================
 
 module.exports = mongoose.model(
   "Donation",

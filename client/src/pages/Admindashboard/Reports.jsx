@@ -1,5 +1,5 @@
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   fetchAdvancedReports,
 } from "../../services/api";
@@ -11,14 +11,16 @@ const MONTHS = [
   "September", "October", "November", "December",
 ];
 
-const number = (value) => Number(value || 0).toLocaleString("en-US");
+const number = (value) =>
+  Number(value || 0).toLocaleString("en-US");
 
-const kg = (value) => `${Number(value || 0).toLocaleString("en-US", {
-  maximumFractionDigits: 2,
-})} kg`;
+const kg = (value) =>
+  `${Number(value || 0).toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+  })} kg`;
 
 const currencySafePercent = (value, total) =>
-  total > 0 ? Math.min((value / total) * 100, 100) : 0;
+  total > 0 ? Math.min((Number(value || 0) / total) * 100, 100) : 0;
 
 const Reports = () => {
   const currentYear = new Date().getFullYear();
@@ -40,12 +42,15 @@ const Reports = () => {
       );
 
       if (!data?.success) {
-        throw new Error(data?.message || "Reports could not be loaded.");
+        throw new Error(
+          data?.message || "Reports could not be loaded."
+        );
       }
 
       setReport(data);
     } catch (err) {
       console.error("Advanced reports error:", err);
+
       setError(
         err.response?.data?.message ||
         err.message ||
@@ -87,6 +92,7 @@ const Reports = () => {
     0
   );
 
+  // Export CSV Report
   const exportCSV = () => {
     if (!report) return;
 
@@ -124,10 +130,12 @@ const Reports = () => {
 
     const csv = rows
       .map((row) =>
-        row.map((cell) => {
-          const value = String(cell ?? "");
-          return `"${value.replace(/"/g, '""')}"`;
-        }).join(",")
+        row
+          .map((cell) => {
+            const value = String(cell ?? "");
+            return `"${value.replace(/"/g, '""')}"`;
+          })
+          .join(",")
       )
       .join("\n");
 
@@ -139,28 +147,34 @@ const Reports = () => {
     const link = document.createElement("a");
 
     link.href = url;
-    link.download = `feedlink-reports-${year}${month ? `-${month}` : ""}.csv`;
-    link.click();
+    link.download = `feedlink-reports-${year}${
+      month ? `-${month}` : ""
+    }.csv`;
 
+    link.click();
     URL.revokeObjectURL(url);
   };
 
   const maxDonor = Math.max(
     1,
-    ...(donor.topPerformers || []).map((item) => item.quantity || 0)
+    ...(donor.topPerformers || []).map(
+      (item) => Number(item.quantity) || 0
+    )
   );
 
   const maxNgo = Math.max(
     1,
-    ...(ngo.topPerformers || []).map((item) => item.completedQuantity || 0)
+    ...(ngo.topPerformers || []).map(
+      (item) => Number(item.completedQuantity) || 0
+    )
   );
 
   return (
     <div className="page reports-page">
+
+      {/* Header */}
       <div className="reports-hero">
         <div>
-          
-
           <h1>Analytics</h1>
 
           <p>
@@ -170,8 +184,6 @@ const Reports = () => {
         </div>
 
         <div className="reports-actions">
-          
-
           <button
             type="button"
             className="report-refresh-btn"
@@ -183,51 +195,78 @@ const Reports = () => {
         </div>
       </div>
 
+      {/* Report Filters */}
       <section className="report-filter-panel">
         <div>
-          <span className="filter-caption">REPORT PERIOD</span>
+          <span className="filter-caption">
+            REPORT PERIOD
+          </span>
+
           <h3>{selectedPeriod}</h3>
-          <p>All figures are calculated from database records.</p>
+
+          <p>
+            All figures are calculated from database records.
+          </p>
         </div>
 
         <div className="report-filter-controls">
           <label>
             <span>Year</span>
+
             <select
               value={year}
-              onChange={(event) => setYear(Number(event.target.value))}
+              onChange={(event) =>
+                setYear(Number(event.target.value))
+              }
             >
-              {Array.from({ length: 7 }, (_, index) => currentYear - 5 + index)
+              {Array.from(
+                { length: 7 },
+                (_, index) => currentYear - 5 + index
+              )
                 .reverse()
                 .map((item) => (
-                  <option key={item} value={item}>{item}</option>
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
                 ))}
             </select>
           </label>
 
           <label>
             <span>Month</span>
+
             <select
               value={month}
-              onChange={(event) => setMonth(event.target.value)}
+              onChange={(event) =>
+                setMonth(event.target.value)
+              }
             >
               <option value="">All months</option>
+
               {MONTHS.map((item, index) => (
-                <option key={item} value={index + 1}>{item}</option>
+                <option key={item} value={index + 1}>
+                  {item}
+                </option>
               ))}
             </select>
           </label>
         </div>
       </section>
 
+      {/* Error Message */}
       {error && (
         <div className="reports-error">
           <strong>Unable to load analytics</strong>
+
           <p>{error}</p>
-          <button onClick={loadReports}>Try again</button>
+
+          <button onClick={loadReports}>
+            Try again
+          </button>
         </div>
       )}
 
+      {/* Loading State */}
       {loading && !report ? (
         <div className="reports-loading">
           <span className="reports-spinner" />
@@ -235,11 +274,14 @@ const Reports = () => {
         </div>
       ) : report ? (
         <>
+
+          {/* Platform Overview */}
           <div className="report-section-heading">
             <div>
               <span>PLATFORM OVERVIEW</span>
               <h2>Performance at a glance</h2>
             </div>
+
             <small>{selectedPeriod}</small>
           </div>
 
@@ -248,7 +290,9 @@ const Reports = () => {
               icon="👥"
               label="Total Users"
               value={number(overall.totalUsers)}
-              note={`${number(overall.totalDonors)} Donors • ${number(overall.totalNgos)} NGOs`}
+              note={`${number(overall.totalDonors)} Donors • ${number(
+                overall.totalNgos
+              )} NGOs`}
               color="green"
             />
 
@@ -272,11 +316,14 @@ const Reports = () => {
               icon="🚚"
               label="Food Distributed"
               value={kg(overall.totalFoodDistributed)}
-              note={`${number(overall.completedDonations)} completed records`}
+              note={`${number(
+                overall.completedDonations
+              )} completed records`}
               color="purple"
             />
           </div>
 
+          {/* Donor and NGO Analytics */}
           <div className="report-section-heading">
             <div>
               <span>ORGANIZATION PERFORMANCE</span>
@@ -285,9 +332,12 @@ const Reports = () => {
           </div>
 
           <div className="report-role-grid">
+
+            {/* Donor Analytics */}
             <section className="report-panel role-panel donor-panel">
               <div className="role-panel-heading">
                 <div className="role-icon">🍽️</div>
+
                 <div>
                   <span>DONOR PERFORMANCE</span>
                   <h3>Donor Analytics</h3>
@@ -295,10 +345,25 @@ const Reports = () => {
               </div>
 
               <div className="role-metrics">
-                <Metric label="Registered Donors" value={number(donor.registered)} />
-                <Metric label="Donations Created" value={number(donor.donations)} />
-                <Metric label="Food Donated" value={kg(donor.quantity)} />
-                <Metric label="Completed Donations" value={number(donor.completed)} />
+                <Metric
+                  label="Registered Donors"
+                  value={number(donor.registered)}
+                />
+
+                <Metric
+                  label="Donations Created"
+                  value={number(donor.donations)}
+                />
+
+                <Metric
+                  label="Food Donated"
+                  value={kg(donor.quantity)}
+                />
+
+                <Metric
+                  label="Completed Donations"
+                  value={number(donor.completed)}
+                />
               </div>
 
               <div className="performer-heading">
@@ -314,9 +379,11 @@ const Reports = () => {
               />
             </section>
 
+            {/* NGO Analytics */}
             <section className="report-panel role-panel ngo-panel">
               <div className="role-panel-heading">
                 <div className="role-icon">🏢</div>
+
                 <div>
                   <span>NGO PERFORMANCE</span>
                   <h3>NGO Analytics</h3>
@@ -324,10 +391,25 @@ const Reports = () => {
               </div>
 
               <div className="role-metrics">
-                <Metric label="Registered NGOs" value={number(ngo.registered)} />
-                <Metric label="Received Donations" value={number(ngo.donations)} />
-                <Metric label="Food Received" value={kg(ngo.quantity)} />
-                <Metric label="Food Distributed" value={kg(ngo.completedQuantity)} />
+                <Metric
+                  label="Registered NGOs"
+                  value={number(ngo.registered)}
+                />
+
+                <Metric
+                  label="Received Donations"
+                  value={number(ngo.donations)}
+                />
+
+                <Metric
+                  label="Food Received"
+                  value={kg(ngo.quantity)}
+                />
+
+                <Metric
+                  label="Food Distributed"
+                  value={kg(ngo.completedQuantity)}
+                />
               </div>
 
               <div className="performer-heading">
@@ -344,6 +426,7 @@ const Reports = () => {
             </section>
           </div>
 
+          {/* Donation Trends Heading */}
           <div className="report-section-heading">
             <div>
               <span>DONATION TRENDS</span>
@@ -351,79 +434,138 @@ const Reports = () => {
             </div>
           </div>
 
-          <section className="report-panel chart-panel">
-            <div className="chart-heading">
-              <div>
-                <h3>Monthly food donation trend</h3>
-                <p>Food quantity recorded in each month of {year}</p>
+          {/* Monthly and Yearly Graphs Side by Side */}
+          <div className="report-trends-grid">
+
+            {/* Monthly Graph */}
+            <section className="report-panel chart-panel">
+              <div className="chart-heading">
+                <div>
+                  <h3>Monthly food donation trend</h3>
+
+                  <p>
+                    Food quantity recorded in each month of {year}
+                  </p>
+                </div>
+
+                <span className="chart-unit">KG</span>
               </div>
-              <span className="chart-unit">KG</span>
-            </div>
 
-            <div className="monthly-chart">
-              {monthly.map((item) => {
-                const height = currencySafePercent(item.quantity, maxMonthly);
+              <div className="monthly-chart">
+                {monthly.map((item) => {
+                  const height = currencySafePercent(
+                    item.quantity,
+                    maxMonthly
+                  );
 
-                return (
-                  <div className="monthly-chart-column" key={item.month}>
-                    <div className="monthly-chart-value">
-                      {item.quantity > 0 ? number(item.quantity) : ""}
+                  return (
+                    <div
+                      className="monthly-chart-column"
+                      key={item.month}
+                    >
+                      <div className="monthly-chart-value">
+                        {item.quantity > 0
+                          ? number(item.quantity)
+                          : ""}
+                      </div>
+
+                      <div className="monthly-chart-track">
+                        <div
+                          className={`monthly-chart-bar ${
+                            Number(month) === item.month
+                              ? "selected"
+                              : ""
+                          }`}
+                          style={{
+                            height: `${Math.max(
+                              height,
+                              item.quantity ? 3 : 0
+                            )}%`,
+                          }}
+                          title={`${item.label}: ${kg(
+                            item.quantity
+                          )}`}
+                        />
+                      </div>
+
+                      <span>{item.label}</span>
+
+                      <small>
+                        {number(item.donations)} donations
+                      </small>
                     </div>
-
-                    <div className="monthly-chart-track">
-                      <div
-                        className={`monthly-chart-bar ${
-                          Number(month) === item.month ? "selected" : ""
-                        }`}
-                        style={{ height: `${Math.max(height, item.quantity ? 3 : 0)}%` }}
-                        title={`${item.label}: ${kg(item.quantity)}`}
-                      />
-                    </div>
-
-                    <span>{item.label}</span>
-                    <small>{number(item.donations)} donations</small>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="report-panel chart-panel yearly-panel">
-            <div className="chart-heading">
-              <div>
-                <h3>Yearly growth overview</h3>
-                <p>Five-year comparison of food donation quantities</p>
+                  );
+                })}
               </div>
-              <span className="chart-unit">KG</span>
-            </div>
+            </section>
 
-            <div className="yearly-chart">
-              {yearly.map((item) => {
-                const height = currencySafePercent(item.quantity, maxYearly);
+            {/* Yearly Graph */}
+            <section className="report-panel chart-panel yearly-panel">
+              <div className="chart-heading">
+                <div>
+                  <h3>Yearly growth overview</h3>
 
-                return (
-                  <div className="yearly-chart-column" key={item.year}>
-                    <strong>{number(item.quantity)}</strong>
-                    <div className="yearly-chart-track">
-                      <div
-                        className="yearly-chart-bar"
-                        style={{ height: `${Math.max(height, item.quantity ? 3 : 0)}%` }}
-                      />
+                  <p>
+                    Five-year comparison of food donation quantities
+                  </p>
+                </div>
+
+                <span className="chart-unit">KG</span>
+              </div>
+
+              <div className="yearly-chart">
+                {yearly.map((item) => {
+                  const height = currencySafePercent(
+                    item.quantity,
+                    maxYearly
+                  );
+
+                  return (
+                    <div
+                      className="yearly-chart-column"
+                      key={item.year}
+                    >
+                      <strong>
+                        {number(item.quantity)}
+                      </strong>
+
+                      <div className="yearly-chart-track">
+                        <div
+                          className="yearly-chart-bar"
+                          style={{
+                            height: `${Math.max(
+                              height,
+                              item.quantity ? 3 : 0
+                            )}%`,
+                          }}
+                        />
+                      </div>
+
+                      <span>{item.year}</span>
+
+                      <small>
+                        {number(item.donations)} donations
+                      </small>
                     </div>
-                    <span>{item.year}</span>
-                    <small>{number(item.donations)} donations</small>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+                  );
+                })}
+              </div>
+            </section>
 
+          </div>
+
+          {/* Status and Comparison */}
           <div className="report-bottom-grid">
+
+            {/* Donation Status Breakdown */}
             <section className="report-panel">
               <div className="chart-heading">
                 <div>
                   <h3>Donation status breakdown</h3>
-                  <p>Distribution of donation pipeline statuses</p>
+
+                  <p>
+                    Distribution of donation pipeline statuses
+                  </p>
                 </div>
               </div>
 
@@ -434,20 +576,33 @@ const Reports = () => {
 
               <div className="status-list">
                 {statuses.map((item) => {
-                  const percent = currencySafePercent(item.count, totalStatus);
+                  const percent = currencySafePercent(
+                    item.count,
+                    totalStatus
+                  );
 
                   return (
-                    <div className="status-item" key={item.status}>
+                    <div
+                      className="status-item"
+                      key={item.status}
+                    >
                       <div>
                         <span>{item.status}</span>
-                        <strong>{number(item.count)} ({percent.toFixed(1)}%)</strong>
+
+                        <strong>
+                          {number(item.count)} (
+                          {percent.toFixed(1)}%)
+                        </strong>
                       </div>
+
                       <div className="status-track">
                         <div
                           className={`status-fill status-${item.status
                             .toLowerCase()
                             .replaceAll(" ", "-")}`}
-                          style={{ width: `${percent}%` }}
+                          style={{
+                            width: `${percent}%`,
+                          }}
                         />
                       </div>
                     </div>
@@ -456,64 +611,99 @@ const Reports = () => {
               </div>
             </section>
 
+            {/* Donor vs NGO Comparison */}
             <section className="report-panel comparison-panel">
               <div className="chart-heading">
                 <div>
                   <h3>Donor vs NGO comparison</h3>
-                  <p>Food contribution and distribution</p>
+
+                  <p>
+                    Food contribution and distribution
+                  </p>
                 </div>
               </div>
 
               <ComparisonRow
                 label="Donor contribution"
                 value={overall.totalFoodDonated}
-                max={Math.max(1, overall.totalFoodDonated, overall.totalFoodReceived)}
+                max={Math.max(
+                  1,
+                  overall.totalFoodDonated,
+                  overall.totalFoodReceived
+                )}
                 color="donor"
               />
 
               <ComparisonRow
                 label="NGO received food"
                 value={overall.totalFoodReceived}
-                max={Math.max(1, overall.totalFoodDonated, overall.totalFoodReceived)}
+                max={Math.max(
+                  1,
+                  overall.totalFoodDonated,
+                  overall.totalFoodReceived
+                )}
                 color="ngo"
               />
 
               <ComparisonRow
                 label="NGO distributed food"
                 value={overall.totalFoodDistributed}
-                max={Math.max(1, overall.totalFoodDonated, overall.totalFoodReceived)}
+                max={Math.max(
+                  1,
+                  overall.totalFoodDonated,
+                  overall.totalFoodReceived
+                )}
                 color="distributed"
               />
 
               <div className="comparison-note">
-                Donor contribution is based on created donations. NGO
-                distribution is based on completed donations assigned to an NGO.
+                Donor contribution is based on created donations.
+                NGO distribution is based on completed donations
+                assigned to an NGO.
               </div>
             </section>
           </div>
 
+          {/* Footer */}
           <div className="reports-footer">
             <span>FEEDLINK ANALYTICS</span>
-            <span>Report period: {selectedPeriod}</span>
+
+            <span>
+              Report period: {selectedPeriod}
+            </span>
           </div>
+
         </>
       ) : null}
     </div>
   );
 };
 
-const KpiCard = ({ icon, label, value, note, color }) => (
+
+// KPI Card Component
+const KpiCard = ({
+  icon,
+  label,
+  value,
+  note,
+  color,
+}) => (
   <div className={`report-kpi-card kpi-${color}`}>
     <div className="kpi-top">
       <span className="kpi-icon">{icon}</span>
       <span className="kpi-dot" />
     </div>
+
     <span className="kpi-label">{label}</span>
+
     <strong>{value}</strong>
+
     <small>{note}</small>
   </div>
 );
 
+
+// Metric Component
 const Metric = ({ label, value }) => (
   <div className="role-metric">
     <span>{label}</span>
@@ -521,23 +711,43 @@ const Metric = ({ label, value }) => (
   </div>
 );
 
-const PerformerList = ({ items, valueKey, maxValue, empty }) => {
+
+// Top Performer Component
+const PerformerList = ({
+  items,
+  valueKey,
+  maxValue,
+  empty,
+}) => {
   if (!items.length) {
-    return <div className="performer-empty">{empty}</div>;
+    return (
+      <div className="performer-empty">
+        {empty}
+      </div>
+    );
   }
 
   return (
     <div className="performer-list">
       {items.map((item, index) => (
-        <div className="performer-item" key={item.id}>
-          <div className="performer-rank">{index + 1}</div>
+        <div
+          className="performer-item"
+          key={item.id}
+        >
+          <div className="performer-rank">
+            {index + 1}
+          </div>
 
           <div className="performer-info">
             <strong>{item.name}</strong>
+
             <div className="performer-track">
               <div
                 style={{
-                  width: `${currencySafePercent(item[valueKey], maxValue)}%`,
+                  width: `${currencySafePercent(
+                    item[valueKey],
+                    maxValue
+                  )}%`,
                 }}
               />
             </div>
@@ -550,16 +760,26 @@ const PerformerList = ({ items, valueKey, maxValue, empty }) => {
   );
 };
 
-const ComparisonRow = ({ label, value, max, color }) => (
+
+// Comparison Component
+const ComparisonRow = ({
+  label,
+  value,
+  max,
+  color,
+}) => (
   <div className="comparison-row">
     <div>
       <span>{label}</span>
       <strong>{kg(value)}</strong>
     </div>
+
     <div className="comparison-track">
       <div
         className={`comparison-fill ${color}`}
-        style={{ width: `${currencySafePercent(value, max)}%` }}
+        style={{
+          width: `${currencySafePercent(value, max)}%`,
+        }}
       />
     </div>
   </div>
